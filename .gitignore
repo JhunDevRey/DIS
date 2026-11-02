@@ -1,0 +1,27 @@
+# Secrets — real values live only on the server / your machine
+config.php
+
+# Backups and deploy leftovers
+*.tar.gz
+*.sql.gz
+*.zip
+
+# Client uploads (local dev keeps them in ./uploads)
+uploads/
+
+# On the server admin/{api,css,js,images} and portal/{api,css,js,images} are
+# symlinks to the shared folders at the project root; never commit copies.
+admin/api/
+admin/css/
+admin/js/
+admin/images/
+portal/api/
+portal/css/
+portal/js/
+portal/images/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

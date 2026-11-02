@@ -1,0 +1,1904 @@
+/* =========================================================
+   Duque Immigration — Document Portal
+   Notion-inspired minimal design system: soft neutral surfaces,
+   quiet borders, generous whitespace, tinted (not solid) status
+   tags, and a light/dark theme pair driven entirely by CSS
+   custom properties — toggled at runtime via [data-theme] on
+   <html> (see js/ui-kit.js: initTheme() / toggleTheme()).
+
+   The sidebar is an intentional exception: it stays a fixed dark
+   "rail" in both themes (a common pattern in modern dashboards —
+   Linear, Vercel, Notion's own desktop chrome) and hosts the
+   theme toggle itself, so switching themes never hides the
+   switch that controls it.
+   ========================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+  /* ---- Fixed brand rail tokens (sidebar + solid dark elements) ----
+     Intentionally NOT theme-reactive — see note above. */
+  --ink-solid: #1B1B1D;
+  --ink-solid-hover: #2E2E31;
+  --on-ink: #FFFFFF;
+
+  /* ---- Brand accent ---- */
+  --gold: #DD0000;
+  --gold-dark: #B30000;
+  --gold-tint: rgba(221, 0, 0, .08);
+  --gold-tint-strong: rgba(221, 0, 0, .14);
+
+  /* ---- Danger ---- */
+  --maple: #9A1B1B;
+  --maple-tint: rgba(154, 27, 27, .08);
+  --maple-border: rgba(154, 27, 27, .28);
+
+  /* ---- Client-authored message highlight ---- */
+  --client-tint: rgba(221, 0, 0, .05);
+  --client-tint-border: rgba(221, 0, 0, .16);
+
+  /* ---- Status tags — soft tint + saturated text, Notion-tag style ---- */
+  --pending: #9B9A97;
+  --pending-tint: rgba(155, 154, 151, .16);
+  --received: #2483C5;
+  --received-tint: rgba(36, 131, 197, .12);
+  --revision: #C2760F;
+  --revision-tint: rgba(194, 118, 15, .13);
+  --accepted: #24886F;
+  --accepted-tint: rgba(36, 136, 111, .13);
+
+  /* ---- Class-taxonomy tag colors (admin/classes.php + case-type tags) —
+     deliberately a separate palette from the status colors above, so a
+     case-type tag next to a status pill never reads as the same signal. ---- */
+  --class-economic: #0B6E99;
+  --class-economic-tint: rgba(11, 110, 153, .12);
+  --class-family: #6940A5;
+  --class-family-tint: rgba(105, 64, 165, .12);
+  --class-work: #B0620A;
+  --class-work-tint: rgba(176, 98, 10, .12);
+  --class-study: #2A8C5A;
+  --class-study-tint: rgba(42, 140, 90, .12);
+  --class-visit: #B23F82;
+  --class-visit-tint: rgba(178, 63, 130, .12);
+  --class-lmia: #C13333;
+  --class-lmia-tint: rgba(193, 51, 51, .12);
+
+  /* ---- Application Review state (distinct hue from both the status
+     pills and the class tags, so a review badge never gets mistaken
+     for either) ---- */
+  --review: #5B4FC4;
+  --review-tint: rgba(91, 79, 196, .1);
+  --review-tint-strong: rgba(91, 79, 196, .28);
+
+  /* ---- Light theme surfaces (default) ---- */
+  --bg: #FFFFFF;
+  --card: #FFFFFF;
+  --surface-alt: #F7F7F5;
+  --surface-hover: #F0F0EE;
+  --line: #EAEAE8;
+  --line-strong: #DDDDDA;
+  --ink: #26251F;
+  --text: #2B2A26;
+  --text-muted: #86847E;
+  --slate: #55534C;
+  --slate-light: #86847E;
+
+  --radius: 10px;
+  --radius-sm: 8px;
+  --radius-lg: 16px;
+  --shadow: 0 1px 2px rgba(20,20,18,.04), 0 1px 6px rgba(20,20,18,.04);
+  --shadow-md: 0 10px 30px rgba(20,20,18,.10);
+  --font-display: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  /* ---- Unified transition timing ----
+     One single duration/easing used everywhere in the app, so every
+     hover, toggle, open/close, and state change moves at the same speed
+     and feels like one consistent piece of software. --ease-duration is
+     split out on its own (rather than baked only into --ease) for the
+     handful of places — modal backdrops, dropdown menus — that pair a
+     visible CSS transition with a zero-length, delayed `visibility`
+     swap, so that hidden delay can still line up with this same timing
+     without hardcoding the duration a second time in two places. */
+  --ease-duration: .3s;
+  --ease: var(--ease-duration) ease;
+  /* A snappier "pop" curve — overshoots slightly then settles — used
+     specifically for things that open/appear (dropdowns, modals), where
+     a plain linear ease reads as flat next to a modern app's UI chrome.
+     Regular hover/state transitions above keep using --ease as-is. */
+  --ease-pop: .28s cubic-bezier(0.16, 1, 0.3, 1);
+
+  color-scheme: light;
+}
+
+/* ---- Dark theme overrides ---- */
+[data-theme="dark"] {
+  --gold: #EF5D5D;
+  --gold-dark: #F58080;
+  --gold-tint: rgba(239, 93, 93, .14);
+  --gold-tint-strong: rgba(239, 93, 93, .22);
+
+  --maple: #F08A8A;
+  --maple-tint: rgba(240, 138, 138, .12);
+  --maple-border: rgba(240, 138, 138, .3);
+
+  --client-tint: rgba(239, 93, 93, .10);
+  --client-tint-border: rgba(239, 93, 93, .22);
+
+  --pending: #9B9A97;
+  --pending-tint: rgba(155, 154, 151, .16);
+  --received: #62AEEB;
+  --received-tint: rgba(98, 174, 235, .14);
+  --revision: #E3A155;
+  --revision-tint: rgba(227, 161, 85, .15);
+  --accepted: #5BBFA4;
+  --accepted-tint: rgba(91, 191, 164, .15);
+
+  --class-economic: #5FB3E0;
+  --class-economic-tint: rgba(95, 179, 224, .16);
+  --class-family: #B18AE0;
+  --class-family-tint: rgba(177, 138, 224, .16);
+  --class-work: #E5A24E;
+  --class-work-tint: rgba(229, 162, 78, .16);
+  --class-study: #6FC496;
+  --class-study-tint: rgba(111, 196, 150, .16);
+  --class-visit: #E28AB8;
+  --class-visit-tint: rgba(226, 138, 184, .16);
+  --class-lmia: #EB7373;
+  --class-lmia-tint: rgba(235, 115, 115, .18);
+
+  --review: #9089E0;
+  --review-tint: rgba(144, 137, 224, .16);
+  --review-tint-strong: rgba(144, 137, 224, .38);
+
+  --bg: #191919;
+  --card: #202020;
+  --surface-alt: #252525;
+  --surface-hover: #2C2C2C;
+  --line: #313131;
+  --line-strong: #3D3D3D;
+  --ink: #EDEDEC;
+  --text: #E3E2DF;
+  --text-muted: #8B8A87;
+  --slate: #C6C4C0;
+  --slate-light: #9E9C98;
+
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 1px 6px rgba(0,0,0,.3);
+  --shadow-md: 0 14px 34px rgba(0,0,0,.5);
+
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.5;
+  font-size: 14px;
+  transition: all var(--ease);
+}
+a { color: inherit; text-decoration: none; }
+button { font-family: inherit; cursor: pointer; }
+input, select, textarea { font-family: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+/* ---------- Layout shells ---------- */
+.app-shell { display: flex; min-height: 100vh; }
+
+.sidebar {
+  width: 224px;
+  flex-shrink: 0;
+  background: var(--ink-solid);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 16px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  align-self: flex-start;
+  overflow-y: auto;
+}
+.sidebar-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.mobile-nav-toggle {
+  display: none;
+  background: none; border: none; color: #fff;
+  font-size: 18px; padding: 4px 6px; flex-shrink: 0;
+}
+.sidebar-drawer { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.sidebar .brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-size: 15.5px;
+  font-weight: 700;
+  letter-spacing: -.2px;
+  margin-bottom: 4px;
+  line-height: 1.3;
+}
+/* Logo on a white tile so the maple leaf reads white on the dark sidebar. */
+.sidebar .brand-logo {
+  flex-shrink: 0;
+  width: 36px; height: 36px;
+  border-radius: 9px;
+  background: #fff;
+  display: inline-flex; align-items: center; justify-content: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,.3);
+}
+.sidebar .brand-logo img { width: 26px; height: 26px; display: block; }
+.sidebar .brand-text { min-width: 0; }
+.sidebar .brand small {
+  display: block;
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 600;
+  color: #8F8F94;
+  text-transform: uppercase;
+  letter-spacing: 1.3px;
+  margin-top: 4px;
+}
+.sidebar nav { margin-top: 26px; display: flex; flex-direction: column; gap: 2px; }
+.sidebar nav a {
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #ADADB2;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: all var(--ease);
+}
+.sidebar nav a i { width: 16px; text-align: center; color: #86868C; font-size: 13px; transition: all var(--ease); }
+.sidebar nav a:hover { background: rgba(255,255,255,.06); color: #fff; }
+.sidebar nav a:hover i { color: #fff; }
+.sidebar nav a.active { background: rgba(239,93,93,.16); color: #fff; font-weight: 600; }
+.sidebar nav a.active i { color: #F08080; }
+.nav-badge {
+  margin-left: auto; flex-shrink: 0;
+  min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: 999px; background: #E53E3E; color: #fff;
+  font-size: 10.5px; font-weight: 700; line-height: 18px; text-align: center;
+}
+.sidebar .spacer { flex: 1; }
+
+/* ---- Theme toggle switch (sidebar) ---- */
+.theme-toggle-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 10px;
+  margin-bottom: 4px;
+  font-size: 13px; font-weight: 500; color: #ADADB2;
+}
+.theme-toggle-row .theme-toggle-label { display: flex; align-items: center; gap: 10px; }
+.theme-toggle-row .theme-toggle-label i { width: 16px; text-align: center; color: #86868C; font-size: 13px; }
+.theme-switch {
+  position: relative;
+  width: 34px; height: 20px; flex-shrink: 0;
+  background: rgba(255,255,255,.14);
+  border: none; border-radius: 999px;
+  padding: 0; cursor: pointer;
+  transition: all var(--ease);
+}
+.theme-switch::before {
+  content: '';
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: #fff;
+  transition: all var(--ease);
+  box-shadow: 0 1px 3px rgba(0,0,0,.3);
+}
+[data-theme="dark"] .theme-switch { background: var(--gold); }
+[data-theme="dark"] .theme-switch::before { transform: translateX(14px); }
+
+.sidebar .user-box {
+  border-top: 1px solid rgba(255,255,255,.1);
+  padding-top: 14px;
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: #A8A8AD;
+}
+.sidebar .user-box .name { color: #fff; font-weight: 600; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.sidebar .user-box a { color: #F58080; font-weight: 600; display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+
+/* ---------- Stat / info boxes (dashboard) ---------- */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 22px;
+}
+.stat-box {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  transition: all var(--ease);
+  min-width: 0; /* allows this grid item to shrink below its content's natural
+                   width instead of overflowing its track — the standard fix
+                   for CSS Grid's default min-width:auto on grid items */
+}
+.stat-box > div:last-child { min-width: 0; }
+.stat-box:hover { box-shadow: var(--shadow-md); }
+.stat-box .stat-icon {
+  width: 36px; height: 36px; border-radius: var(--radius-sm);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; flex-shrink: 0; color: #fff;
+}
+.stat-box .stat-icon.tone-ink      { background: var(--ink-solid); }
+.stat-box .stat-icon.tone-pending  { background: var(--pending); }
+.stat-box .stat-icon.tone-received { background: var(--received); }
+.stat-box .stat-icon.tone-revision { background: var(--revision); }
+.stat-box .stat-icon.tone-accepted { background: var(--accepted); }
+/* Minimal accent — a thin top border rather than AdminLTE's thick left
+   stripe, echoing the tone without adding visual weight. */
+.stat-box-ink      { border-top: 2px solid var(--ink-solid); }
+.stat-box-pending  { border-top: 2px solid var(--pending); }
+.stat-box-received { border-top: 2px solid var(--received); }
+.stat-box-revision { border-top: 2px solid var(--revision); }
+.stat-box-accepted { border-top: 2px solid var(--accepted); }
+.stat-box .stat-value { font-family: var(--font-display); font-size: 21px; font-weight: 700; color: var(--ink); line-height: 1.1; }
+.stat-box .stat-label { font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .4px; margin-top: 3px; }
+
+.section-title {
+  font-family: var(--font-display);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink);
+  text-transform: uppercase;
+  letter-spacing: .3px;
+  margin: 22px 0 0;
+  padding: 12px 18px;
+  background: var(--surface-alt);
+  border: 1px solid var(--line);
+  border-bottom: none;
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+.section-title:first-child { margin-top: 0; }
+.section-title + .card {
+  border-radius: 0 0 var(--radius) var(--radius);
+  border-top: none;
+  box-shadow: none;
+}
+
+.dashboard-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+
+/* ---------- Client page: Documents Checklist / Application Review side by side ---------- */
+.client-columns {
+  display: grid;
+  /* auto-fit + minmax reflows on its own — two columns once there's room
+     for both at a reasonable width, one stacked column on a narrower
+     screen — no separate mobile breakpoint needed, same pattern already
+     used for .dashboard-columns above. */
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  gap: 24px;
+  align-items: start;
+}
+.client-column-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.client-column-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  color: var(--text-muted);
+  margin: 0 0 10px;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  padding: 30px 40px;
+}
+.main-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 22px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.main-header h1 {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -.2px;
+  margin: 0 0 4px;
+  color: var(--ink);
+}
+.main-header p { margin: 0; color: var(--text-muted); font-size: 13px; }
+
+/* ---------- Cards ---------- */
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  transition: all var(--ease);
+}
+.card + .card { margin-top: 14px; }
+.card-pad { padding: 18px 20px; }
+
+/* ---------- Buttons ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 9px 15px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .1px;
+  transition: all var(--ease);
+}
+.btn:active { transform: translateY(1px); }
+.btn-primary { background: var(--ink-solid); color: #fff; }
+.btn-primary:hover { background: var(--ink-solid-hover); }
+.btn-gold { background: var(--gold); color: #fff; }
+.btn-gold:hover { background: var(--gold-dark); }
+.btn-ghost { background: transparent; color: var(--slate); border: 1px solid var(--line); }
+.btn-ghost:hover { background: var(--surface-hover); border-color: var(--line-strong); }
+.btn-danger { background: var(--card); color: var(--maple); border: 1px solid var(--maple-border); }
+.btn-danger:hover { background: var(--maple-tint); }
+.btn-danger-solid { background: var(--maple); color: #fff; }
+.btn-danger-solid:hover { filter: brightness(.9); }
+.btn-sm { padding: 6px 11px; font-size: 12px; border-radius: 6px; }
+
+/* Screen-reader-only text — visually hidden but still announced by
+   assistive tech and still fully readable/updatable by JS (used for
+   button labels shown as icon-only buttons, where the real label lives
+   in the title attribute for sighted hover users instead). */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Icon-only buttons (doc-actions' Upload/Remove field) — compact and
+   square, so they can never wrap into multi-line button text no matter
+   how narrow their column gets, which is exactly what a very long
+   uploaded filename was doing to them before. The title attribute
+   carries the label as a native hover tooltip. */
+.icon-btn-tooltip {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.icon-btn-tooltip i { font-size: 13px; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ---------- Forms ---------- */
+.field { margin-bottom: 15px; }
+.field label {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  margin-bottom: 6px;
+}
+.field input[type=text],
+.field input[type=email],
+.field input[type=password],
+.field input[type=date],
+.field select,
+.field textarea {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-size: 13.5px;
+  background: var(--card);
+  color: var(--text);
+  transition: all var(--ease);
+}
+.field textarea { resize: vertical; min-height: 70px; }
+.field input:focus, .field select:focus, .field textarea:focus {
+  border-color: var(--gold);
+}
+
+/* ---------- Live-while-typing link editor (contenteditable stand-in for a textarea) ---------- */
+.live-link-editor {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-size: 13.5px;
+  font-family: inherit;
+  line-height: 1.5;
+  background: var(--card);
+  color: var(--text);
+  min-height: 70px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  transition: all var(--ease);
+}
+.live-link-editor:focus { outline: none; border-color: var(--gold); }
+.live-link-editor:empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-muted);
+}
+/* Comment boxes and checklist notes are shorter, single/few-line fields — match their original min-height instead of the general field one above. */
+.comment-form .live-link-editor { min-height: 20px; flex: 1; }
+.ci-instructions + .live-link-editor { min-height: 46px; }
+.live-link-editor .live-link {
+  display: inline;
+  color: var(--gold);
+}
+.live-link-editor .live-link a {
+  color: inherit;
+  text-decoration: underline;
+  pointer-events: none; /* clicking edits text, not navigates, while still composing */
+}
+
+.field-row { display: flex; gap: 12px; }
+.field-row .field { flex: 1; }
+.checkbox-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text); }
+
+.help-text { font-size: 11.5px; color: var(--text-muted); margin-top: 4px; }
+.error-text { font-size: 12.5px; color: var(--maple); margin-top: 8px; }
+
+/* ---------- Status pills — soft tint + saturated text, Notion-tag style ---------- */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .2px;
+  white-space: nowrap;
+}
+.status-pending  { background: var(--pending-tint);  color: var(--pending); }
+.status-received { background: var(--received-tint); color: var(--received); }
+.status-revision { background: var(--revision-tint); color: var(--revision); }
+.status-accepted { background: var(--accepted-tint); color: var(--accepted); }
+
+/* Application Review states — distinct from the ordinary upload/accept
+   pill colors above, since these describe the client's response to a
+   staff-provided form rather than an upload's own lifecycle. */
+.status-review-pending   { background: var(--review-tint);           color: var(--review); }
+.status-review-confirmed { background: var(--accepted-tint);         color: var(--accepted); }
+.status-review-flagged   { background: var(--revision-tint);         color: var(--revision); }
+
+/* ---------- Class tags (case-type taxonomy) — rounded-rect, not full
+   pill, so they read visually distinct from the round status pills above
+   even though the pattern (tint bg + matching text) is the same. ---------- */
+.class-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.class-tag-economic { background: var(--class-economic-tint); color: var(--class-economic); }
+.class-tag-family   { background: var(--class-family-tint);   color: var(--class-family); }
+.class-tag-work      { background: var(--class-work-tint);     color: var(--class-work); }
+.class-tag-study     { background: var(--class-study-tint);    color: var(--class-study); }
+.class-tag-visit     { background: var(--class-visit-tint);    color: var(--class-visit); }
+.class-tag-lmia      { background: var(--class-lmia-tint);     color: var(--class-lmia); }
+.class-tag-other     { background: var(--surface-hover);       color: var(--text-muted); }
+
+/* Class filter bar (Clients list) — same taxonomy/colors as .class-tag,
+   but interactive tabs instead of a static label. Reuses the existing
+   --class-* variables so each active tab's color (and dark mode) stays
+   in sync with the tag colors automatically, with no separate palette
+   to keep in step. */
+.class-filter-bar { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 18px; }
+.class-filter-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 600; font-family: inherit;
+  border: 1px solid var(--line); background: var(--card); color: var(--text-muted);
+  cursor: pointer; transition: all var(--ease);
+}
+.class-filter-btn:hover { background: var(--surface-hover); color: var(--ink); }
+.class-filter-btn .count {
+  font-size: 11px; font-weight: 700; line-height: 1;
+  background: var(--surface-alt); color: var(--text-muted);
+  border-radius: 999px; padding: 3px 7px;
+}
+.class-filter-btn.active { border-color: transparent; background: var(--surface-hover); color: var(--ink); }
+.class-filter-btn[data-class="economic"].active { background: var(--class-economic-tint); color: var(--class-economic); }
+.class-filter-btn[data-class="family"].active   { background: var(--class-family-tint);   color: var(--class-family); }
+.class-filter-btn[data-class="work"].active      { background: var(--class-work-tint);     color: var(--class-work); }
+.class-filter-btn[data-class="study"].active     { background: var(--class-study-tint);    color: var(--class-study); }
+.class-filter-btn[data-class="visit"].active     { background: var(--class-visit-tint);    color: var(--class-visit); }
+.class-filter-btn[data-class="lmia"].active      { background: var(--class-lmia-tint);     color: var(--class-lmia); }
+
+select.status-select {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--card);
+  color: var(--text);
+}
+
+/* ---------- Status dropdown (replaces the old native <select> so it can
+   share the same animated, modern dropdown look as everything else) ---------- */
+.status-dropdown { position: relative; display: inline-block; }
+.status-dropdown-toggle {
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.status-dropdown-toggle i { font-size: 9px; transition: transform var(--ease); }
+.status-dropdown-toggle:hover { filter: brightness(0.95); }
+[data-theme="dark"] .status-dropdown-toggle:hover { filter: brightness(1.2); }
+.status-dropdown-toggle.open i { transform: rotate(180deg); }
+.status-dropdown-menu {
+  left: auto;
+  right: 0;
+  min-width: 170px;
+}
+
+/* ---------- Tables / lists — AdminLTE4/Bootstrap5-inspired: a crisp
+   double-weight rule under the header to separate it clearly from the
+   body, comfortable row padding, and a quiet accent-bar-on-hover instead
+   of just a flat background swap, without going back to heavy zebra
+   striping (a deliberate, more minimal choice made earlier). ---------- */
+table { width: 100%; border-collapse: collapse; }
+thead { background: var(--surface-alt); }
+th {
+  text-align: left;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  color: var(--text-muted);
+  font-weight: 700;
+  padding: 13px 16px;
+  border-bottom: 2px solid var(--line-strong);
+}
+/* Rounds the header to match whatever rounded card usually wraps a
+   table, so corners never poke square out of a rounded container. */
+thead tr:first-child th:first-child { border-top-left-radius: var(--radius); }
+thead tr:first-child th:last-child { border-top-right-radius: var(--radius); }
+
+td { padding: 14px 16px; border-bottom: 1px solid var(--line); font-size: 13.5px; vertical-align: middle; transition: all var(--ease); }
+tr:last-child td { border-bottom: none; }
+tbody tr:last-child td:first-child { border-bottom-left-radius: var(--radius); }
+tbody tr:last-child td:last-child { border-bottom-right-radius: var(--radius); }
+
+tr.row-link { cursor: pointer; position: relative; transition: all var(--ease); }
+tr.row-link td:first-child { position: relative; }
+tr.row-link td:first-child::before {
+  /* A quiet left accent bar that grows in on hover — a modern touch
+     lifted from AdminLTE4/admin-dashboard table conventions, subtler
+     than a full-row background flash. */
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 0;
+  background: var(--gold);
+  transition: width var(--ease);
+}
+tr.row-link:hover { background: var(--surface-hover); }
+tr.row-link:hover td:first-child::before { width: 3px; }
+
+@media (max-width: 700px) {
+  table.responsive-table thead { display: none; }
+  table.responsive-table, table.responsive-table tbody,
+  table.responsive-table tr, table.responsive-table td {
+    display: block; width: 100%;
+  }
+  table.responsive-table tr {
+    border: 1px solid var(--line); border-radius: var(--radius);
+    margin-bottom: 10px; padding: 12px 14px;
+    background: var(--card); box-shadow: var(--shadow);
+  }
+  table.responsive-table td {
+    border-bottom: none; padding: 7px 0;
+  }
+  table.responsive-table td:first-child { padding-top: 0; }
+  table.responsive-table td:last-child { padding-bottom: 0; }
+  table.responsive-table td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .4px; color: var(--text-muted); margin-bottom: 4px;
+  }
+}
+
+.avatar {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: var(--ink-solid); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12.5px; font-weight: 700; flex-shrink: 0;
+}
+
+/* ---------- Document checklist rail (signature element) ---------- */
+.doc-rail {
+  display: flex;
+  flex-direction: column;
+  /* Establishes a query container so .doc-item below can respond to its
+     own available width — auto-adapting whether it's rendered in the
+     full main content area, a narrower modal, a tablet split-view, or a
+     phone — rather than reacting to the whole page's viewport width the
+     way a plain @media query would. This is what actually makes the
+     checklist layout "auto" across Mobile/Tab/iPad/Desktop instead of
+     just having two hard breakpoints. */
+  container-type: inline-size;
+  container-name: doc-rail;
+}
+.doc-item {
+  display: grid;
+  grid-template-columns: 26px 1fr auto;
+  gap: 13px;
+  padding: 16px 4px;
+  border-bottom: 1px solid var(--line);
+  align-items: start;
+}
+.doc-item:last-child { border-bottom: none; }
+/* Grid items default to min-width:auto (their content's natural size),
+   not 0 — meaning a long, unwrapped filename inside the middle column
+   could still force that column (and everything else in the row,
+   including the actions buttons) wider than intended, even though the
+   filename itself is styled to truncate with an ellipsis. That
+   truncation only actually applies once the column's own minimum size
+   stops being dictated by the content it contains — this is what
+   fixes that. */
+.doc-item > div:not(.doc-marker):not(.doc-actions) { min-width: 0; }
+.doc-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+/* ---- Auto-layout tiers for the checklist rail, keyed off the rail's own
+   width via the container query above — not the viewport. This means it
+   reflows correctly no matter what's surrounding it: the full-width admin
+   page, an iPad in split-view, a phone, or a narrower future layout,
+   without needing a matching device-specific breakpoint added by hand
+   each time. ---- */
+
+/* Tablet / narrower desktop split-view: marker + name/instructions still
+   side by side, but actions move below as a compact wrapping row instead
+   of the full-height sidebar column — there's not quite enough width for
+   both comfortably, but plenty of width for the actions to wrap instead
+   of stacking full-height. */
+@container doc-rail (max-width: 640px) {
+  .doc-item { grid-template-columns: 22px 1fr; }
+  .doc-item .doc-actions {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: stretch;
+    margin-top: 12px;
+  }
+}
+
+/* Phone-width: same stacked layout as tablet, but each action now goes
+   full-width for a properly-sized tap target instead of a compact
+   wrapped chip — this is the one tier where thumb reach matters more
+   than density. */
+@container doc-rail (max-width: 420px) {
+  .doc-item .doc-actions .btn,
+  .doc-item .doc-actions select,
+  .doc-item .doc-actions label.btn {
+    flex: 1 1 auto;
+    min-width: 130px;
+    justify-content: center;
+  }
+}
+.doc-marker {
+  width: 24px; height: 24px; border-radius: 50%;
+  border: 1.5px solid var(--line-strong);
+  display: flex; align-items: center; justify-content: center;
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--surface-alt);
+}
+.doc-item[data-status="accepted"] .doc-marker { border-color: var(--accepted); color: #fff; background: var(--accepted); }
+.doc-item[data-status="received"] .doc-marker { border-color: var(--received); color: var(--received); background: var(--received-tint); }
+.doc-item[data-status="needs_revision"] .doc-marker { border-color: var(--revision); color: #fff; background: var(--revision); }
+
+.doc-name { font-weight: 700; font-size: 14px; color: var(--ink); letter-spacing: -.1px; }
+.doc-instructions { font-size: 12.5px; color: var(--text-muted); margin-top: 3px; overflow-wrap: anywhere; word-break: break-word; }
+.doc-instructions a { color: var(--gold); text-decoration: underline; transition: all var(--ease); overflow-wrap: anywhere; word-break: break-word; }
+.doc-instructions a:hover { color: var(--gold-dark); }
+
+/* ---------- Editable links (hover pencil + edit popup) ---------- */
+.editable-link { position: relative; display: inline; }
+.edit-link-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; margin-left: 3px;
+  border: none; background: var(--surface-hover); color: var(--slate);
+  border-radius: 50%; font-size: 9px; cursor: pointer;
+  opacity: 0; transform: translateY(1px);
+  transition: all var(--ease);
+  vertical-align: middle;
+}
+.editable-link:hover .edit-link-btn,
+.edit-link-btn:focus { opacity: 1; }
+.edit-link-btn:hover { background: var(--gold); color: #fff; }
+@media (max-width: 860px), (hover: none) {
+  /* No hover on touch devices — keep the pencil reachable at all times. */
+  .edit-link-btn { opacity: 1; }
+}
+
+.link-edit-popup {
+  position: fixed;
+  z-index: 200;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  padding: 10px;
+  width: 300px;
+  display: none;
+}
+.link-edit-popup.open { display: block; }
+.link-edit-popup-field {
+  display: flex; align-items: center; gap: 8px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  padding: 7px 10px; margin-bottom: 8px;
+}
+.link-edit-popup-field:last-of-type { margin-bottom: 10px; }
+.link-edit-popup-field i { color: var(--text-muted); font-size: 12px; flex-shrink: 0; }
+.link-edit-popup-field input {
+  border: none; outline: none; flex: 1; font-size: 13px; color: var(--text); min-width: 0;
+  background: transparent;
+}
+.link-edit-popup-actions { display: flex; justify-content: flex-end; align-items: center; gap: 12px; }
+.link-edit-popup-remove { font-size: 12.5px; color: var(--maple); background: none; border: none; cursor: pointer; margin-right: auto; }
+.link-edit-popup-remove:hover { text-decoration: underline; }
+.link-edit-popup-apply { font-size: 13px; font-weight: 700; color: var(--gold); background: none; border: none; cursor: pointer; }
+.link-edit-popup-apply:hover { color: var(--gold-dark); }
+.link-edit-popup-apply:disabled { color: var(--text-muted); cursor: default; }
+
+.doc-meta { display: flex; gap: 10px; align-items: center; margin-top: 9px; flex-wrap: wrap; }
+
+.file-chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--surface-alt); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); padding: 6px 10px; font-size: 12px;
+  color: var(--slate);
+}
+.file-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: var(--surface-alt); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); padding: 8px 12px; margin-bottom: 6px;
+}
+.file-row .file-select-checkbox { flex-shrink: 0; width: 16px; height: 16px; cursor: pointer; accent-color: var(--gold); }
+.file-number {
+  flex-shrink: 0;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--ink-solid); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700;
+}
+
+.multi-select-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 4px 2px 8px;
+}
+.multi-select-bar .select-all-label {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--text); font-weight: 500; cursor: pointer;
+}
+.multi-select-bar .select-all-label input { cursor: pointer; accent-color: var(--gold); }
+.multi-select-bar .multi-select-count {
+  font-size: 11.5px; color: var(--text-muted); font-weight: 600;
+  margin-left: auto; margin-right: 10px;
+}
+.file-row .file-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.file-row .file-name { font-size: 12.5px; font-weight: 600; color: var(--slate); overflow-wrap: anywhere; word-break: break-word; transition: all var(--ease); }
+.file-row .file-name:hover { color: var(--gold); }
+.file-actions {
+  display: flex; gap: 4px; flex-shrink: 0;
+  opacity: 0; transform: translateX(4px);
+  transition: all var(--ease);
+  pointer-events: none;
+}
+.file-row:hover .file-actions,
+.file-row:focus-within .file-actions { opacity: 1; transform: translateX(0); pointer-events: auto; }
+
+/* Collapses files beyond the 5th in a single checklist item, so a
+   client who uploaded 12 pages one at a time doesn't turn one document
+   request into a wall of rows. */
+.file-list-extra { display: contents; }
+.file-list-extra[hidden] { display: none; }
+.file-list-toggle {
+  display: flex; align-items: center; gap: 6px;
+  width: 100%; margin-top: 2px; padding: 7px 0;
+  background: none; border: none; cursor: pointer;
+  font-size: 12.5px; font-weight: 600; color: var(--text-muted);
+  transition: color var(--ease);
+}
+.file-list-toggle:hover { color: var(--gold); }
+.file-list-toggle i { font-size: 10px; transition: transform var(--ease); }
+.file-list-toggle.open i { transform: rotate(180deg); }
+
+@media (max-width: 860px), (hover: none) {
+  /* Touchscreens have no hover state, so hover-revealed actions would be
+     permanently invisible and unreachable — show them always instead. */
+  .file-actions { opacity: 1; transform: none; pointer-events: auto; }
+}
+.icon-btn {
+  width: 27px; height: 27px; border-radius: var(--radius-sm);
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--line); background: var(--card); color: var(--slate);
+  font-size: 12px; flex-shrink: 0;
+  transition: all var(--ease);
+}
+.icon-btn:hover { background: var(--surface-hover); color: var(--gold); }
+.icon-btn.icon-btn-danger { color: var(--maple); }
+.icon-btn.icon-btn-danger:hover { background: var(--maple-tint); border-color: var(--maple-border); }
+
+/* ---------- Password cell (clients table) ---------- */
+.password-cell { display: flex; align-items: center; gap: 6px; }
+.password-cell .password-value {
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-size: 12.5px; color: var(--ink); letter-spacing: .3px;
+  min-width: 90px;
+}
+
+/* ---------- Search bar ---------- */
+.search-bar { position: relative; max-width: 320px; margin-bottom: 14px; }
+.search-bar i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 12px; }
+.search-bar input {
+  width: 100%; padding: 8px 12px 8px 32px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  font-size: 13px; background: var(--card); color: var(--text);
+  transition: all var(--ease);
+}
+.search-bar input:focus { border-color: var(--gold); }
+
+/* ---------- Combobox (e.g. Client No.: dropdown pick + free typing) ---------- */
+.combo-field { position: relative; }
+.combo-field input[type=text] { padding-right: 34px; }
+.combo-toggle {
+  position: absolute; right: 1px; top: 1px; bottom: 1px;
+  width: 32px; border: none; background: transparent;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-muted); cursor: pointer; border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  transition: all var(--ease);
+}
+.combo-toggle:hover { color: var(--gold); }
+.combo-dropdown { width: 100%; max-height: 240px; }
+.combo-dropdown .dropdown-item { display: flex; justify-content: space-between; gap: 8px; }
+.combo-dropdown .dropdown-item .in-use-tag { color: var(--text-muted); font-weight: 400; font-size: 11.5px; }
+
+/* ---------- Comments ---------- */
+.comment-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 6px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--slate);
+  margin-top: 9px;
+}
+.comment-toggle:hover { color: var(--gold); }
+.comment-toggle .chevron { transition: all var(--ease); font-size: 9px; }
+.comment-toggle.open .chevron { transform: rotate(90deg); }
+
+/* ---- Comments section — smooth expand/collapse ----
+   display:none/block (the old approach) can't be transitioned at all —
+   content just snaps open/shut instantly. CSS Grid's grid-template-rows
+   0fr → 1fr is the standard trick for animating something to its real
+   "auto" height without needing JS to measure pixels: the outer element
+   becomes a single-row grid track that itself animates, and the one
+   inner wrapper (.comment-section-inner) clips to that track via
+   overflow:hidden. Needs that one inner wrapper specifically — a grid
+   with multiple un-wrapped children wouldn't all share the same
+   animating row track. */
+.comment-section {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--ease-pop);
+}
+.comment-section.open { grid-template-rows: 1fr; }
+.comment-section-inner {
+  overflow: hidden;
+  min-height: 0; /* grid items default to min-height:auto, which quietly defeats the 0fr collapse */
+  margin-top: 4px;
+}
+
+.comment-list { display: flex; flex-direction: column; gap: 9px; margin-top: 11px; }
+.comment-resolve-row { display: flex; justify-content: flex-end; margin-top: 8px; }
+.comment {
+  background: var(--surface-alt);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-size: 13px;
+}
+.comment.from-client { background: var(--client-tint); border-color: var(--client-tint-border); }
+.comment .comment-head {
+  display: flex; justify-content: space-between;
+  font-size: 10.5px; color: var(--text-muted); margin-bottom: 4px;
+  font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
+}
+.comment-delete-btn {
+  border: none; background: none; color: var(--text-muted);
+  font-size: 10.5px; cursor: pointer; margin-left: 6px;
+  transition: all var(--ease);
+}
+.comment-delete-btn:hover { color: var(--maple); }
+.comment a {
+  color: var(--gold);
+  text-decoration: underline;
+  word-break: break-all;
+  transition: all var(--ease);
+}
+.comment a:hover { color: var(--gold-dark); }
+.comment-form { display: flex; gap: 8px; margin-top: 11px; align-items: flex-end; }
+.comment-form textarea { flex: 1; min-height: 40px; }
+.comment-attach-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; flex-shrink: 0;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--card); color: var(--slate); cursor: pointer;
+  transition: all var(--ease);
+}
+.comment-attach-btn:hover { background: var(--surface-alt); color: var(--gold); }
+.comment-attach-preview {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 6px; font-size: 12px; color: var(--text-muted);
+  background: var(--surface-alt); border-radius: var(--radius-sm); padding: 5px 10px;
+}
+.comment-attach-preview button {
+  border: none; background: none; color: var(--maple); cursor: pointer;
+  font-size: 11px; margin-left: auto;
+}
+.ci-attach-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; flex-shrink: 0;
+  border: none; background: none; color: var(--slate); cursor: pointer;
+  border-radius: var(--radius-sm); transition: all var(--ease);
+}
+.ci-attach-btn:hover { background: var(--surface-alt); color: var(--gold); }
+.ci-attach-preview {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 6px; font-size: 11.5px; color: var(--text-muted);
+  background: var(--surface-alt); border-radius: var(--radius-sm); padding: 4px 9px;
+}
+.ci-attach-preview button {
+  border: none; background: none; color: var(--maple); cursor: pointer;
+  font-size: 10px; margin-left: auto;
+}
+
+/* File uploader attribution line */
+.file-meta { font-size: 11.5px; color: var(--text-muted); margin-top: 3px; }
+
+/* ---------- Application Review action bar (client portal) ---------- */
+.review-banner {
+  display: flex; align-items: flex-start; gap: 10px;
+  background: var(--review-tint); border: 1px solid var(--review-tint-strong);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px; margin-top: 10px; font-size: 12.5px; color: var(--text);
+}
+.review-banner i { color: var(--review); margin-top: 2px; flex-shrink: 0; }
+.review-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.review-flag-form { display: none; margin-top: 10px; }
+.review-flag-form.open { display: block; }
+.review-flag-form textarea {
+  width: 100%; min-height: 60px; padding: 9px 12px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  font-size: 13px; font-family: inherit; background: var(--card); color: var(--text);
+  resize: vertical;
+}
+.review-flag-form .review-flag-actions { display: flex; gap: 8px; margin-top: 8px; justify-content: flex-end; }
+.review-outcome {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 10px; font-size: 12.5px; font-weight: 600;
+}
+.review-outcome.confirmed { color: var(--accepted); }
+.review-outcome.flagged { color: var(--revision); }
+
+/* ---------- Auth screens (client + admin login) ----------
+   Deliberately theme-independent — a fixed brand splash regardless
+   of the app's light/dark setting, same as most product logins. */
+.auth-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, #1B1B1D 0%, #2A1414 55%, #52525B 100%);
+  padding: 20px;
+}
+.auth-card {
+  width: 100%;
+  max-width: 380px;
+  background: #fff;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 60px rgba(0,0,0,.28);
+  padding: 32px 30px;
+  border-top: 3px solid var(--gold);
+}
+.auth-card .auth-logo { display: block; width: 56px; height: 56px; margin-bottom: 14px; }
+.auth-card .brand-mark {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -.2px;
+  color: #1B1B1D;
+  margin-bottom: 2px;
+}
+.auth-card .brand-sub {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  font-weight: 600;
+  color: #86847E;
+  margin-bottom: 24px;
+}
+.auth-card .btn { width: 100%; justify-content: center; padding: 11px; font-size: 13.5px; }
+
+/* ---------- Empty state ---------- */
+.empty-state {
+  text-align: center;
+  padding: 44px 20px;
+  color: var(--text-muted);
+}
+.empty-state .icon { font-size: 28px; margin-bottom: 10px; }
+
+/* ---------- Pagination ---------- */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 16px;
+}
+.pagination-info { font-size: 12.5px; font-weight: 600; color: var(--text-muted); min-width: 90px; text-align: center; }
+
+/* ---------- File viewer (view_file.php — opened in a new tab) ----------
+   A lean, standalone shell (no sidebar) that embeds the file inline via
+   an <iframe> rather than navigating directly to the raw file. Sidestepping
+   the browser/OS's own "open vs. download" default handling this way is
+   what actually makes preview reliable across Safari and Chrome on macOS —
+   server response headers alone (Content-Disposition: inline, correct
+   Content-Length) can still get overridden by a browser's or OS's own
+   file-handling preference on a top-level navigation, but an iframe'd
+   sub-resource consistently renders with the browser's built-in viewer
+   regardless of that setting. */
+html.file-viewer-html, .file-viewer-html body { height: 100%; margin: 0; }
+.file-viewer-shell { display: flex; flex-direction: column; height: 100vh; }
+.file-viewer-header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 12px 18px;
+  background: var(--card); border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.file-viewer-name {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13.5px; font-weight: 600; color: var(--ink);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.file-viewer-frame { flex: 1; width: 100%; border: none; background: var(--surface-alt); }
+.adobe-dc-view-shell {
+  /* SIZED_CONTAINER mode (used for Application Review PDFs) needs its
+     container to have a real, measured height at the moment Adobe's SDK
+     calls previewFile() — flex:1 alone (matching .file-viewer-frame
+     above, the plain iframe viewer, which is proven to size correctly
+     in this exact layout) gives it one. Deliberately NOT also setting
+     height:100% here — pairing flex:1 (which sets flex-basis:0%) with
+     an explicit height on the same axis is a known source of a
+     zero-height flex item in some browsers, which would explain Adobe's
+     viewer measuring nothing to render into. */
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  background: var(--surface-alt);
+}
+.file-viewer-trouble-hint {
+  flex-shrink: 0;
+  padding: 9px 18px;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--surface-alt);
+  border-top: 1px solid var(--line);
+  text-align: center;
+}
+.file-viewer-trouble-hint a { color: var(--gold); text-decoration: underline; }
+.file-viewer-trouble-hint a:hover { color: var(--gold-dark); }
+.file-viewer-fallback {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px; text-align: center; padding: 40px 20px; color: var(--text-muted);
+}
+.file-viewer-fallback .icon { font-size: 40px; color: var(--text-muted); }
+.file-viewer-fallback p { margin: 0; font-size: 14px; max-width: 360px; }
+
+/* PDF.js canvas-based preview — renders pages as <canvas> instead of
+   letting the browser open the PDF natively, so no browser/extension
+   PDF handling is ever invoked (see js/pdf-preview.js for why). */
+.pdfjs-toolbar, .image-viewer-toolbar {
+  flex-shrink: 0; display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; padding: 7px 12px; font-size: 12px; font-weight: 600; color: var(--text-muted);
+  background: var(--card); border-bottom: 1px solid var(--line);
+}
+.viewer-zoom-controls { display: flex; align-items: center; gap: 4px; }
+.viewer-zoom-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: var(--radius-sm);
+  border: 1px solid var(--line); background: var(--surface-alt); color: var(--text-muted);
+  cursor: pointer; font-size: 11px; transition: all var(--ease);
+}
+.viewer-zoom-btn:hover:not(:disabled) { background: var(--gold-tint); color: var(--gold); border-color: var(--gold-tint-strong); }
+.viewer-zoom-btn:disabled { opacity: .4; cursor: not-allowed; }
+.viewer-zoom-label { min-width: 42px; text-align: center; font-variant-numeric: tabular-nums; }
+.pdfjs-viewer-shell {
+  flex: 1; min-height: 0; position: relative;
+  overflow-y: auto; overflow-x: hidden;
+  background: var(--surface-alt);
+  display: flex; flex-direction: column; align-items: center;
+  gap: 14px; padding: 18px 0 36px;
+}
+.pdfjs-page { box-shadow: 0 1px 4px rgba(0,0,0,.18); background: #fff; border-radius: 2px; }
+.file-viewer-status {
+  display: none; position: absolute; top: 18px; left: 16px; right: 16px;
+  text-align: center; font-size: 13px; color: var(--text-muted);
+}
+.file-viewer-status.is-error { color: var(--revision); font-weight: 600; }
+
+/* Image preview — plain <img>, with js/image-preview.js driving zoom
+   via inline width (letting CSS's max-width/max-height handle the
+   default "fit the panel" state so it stays responsive at 100%). */
+.image-viewer-shell {
+  flex: 1; min-height: 0; overflow: auto;
+  background: var(--surface-alt);
+  display: flex; align-items: center; justify-content: center;
+  padding: 18px;
+}
+.image-viewer-shell.is-zoomed { cursor: grab; align-items: flex-start; justify-content: flex-start; }
+.image-viewer-shell.is-dragging { cursor: grabbing; }
+.image-viewer-img {
+  max-width: 100%; max-height: 100%;
+  box-shadow: 0 1px 4px rgba(0,0,0,.18); background: #fff;
+  border-radius: 2px; user-select: none;
+}
+
+/* ---------- Toast ---------- */
+#toast {
+  position: fixed; bottom: 24px; right: 24px;
+  background: var(--ink-solid); color: #fff;
+  padding: 11px 17px; border-radius: var(--radius-sm);
+  font-size: 13px; font-weight: 500;
+  box-shadow: var(--shadow-md);
+  opacity: 0; transform: translateY(10px);
+  transition: all var(--ease);
+  pointer-events: none; z-index: 999;
+}
+#toast.show { opacity: 1; transform: translateY(0); }
+#toast.error { background: var(--maple); }
+
+/* ---------- Dropdown menu ---------- */
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 250px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 6px rgba(20,20,18,.05), 0 12px 32px rgba(20,20,18,.14);
+  padding: 6px;
+  z-index: 50;
+  max-height: 320px;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  opacity: 0;
+  visibility: hidden;
+  transform-origin: top;
+  transform: translateY(-4px) scale(.97);
+  transition: opacity var(--ease-pop), transform var(--ease-pop), visibility 0s linear var(--ease-duration);
+}
+.dropdown-menu.open {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+  transition: opacity var(--ease-pop), transform var(--ease-pop), visibility 0s linear 0s;
+}
+/* Thin, quiet scrollbar for any dropdown/panel long enough to scroll —
+   the chunky default browser scrollbar looks dated next to everything
+   else here. Firefox uses the `scrollbar-*` properties; the pseudo-
+   elements below cover WebKit/Blink (Chrome, Edge, Safari). */
+.dropdown-menu, .side-panel {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+.dropdown-menu::-webkit-scrollbar, .side-panel::-webkit-scrollbar { width: 8px; }
+.dropdown-menu::-webkit-scrollbar-track, .side-panel::-webkit-scrollbar-track { background: transparent; }
+.dropdown-menu::-webkit-scrollbar-thumb, .side-panel::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 999px;
+  border: 2px solid var(--card);
+}
+.dropdown-menu::-webkit-scrollbar-thumb:hover, .side-panel::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+.dropdown-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 8px 11px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  transition: all var(--ease);
+}
+.dropdown-item:hover { background: var(--gold-tint); color: var(--gold); }
+.dropdown-item:focus-visible { background: var(--gold-tint); color: var(--gold); outline: 2px solid var(--gold); outline-offset: -2px; }
+.status-dropdown-toggle:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.dropdown-group-label {
+  padding: 8px 11px 4px;
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+  color: var(--text-muted);
+}
+.dropdown-group-label:not(:first-child) { margin-top: 4px; border-top: 1px solid var(--line); }
+
+/* ---------- Checklist review modal ---------- */
+.checklist-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px 12px;
+  align-items: start;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line);
+}
+.checklist-row:last-of-type { border-bottom: none; }
+.checklist-row .field { margin-bottom: 8px; }
+.checklist-row-remove {
+  width: 25px; height: 25px; border-radius: var(--radius-sm);
+  border: 1px solid var(--line); background: var(--card); color: var(--maple);
+  display: flex; align-items: center; justify-content: center; font-size: 11px;
+  flex-shrink: 0;
+  transition: all var(--ease);
+}
+.checklist-row-remove:hover { background: var(--maple-tint); }
+/* ---------- Classes Table (admin/classes.php) ---------- */
+.class-group { margin-bottom: 14px; }
+.class-group summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex; align-items: center; justify-content: space-between;
+  user-select: none;
+}
+.class-group summary::-webkit-details-marker { display: none; }
+.class-group summary .chevron {
+  font-size: 10px; margin-right: 8px; transition: all var(--ease);
+  display: inline-block;
+}
+.class-group[open] summary .chevron { transform: rotate(90deg); }
+.class-group .category-count {
+  font-size: 11px; font-weight: 700; color: var(--text-muted);
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 999px; padding: 1px 9px;
+}
+.class-group .card { margin-top: 0; }
+.chip-link {
+  display: inline-flex; align-items: center;
+  background: var(--surface-alt); border: 1px solid var(--line);
+  border-radius: 999px; padding: 3px 10px 3px 4px;
+  font-size: 12px; font-weight: 500; color: var(--text);
+  transition: all var(--ease);
+}
+.chip-link:hover { background: var(--gold-tint); border-color: var(--gold-tint-strong); color: var(--gold); }
+.chip-link .chip-avatar {
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--ink-solid); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; font-weight: 700; margin-right: 6px; flex-shrink: 0;
+}
+
+.checklist-list {
+  /* auto-fill + minmax reflows on its own — 1 column on a phone-width
+     modal, 2-3 as more room becomes available — with no separate
+     mobile override needed (replacing the old fixed-280px-column /
+     horizontal-scroll approach, which needed one). */
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 4px 28px;
+  margin: 4px 0;
+}
+
+/* ---------- Side panel (e.g. processor's assigned clients) ---------- */
+.side-panel-backdrop {
+  position: fixed; inset: 0; background: rgba(15,15,15,.5);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  z-index: 300;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity var(--ease-pop), visibility 0s linear var(--ease-duration);
+}
+.side-panel-backdrop.open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition: opacity var(--ease-pop), visibility 0s linear 0s;
+}
+.side-panel {
+  position: fixed; top: 0; right: -100vw;
+  /* Half the viewport, split-screen style — the table (name, case-type
+     tag, progress bar) needs real room once grouped by Class, since
+     each group can now list several different case types. Floored at
+     560px so it doesn't get cramped on narrower laptop windows, and
+     capped at 92vw so there's always a sliver of the page visible
+     behind it to click away and close. */
+  width: max(560px, 50vw); max-width: 92vw; height: 100vh;
+  background: var(--card); z-index: 301;
+  box-shadow: -4px 0 24px rgba(0,0,0,.18);
+  transition: right var(--ease-pop);
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  display: flex;
+  flex-direction: column;
+  border-left: 3px solid var(--gold);
+}
+.side-panel-backdrop.open .side-panel { right: 0; }
+.side-panel-header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 10px;
+  padding: 22px 24px 0;
+  flex-shrink: 0;
+}
+.side-panel-header h3 { font-family: var(--font-display); font-size: 17px; font-weight: 700; color: var(--ink); margin: 0 0 3px; }
+.side-panel-header p { margin: 0; font-size: 12.5px; color: var(--text-muted); }
+.side-panel-close {
+  background: none; border: none; font-size: 16px; color: var(--text-muted);
+  cursor: pointer; flex-shrink: 0; width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center; border-radius: var(--radius-sm);
+  transition: all var(--ease);
+}
+.side-panel-close:hover { background: var(--surface-hover); color: var(--ink); }
+/* The header/search area still gets normal side padding — only the
+   table itself (inside #panelClientList) goes fully edge-to-edge, per
+   request. Each cell's own built-in padding (see the table rules
+   earlier) already gives the text breathing room, so nothing looks
+   cramped even without the panel's own side padding on top of it. */
+#panelSearchBar { margin: 18px 24px 14px; }
+#panelClientList { padding-bottom: 20px; flex: 1; }
+/* Auto layout instead of a rigid percentage split: each column sizes
+   itself to its own content — Client gets whatever the avatar+name
+   needs, Case Type gets whatever its tag text needs (wrapping onto a
+   second line for a long one rather than forcing the column wider),
+   and Progress takes the rest. This holds up correctly regardless of
+   the panel's width, instead of a fixed 40/32/28 split that only looks
+   right at one specific width. */
+.panel-clients-table { table-layout: auto; }
+.panel-clients-table th:nth-child(3), .panel-clients-table td:nth-child(3) { width: 130px; }
+.panel-clients-table td, .panel-clients-table th { word-break: break-word; }
+.panel-clients-table .class-tag { white-space: normal; word-break: break-word; display: inline-block; }
+
+/* Groups each case type's clients under its own heading + table inside
+   the Processors side panel, replacing the old single flat table with a
+   repeated Case Type column. */
+.panel-case-group { margin-bottom: 22px; }
+.panel-case-group:last-child { margin-bottom: 0; }
+.panel-case-group-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.panel-case-group-count {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+/* ---------- Per-client completion bar (Processors side panel) ---------- */
+.completion-track {
+  width: 100%; height: 5px;
+  background: var(--surface-hover); border-radius: 999px;
+  overflow: hidden;
+}
+.completion-fill {
+  height: 100%;
+  background: var(--accepted);
+  border-radius: 999px;
+  transition: all var(--ease);
+}
+
+/* ---------- Modal ---------- */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(15,15,15,.5);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  display: flex; align-items: flex-start; justify-content: center; z-index: 100;
+  padding: 40px 20px;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity var(--ease-pop), visibility 0s linear var(--ease-duration);
+}
+.modal-backdrop.open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition: opacity var(--ease-pop), visibility 0s linear 0s;
+}
+.modal {
+  background: var(--card); border-radius: var(--radius-lg); width: 100%; max-width: 440px;
+  box-shadow: 0 4px 8px rgba(0,0,0,.06), 0 30px 70px rgba(0,0,0,.32);
+  overflow: hidden;
+  transform: translateY(14px) scale(.96);
+  transition: transform var(--ease-pop);
+}
+.modal-backdrop.open .modal { transform: translateY(0) scale(1); }
+.modal-wide { max-width: 720px; }
+.checklist-modal { max-width: 960px; }
+.modal-columns { display: flex; gap: 28px; }
+.modal-column { flex: 1; min-width: 0; }
+.modal-column-heading {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+  color: var(--text-muted); margin: 0 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line);
+}
+.modal h3 {
+  font-family: var(--font-display); font-size: 16px; font-weight: 700; color: #fff;
+  background: var(--ink-solid);
+  margin: 0;
+  padding: 18px 48px 18px 24px;
+  position: relative;
+}
+.modal-close-btn {
+  position: absolute;
+  top: 50%; right: 14px;
+  transform: translateY(-50%);
+  width: 28px; height: 28px;
+  background: none; border: none;
+  color: #fff; font-size: 16px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--ease);
+}
+.modal-close-btn:hover { background: rgba(255,255,255,.15); }
+.modal-body {
+  padding: 24px;
+}
+.modal-actions {
+  display: flex; justify-content: flex-end; gap: 10px;
+  margin: 0;
+  padding: 16px 24px;
+  background: var(--surface-alt);
+  border-top: 1px solid var(--line);
+}
+.confirm-dialog .confirm-message { margin: 0; font-size: 13.5px; color: var(--text); line-height: 1.55; }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 860px) {
+  .app-shell { flex-direction: column; }
+
+  .sidebar {
+    width: 100%;
+    flex-direction: column;
+    padding: 12px 16px;
+    position: relative;
+    height: auto;
+    overflow-y: visible;
+  }
+  .sidebar-top { align-items: center; }
+  .mobile-nav-toggle { display: block; }
+  .sidebar .brand { font-size: 15px; margin-bottom: 0; gap: 8px; }
+  .sidebar .brand-logo { width: 30px; height: 30px; border-radius: 7px; }
+  .sidebar .brand-logo img { width: 22px; height: 22px; }
+  .sidebar .brand small { display: none; } /* subtitle only shown in the open drawer, to save top-bar space */
+
+  .sidebar-drawer {
+    position: fixed;
+    top: 0; right: -280px;
+    width: 260px; height: 100vh;
+    background: var(--ink-solid);
+    padding: 20px 16px;
+    z-index: 200;
+    overflow-y: auto;
+    transition: all var(--ease);
+    box-shadow: -4px 0 24px rgba(0,0,0,.25);
+  }
+  .sidebar.mobile-open .sidebar-drawer { right: 0; }
+  .sidebar.mobile-open::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.45);
+    z-index: 150;
+  }
+  .sidebar nav { margin-top: 4px; }
+  .sidebar nav a { padding: 12px 11px; font-size: 15px; } /* larger tap target */
+  .sidebar .spacer, .sidebar .user-box { display: block; }
+
+  .main { padding: 18px 14px; }
+  .main-header { flex-direction: column; align-items: stretch; }
+  .main-header > .btn, .main-header > a.btn { width: 100%; justify-content: center; padding: 12px 16px; }
+  .main-header .header-actions { flex-direction: column; width: 100%; }
+  .main-header .header-actions > * { width: 100%; }
+  .main-header .header-actions .btn { justify-content: center; padding: 12px 16px; }
+
+  .stat-grid { gap: 10px; }
+  .stat-box { padding: 13px 14px; }
+
+  .field-row { flex-direction: column; gap: 0; }
+  .field input, .field select, .field textarea { padding: 11px 12px; font-size: 16px; } /* 16px avoids iOS auto-zoom on focus */
+
+  /* .doc-item / .doc-actions layout is now handled by the container
+     query on .doc-rail above (keyed off its own width, not the
+     viewport), so no viewport-based override is needed here. */
+
+  .search-bar { max-width: none; }
+
+  .modal { max-width: none; width: calc(100% - 8px); max-height: 90vh; overflow-y: auto; }
+  .modal-body { padding: 20px; }
+  .modal-columns { flex-direction: column; gap: 0; }
+  .modal-actions { flex-direction: column-reverse; padding: 14px 20px; }
+  .modal-actions .btn { width: 100%; justify-content: center; }
+
+  .dropdown-menu { left: 0; right: 0; min-width: 0; width: 100%; }
+
+  /* .checklist-list itself now reflows on its own via auto-fill (see
+     base rule) — only the internal per-row layout still needs a
+     viewport override here. */
+  .checklist-row { grid-template-columns: 1fr; }
+  .checklist-row-remove { justify-self: end; }
+
+  .review-actions { flex-direction: column; align-items: stretch; }
+  .review-actions .btn { width: 100%; justify-content: center; padding: 11px 16px; }
+  .review-flag-form .review-flag-actions { flex-direction: column-reverse; }
+  .review-flag-form .review-flag-actions .btn { width: 100%; justify-content: center; }
+
+  #toast { left: 16px; right: 16px; bottom: 16px; text-align: center; }
+}
+
+@media (max-width: 480px) {
+  .main-header h1 { font-size: 19px; }
+}
+
+/* ---------- Loading spinner — shown while any section fetches data
+   asynchronously (e.g. the Processors side panel loading a client list),
+   instead of a blank gap between "empty" and "populated". ---------- */
+.loading-spinner {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px; padding: 60px 20px; color: var(--text-muted); font-size: 13px;
+}
+.loading-spinner .spinner-ring {
+  width: 30px; height: 30px;
+  border: 3px solid var(--line);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---------- Reveal-in — a reusable "this just finished loading" fade +
+   rise, applied to freshly-rendered content (e.g. the Processors panel's
+   client table once its fetch resolves) so new content settles in
+   smoothly rather than snapping into place. ---------- */
+@keyframes revealIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.reveal-in { animation: revealIn .35s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* ---------- Page-load cascade — the main content's direct children
+   (header, cards, columns) fade + rise in with a slight stagger on every
+   page load, instead of the whole page just snapping into view at once. ---------- */
+@keyframes pageReveal {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.main > * { animation: pageReveal .5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.main > *:nth-child(1) { animation-delay: 0s; }
+.main > *:nth-child(2) { animation-delay: .06s; }
+.main > *:nth-child(3) { animation-delay: .12s; }
+.main > *:nth-child(4) { animation-delay: .18s; }
+.main > *:nth-child(n+5) { animation-delay: .22s; }
+
+/* Respects the OS-level "reduce motion" accessibility setting — the
+   content still appears immediately, just without the animated entrance,
+   for anyone who's asked their system to minimize motion. */
+@media (prefers-reduced-motion: reduce) {
+  .loading-spinner .spinner-ring { animation-duration: 1.8s; }
+  .reveal-in, .main > * { animation: none; }
+}
+
+/* ======================================================================
+   Messages — staff <-> client inbox (admin/inbox.php, portal/messages.php)
+   ====================================================================== */
+.msg-layout {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 14px;
+  height: calc(100vh - 150px);
+  min-height: 460px;
+}
+.msg-layout.single { grid-template-columns: minmax(0, 1fr); max-width: 860px; }
+
+/* ---- Conversation list (staff only) ---- */
+.conv-panel { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.conv-tools { padding: 12px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
+.conv-tools input[type=search],
+.conv-tools select {
+  width: 100%; padding: 8px 10px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  font: inherit; font-size: 13px; background: var(--card); color: var(--text);
+}
+.conv-tools input[type=search]:focus, .conv-tools select:focus { outline: none; border-color: var(--gold); }
+.conv-list { flex: 1; overflow-y: auto; }
+.conv-item {
+  display: block; padding: 11px 14px;
+  border-bottom: 1px solid var(--line);
+  color: var(--text); text-decoration: none;
+  transition: background var(--ease);
+}
+.conv-item:hover { background: var(--surface-hover); }
+.conv-item.active { background: var(--gold-tint); box-shadow: inset 3px 0 0 var(--gold); }
+.conv-top, .conv-bottom { display: flex; align-items: center; gap: 8px; }
+.conv-name { flex: 1; min-width: 0; font-weight: 600; color: var(--ink); font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conv-time { font-size: 11.5px; color: var(--text-muted); flex-shrink: 0; }
+.conv-bottom { margin-top: 2px; }
+.conv-preview { flex: 1; min-width: 0; font-size: 12.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conv-item.unread .conv-name { font-weight: 700; }
+.conv-item.unread .conv-preview { color: var(--text); font-weight: 600; }
+.conv-unread {
+  flex-shrink: 0; min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: 999px; background: #E53E3E; color: #fff;
+  font-size: 10.5px; font-weight: 700; line-height: 18px; text-align: center;
+}
+.conv-empty { padding: 24px 16px; text-align: center; color: var(--text-muted); font-size: 13px; }
+
+/* ---- Thread ---- */
+.msg-panel { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.msg-panel-head {
+  padding: 12px 18px; border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+}
+.msg-panel-head h2 { margin: 0; font-family: var(--font-display); font-size: 15px; font-weight: 700; color: var(--ink); }
+.msg-panel-head .msg-panel-sub { font-size: 12.5px; color: var(--text-muted); margin-top: 2px; }
+.msg-thread {
+  flex: 1; overflow-y: auto;
+  padding: 16px 18px;
+  display: flex; flex-direction: column; gap: 10px;
+  background: var(--surface-alt);
+}
+.msg-day {
+  align-self: center;
+  font-size: 11px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase;
+  color: var(--text-muted); margin: 6px 0 2px;
+}
+.msg {
+  max-width: min(78%, 560px);
+  align-self: flex-start;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px 12px 12px 4px;
+  padding: 9px 12px;
+  font-size: 13.5px;
+}
+.msg.from-client { background: var(--client-tint); border-color: var(--client-tint-border); }
+.msg.mine { align-self: flex-end; border-radius: 12px 12px 4px 12px; }
+.msg-head { display: flex; gap: 10px; justify-content: space-between; font-size: 11.5px; color: var(--text-muted); margin-bottom: 3px; }
+.msg-sender { font-weight: 700; color: var(--slate); }
+.msg-body { white-space: pre-wrap; word-break: break-word; color: var(--text); line-height: 1.5; }
+.msg-body a { color: var(--gold); text-decoration: underline; }
+.msg-files { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.msg-file {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--card); font-size: 12.5px;
+}
+.msg-file a:not(.icon-btn) { flex: 1; min-width: 0; color: var(--ink); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msg-file-size { color: var(--text-muted); font-size: 11.5px; flex-shrink: 0; }
+.msg-empty { margin: auto; text-align: center; color: var(--text-muted); font-size: 13px; max-width: 320px; }
+.msg-empty .icon { font-size: 28px; margin-bottom: 6px; }
+
+/* ---- Composer ---- */
+.msg-composer { border-top: 1px solid var(--line); padding: 10px 12px; background: var(--card); }
+.msg-composer-row { display: flex; gap: 8px; align-items: flex-end; }
+.msg-composer textarea {
+  flex: 1; resize: none;
+  min-height: 42px; max-height: 180px;
+  padding: 10px 12px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  font: inherit; font-size: 13.5px; line-height: 1.45;
+  background: var(--card); color: var(--text);
+}
+.msg-composer textarea:focus { outline: none; border-color: var(--gold); }
+.msg-attach-btn {
+  flex-shrink: 0; width: 42px; height: 42px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  color: var(--slate); cursor: pointer; background: var(--card);
+  transition: all var(--ease);
+}
+.msg-attach-btn:hover { background: var(--surface-alt); color: var(--gold); }
+.msg-composer .btn { height: 42px; flex-shrink: 0; }
+.msg-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.msg-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 6px 4px 9px; border-radius: 999px;
+  background: var(--surface-alt); border: 1px solid var(--line);
+  font-size: 12px; color: var(--text); max-width: 100%;
+}
+.msg-chip button { border: 0; background: none; color: var(--text-muted); cursor: pointer; padding: 0 3px; }
+.msg-chip button:hover { color: var(--maple); }
+.msg-hint { font-size: 11.5px; color: var(--text-muted); margin-top: 6px; }
+
+.msg-select-prompt { margin: auto; text-align: center; color: var(--text-muted); font-size: 13.5px; padding: 30px; }
+.msg-select-prompt .icon { font-size: 30px; margin-bottom: 8px; }
+
+@media (max-width: 860px) {
+  .msg-layout { grid-template-columns: minmax(0, 1fr); height: auto; min-height: 0; }
+  /* On phones the staff inbox shows the list OR the open thread, not both. */
+  .msg-layout.has-open .conv-panel { display: none; }
+  .msg-layout:not(.has-open) .msg-panel { display: none; }
+  .conv-panel { max-height: none; }
+  .msg-panel { height: calc(100vh - 170px); min-height: 420px; }
+  .msg { max-width: 88%; }
+  .msg-hint { display: none; }
+}
+
+/* "Sending as" picker above the staff composer (staff share one login) */
+.msg-sendas { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 12.5px; color: var(--text-muted); }
+.msg-sendas label { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.msg-sendas select {
+  padding: 5px 8px; border: 1px solid var(--line); border-radius: var(--radius-sm);
+  font: inherit; font-size: 12.5px; background: var(--card); color: var(--text); max-width: 100%;
+}
+.msg-sendas select:focus { outline: none; border-color: var(--gold); }
+
+/* Inbox "Search clients" filters + result details */
+.conv-filters { display: flex; gap: 6px; }
+.conv-filters select { flex: 1; min-width: 0; }
+.conv-unread-toggle { display: inline-flex; align-items: center; gap: 7px; align-self: flex-start; font-size: 12.5px; color: var(--text-muted); cursor: pointer; user-select: none; }
+.conv-unread-toggle input { width: 14px; height: 14px; margin: 0; accent-color: var(--gold); cursor: pointer; }
+.conv-count { padding: 7px 14px; font-size: 11.5px; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--line); background: var(--surface-alt); }
+.conv-count[hidden] { display: none; }
+.conv-meta { display: flex; align-items: center; gap: 4px; margin-top: 5px; min-width: 0; font-size: 11.5px; color: var(--text-muted); }
+.conv-meta .class-tag { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; font-size: 10.5px; padding: 1px 7px; }
+.conv-meta-item { flex-shrink: 0; white-space: nowrap; }
+.conv-meta > * + .conv-meta-item::before { content: '·'; margin-right: 4px; }
+.msg-layout > .card + .card { margin-top: 0; }
+.conv-item.no-thread .conv-preview { font-style: italic; }

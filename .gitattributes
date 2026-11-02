@@ -1,0 +1,5 @@
+# Keep Linux line endings everywhere (the server is Linux; files are deployed from this folder).
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.pdf binary
