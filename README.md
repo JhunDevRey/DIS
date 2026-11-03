@@ -1459,7 +1459,7 @@ tied to whichever account is actually authenticated for that panel.
 
 ## Notes / things to revisit
 
-- Allowed upload types and the 10 MB cap live in `config.php`
+- Allowed upload types and the upload size cap (25 MB) live in `config.php`
   (`ALLOWED_EXTENSIONS`, `MAX_UPLOAD_BYTES`).
 - There's no email notification wired up yet (matches DWC, where Brevo
   is dormant pending a meeting) — this would be the natural next step if

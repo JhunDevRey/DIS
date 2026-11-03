@@ -63,14 +63,14 @@ $client = $stmt->fetch();
         <form class="msg-composer" id="msgForm">
           <div class="msg-chips" id="msgFileChips" hidden></div>
           <div class="msg-composer-row">
-            <label class="msg-attach-btn" title="Attach files (PDF, image, Word — up to 10 MB each)">
+            <label class="msg-attach-btn" title="Attach files (PDF, image, Word — up to <?= maxUploadMb() ?> MB each)">
               <i class="fa-solid fa-paperclip"></i>
               <input type="file" id="msgFiles" multiple accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" hidden>
             </label>
             <textarea id="msgBody" rows="1" maxlength="<?= MESSAGE_MAX_LENGTH ?>" placeholder="Write a message…" aria-label="Message"></textarea>
             <button type="submit" class="btn btn-gold" id="msgSendBtn"><i class="fa-solid fa-paper-plane"></i> Send</button>
           </div>
-          <div class="msg-hint">Ctrl + Enter to send · Attachments: PDF, JPG, PNG or Word, up to 10 MB each.</div>
+          <div class="msg-hint">Ctrl + Enter to send · Attachments: PDF, JPG, PNG or Word, up to <?= maxUploadMb() ?> MB each.</div>
         </form>
       </div>
     </div>

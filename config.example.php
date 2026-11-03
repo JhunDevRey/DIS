@@ -56,9 +56,9 @@ if ($isLocal) {
     define('UPLOAD_DIR', '/home/u612178738/duque_uploads');
 }
 
-// Allowed upload types + max size (10 MB)
+// Allowed upload types + max size (25 MB)
 define('ALLOWED_EXTENSIONS', ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx']);
-define('MAX_UPLOAD_BYTES', 10 * 1024 * 1024);
+define('MAX_UPLOAD_BYTES', 25 * 1024 * 1024);
 
 // ---- Outgoing email (processor upload notifications) ----
 // Uses PHP's built-in mail() by default. On InfinityFree this usually works

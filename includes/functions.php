@@ -435,6 +435,12 @@ function normalizeUploadedFiles($filesField): array
     return $files;
 }
 
+/** The per-file upload cap in whole MB, for user-facing messages. */
+function maxUploadMb(): int
+{
+    return (int)round(MAX_UPLOAD_BYTES / 1048576);
+}
+
 /**
  * Validates an uploaded file (from $_FILES['document']) without moving it.
  * Returns ['ok' => true] or ['ok' => false, 'error' => '...'].
@@ -444,11 +450,14 @@ function validateUploadedDocument(array $file): array
     if (empty($file) || $file['error'] === UPLOAD_ERR_NO_FILE) {
         return ['ok' => false, 'error' => 'Please choose a file to upload.'];
     }
+    if ($file['error'] === UPLOAD_ERR_INI_SIZE || $file['error'] === UPLOAD_ERR_FORM_SIZE) {
+        return ['ok' => false, 'error' => 'File is too large. Maximum size is ' . maxUploadMb() . ' MB.'];
+    }
     if ($file['error'] !== UPLOAD_ERR_OK) {
         return ['ok' => false, 'error' => 'Upload failed. Please try again.'];
     }
     if ($file['size'] > MAX_UPLOAD_BYTES) {
-        return ['ok' => false, 'error' => 'File is too large. Maximum size is 10 MB.'];
+        return ['ok' => false, 'error' => 'File is too large. Maximum size is ' . maxUploadMb() . ' MB.'];
     }
     $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
     if (!in_array($ext, ALLOWED_EXTENSIONS, true)) {

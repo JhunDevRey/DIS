@@ -356,7 +356,7 @@ function renderAdminDocItem(array $r, int $displayNumber, array $filesByRequest,
         </div>
         <div class="field">
           <label>Instructions for the client</label>
-          <textarea name="instructions" placeholder="e.g. Clear scan of all four corners, colour, under 10MB" data-live-links></textarea>
+          <textarea name="instructions" placeholder="e.g. Clear scan of all four corners, colour, under <?= maxUploadMb() ?>MB" data-live-links></textarea>
         </div>
         <div class="checkbox-row" style="margin-bottom:16px;">
           <input type="checkbox" id="is_required" name="is_required" value="1" checked>

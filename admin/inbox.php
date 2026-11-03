@@ -126,7 +126,7 @@ if ($openClientId) {
             </div>
             <div class="msg-chips" id="msgFileChips" hidden></div>
             <div class="msg-composer-row">
-              <label class="msg-attach-btn" title="Attach files (PDF, image, Word — up to 10 MB each)">
+              <label class="msg-attach-btn" title="Attach files (PDF, image, Word — up to <?= maxUploadMb() ?> MB each)">
                 <i class="fa-solid fa-paperclip"></i>
                 <input type="file" id="msgFiles" multiple accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" hidden>
               </label>
