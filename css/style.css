@@ -1050,7 +1050,7 @@ tr.row-link:hover td:first-child::before { width: 3px; }
 .cu-status-revision { background: var(--revision); }
 .cu-status-accepted { background: var(--accepted); }
 
-.cu-row .class-tag { font-size: 11px; }
+.cu-row .class-tag { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; font-size: 11px; }
 
 .cu-assignee { display: inline-flex; align-items: center; gap: 7px; max-width: 100%; font-size: 12.5px; }
 .cu-avatar {

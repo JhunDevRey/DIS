@@ -137,7 +137,7 @@ sort($clientNoOptions, SORT_NATURAL);
       <table class="cu-table">
         <colgroup>
           <col class="cu-col-name"><col style="width:72px"><col style="width:200px"><col style="width:150px">
-          <col style="width:140px"><col style="width:200px"><col style="width:120px"><col style="width:130px">
+          <col style="width:140px"><col style="width:200px"><col style="width:120px"><col style="width:150px">
         </colgroup>
         <?php foreach ($clientGroups as $slug => $g): ?>
           <tbody class="cu-group" data-group="<?= h($slug) ?>" style="--grp:<?= $g['color'] ?>">
@@ -149,7 +149,7 @@ sort($clientNoOptions, SORT_NATURAL);
                   <span class="cu-group-count"><?= count($g['rows']) ?></span>
                 </button>
               </th>
-              <th>Client No.</th>
+              <th title="Client No.">No.</th>
               <th>Case Type</th>
               <th>Processor</th>
               <th>Documents</th>
