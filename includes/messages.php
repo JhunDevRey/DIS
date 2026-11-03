@@ -9,6 +9,11 @@
  * state is tracked per side by message id (see sql/migration_messages.sql):
  * clients.client_messages_seen_id for the client, and
  * clients.staff_messages_seen_id for staff.
+ *
+ * WhatsApp (includes/whatsapp.php) is a second channel in the same thread:
+ * messages.channel = 'whatsapp'. Imported past chats (is_history = 1)
+ * never count as unread, and staff WhatsApp replies don't badge the
+ * client's portal — they already got them on their phone.
  */
 
 require_once __DIR__ . '/db.php';
@@ -29,6 +34,7 @@ function clientUnreadMessageCount(int $clientId): int
       SELECT COUNT(*) FROM messages m
       JOIN clients c ON c.id = m.client_id
       WHERE m.client_id = ? AND m.sender_type = 'admin' AND m.id > c.client_messages_seen_id
+        AND m.channel = 'portal' AND m.is_history = 0
     ");
     $stmt->execute([$clientId]);
     return (int)$stmt->fetchColumn();
@@ -44,7 +50,7 @@ function staffUnreadConversationCount(): int
     return (int)getDb()->query("
       SELECT COUNT(DISTINCT m.client_id) FROM messages m
       JOIN clients c ON c.id = m.client_id
-      WHERE m.sender_type = 'client' AND m.id > c.staff_messages_seen_id
+      WHERE m.sender_type = 'client' AND m.id > c.staff_messages_seen_id AND m.is_history = 0
     ")->fetchColumn();
 }
 
@@ -58,13 +64,13 @@ function staffConversationList(): array
       SELECT c.id AS client_id, c.full_name, c.case_type, c.reference_number,
         pr.full_name AS processor_name,
         last.id AS last_message_id, last.body AS last_body,
-        last.sender_type AS last_sender_type, last.created_at AS last_at,
+        last.sender_type AS last_sender_type, last.channel AS last_channel, last.created_at AS last_at,
         (SELECT COUNT(*) FROM messages u
-          WHERE u.client_id = c.id AND u.sender_type = 'client' AND u.id > c.staff_messages_seen_id) AS unread_count
+          WHERE u.client_id = c.id AND u.sender_type = 'client' AND u.id > c.staff_messages_seen_id AND u.is_history = 0) AS unread_count
       FROM clients c
-      JOIN messages last ON last.id = (SELECT MAX(id) FROM messages WHERE client_id = c.id)
+      JOIN messages last ON last.id = (SELECT id FROM messages WHERE client_id = c.id ORDER BY created_at DESC, id DESC LIMIT 1)
       LEFT JOIN processors pr ON pr.id = c.processor_id
-      ORDER BY last.id DESC
+      ORDER BY last.created_at DESC, last.id DESC
     ")->fetchAll();
 }
 
@@ -79,6 +85,7 @@ function staffConversationsForJson(): array
         'full_name'    => $c['full_name'], // kept here too: a deactivated client isn't in the directory
         'preview'      => ($c['last_sender_type'] === 'admin' ? 'You: ' : '') . mb_strimwidth($c['last_body'] !== '' ? $c['last_body'] : '📎 Attachment', 0, 90, '…'),
         'last_at'      => $c['last_at'],
+        'channel'      => $c['last_channel'],
         'unread_count' => (int)$c['unread_count'],
         // Channels this thread has messages on, for the Inbox tabs. Portal
         // is the only one live so far; the WhatsApp channel (branch
@@ -134,11 +141,13 @@ function staffClientDirectory(): array
 /**
  * Messages for one client, oldest first, each with its 'files' list.
  * Pass $afterId to fetch only messages newer than that (used by polling).
+ * The full thread is ordered by time sent, not id, so WhatsApp chats
+ * linked or imported later still land in the right place.
  */
 function fetchMessages(int $clientId, int $afterId = 0): array
 {
     $db = getDb();
-    $stmt = $db->prepare('SELECT * FROM messages WHERE client_id = ? AND id > ? ORDER BY id ASC');
+    $stmt = $db->prepare('SELECT * FROM messages WHERE client_id = ? AND id > ? ORDER BY ' . ($afterId > 0 ? 'id ASC' : 'created_at ASC, id ASC'));
     $stmt->execute([$clientId, $afterId]);
     $messages = $stmt->fetchAll();
     if (!$messages) {
@@ -217,6 +226,10 @@ function messagesForJson(array $messages, string $viewer): array
                 'snippet' => mb_strimwidth(trim(preg_replace('/\s+/u', ' ', $reply['body'])), 0, 160, '…'),
                 'files'   => (int)$reply['file_count'],
             ] : null,
+            'channel'     => $m['channel'] ?? 'portal',
+            // Delivery state + Meta's error text are for staff only.
+            'wa_status'   => $viewer === 'admin' ? ($m['wa_status'] ?? null) : null,
+            'wa_error'    => $viewer === 'admin' ? ($m['wa_error'] ?? null) : null,
             'files'       => array_map(fn($f) => [
                 'id'   => (int)$f['id'],
                 'name' => $f['original_name'],

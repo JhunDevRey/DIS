@@ -18,6 +18,10 @@
 // Replies work like Messenger: hover a message (or swipe it sideways on a
 // phone) and hit the reply arrow; the sent message carries a quote of the
 // original, and clicking the quote jumps back to it.
+//
+// WhatsApp (when configured): messages carry channel = 'whatsapp'; staff
+// pick Portal / WhatsApp per message in #msgChannel, and see delivery
+// ticks (wa_status) that refresh with each poll.
 
 (function () {
   const app = document.getElementById('msgApp');
@@ -39,6 +43,7 @@
   const sendBtn = document.getElementById('msgSendBtn');
 
   let lastId = 0;
+  const renderedIds = new Set();
   let lastSeenReported = 0;
   const byId = new Map(); // message id -> latest data, for re-rendering after an edit
   let loading = false;
@@ -90,7 +95,7 @@
     }
 
     const el = document.createElement('div');
-    el.className = 'msg' + (m.mine ? ' mine' : '') + (m.sender_type === 'client' ? ' from-client' : '');
+    el.className = 'msg' + (m.mine ? ' mine' : '') + (m.sender_type === 'client' ? ' from-client' : '') + (m.channel === 'whatsapp' ? ' via-wa' : '');
     el.dataset.id = m.id;
     byId.set(m.id, m);
     el.innerHTML = bubbleHtml(m);
@@ -107,6 +112,8 @@
         <a class="icon-btn" href="${fileEndpoint}?file_id=${f.id}" title="Download" aria-label="Download ${esc(f.name)}"><i class="fa-solid fa-download"></i></a>
       </div>`).join('');
 
+    const via = m.channel === 'whatsapp'
+      ? `<span class="msg-via-wa" title="${viewer === 'client' ? 'Sent on WhatsApp' : 'WhatsApp'}"><i class="fa-brands fa-whatsapp"></i>${viewer === 'client' ? ' WhatsApp' : ''}</span>` : '';
     // "edited" label; staff can click it to see what was originally sent.
     const edited = m.edited_at ? (viewer === 'admin'
       ? `<button type="button" class="msg-edited" data-history title="Edited ${esc(parseUtc(m.edited_at).toLocaleString())} — click to see earlier versions">edited</button>`
@@ -120,7 +127,7 @@
     return `
       ${replyBtn}
       ${quoteHtml(m)}
-      <div class="msg-head"><span class="msg-sender">${esc(m.sender)}</span>${editBtn}${edited}<span class="msg-time" title="${esc(when.toLocaleString())}">${formatTime(when)}</span></div>
+      <div class="msg-head"><span class="msg-sender">${esc(m.sender)}</span>${via}${editBtn}${edited}<span class="msg-time" title="${esc(when.toLocaleString())}">${formatTime(when)}</span><span class="msg-wa-status">${waStatusHtml(m.wa_status, m.wa_error)}</span></div>
       ${m.body_html ? `<div class="msg-body">${m.body_html}</div>` : ''}
       ${filesHtml ? `<div class="msg-files">${filesHtml}</div>` : ''}`;
   }
@@ -351,12 +358,34 @@
     } catch (e) { /* not critical */ }
   }
 
+  // Staff-only WhatsApp delivery state next to the time.
+  function waStatusHtml(status, error) {
+    if (!status) return '';
+    const notice = status.startsWith('notice_');
+    const st = notice ? status.slice(7) : status;
+    const labels = { sent: 'Sent', delivered: 'Delivered', read: 'Read', failed: 'Failed' };
+    if (notice) {
+      return `<span class="wa-tick notice${st === 'failed' ? ' failed' : ''}" title="Over 24h since their last WhatsApp, so they got a WhatsApp notice to read this in the portal — notice ${esc((labels[st] || st).toLowerCase())}"><i class="fa-solid fa-bell"></i> notice ${esc((labels[st] || st).toLowerCase())}</span>`;
+    }
+    if (st === 'failed') return `<span class="wa-tick failed" title="${esc(error || 'WhatsApp send failed')}"><i class="fa-solid fa-circle-exclamation"></i> Not delivered</span>`;
+    const icon = st === 'sent' ? 'fa-check' : 'fa-check-double';
+    return `<span class="wa-tick${st === 'read' ? ' read' : ''}" title="${esc(labels[st] || st)}"><i class="fa-solid ${icon}"></i></span>`;
+  }
+
+  function applyStatuses(list) {
+    for (const s of list || []) {
+      const el = thread.querySelector(`.msg[data-id="${s.id}"] .msg-wa-status`);
+      if (el) el.innerHTML = waStatusHtml(s.wa_status, s.wa_error);
+    }
+  }
+
   function appendMessages(messages) {
     let added = false;
     for (const m of messages) {
-      if (m.id <= lastId) continue; // already shown (e.g. our own send + a poll racing)
+      if (renderedIds.has(m.id)) continue; // already shown (e.g. our own send + a poll racing)
       renderMessage(m);
-      lastId = m.id;
+      renderedIds.add(m.id);
+      lastId = Math.max(lastId, m.id);
       added = true;
     }
     const empty = document.getElementById('msgEmpty');
@@ -391,6 +420,7 @@
       if (appendMessages(data.messages) && wasNearBottom) scrollToBottom();
       applyEdits(data.edits);
       expireEditButtons();
+      applyStatuses(data.wa_statuses);
       if (initial) scrollToBottom();
       reportSeen();
     } catch (e) {
@@ -438,6 +468,32 @@
         try { localStorage.setItem(SEND_AS_KEY, sendAs.value); } catch (e) { /* not critical */ }
       });
     }
+
+    // Portal / WhatsApp switch (staff, WhatsApp configured). The note
+    // explains WhatsApp's 24-hour rule before staff press Send.
+    const channelBox = document.getElementById('msgChannel');
+    const channelNote = document.getElementById('msgChannelNote');
+    function pickedChannel() {
+      return channelBox?.querySelector('input[name="msgChannelPick"]:checked')?.value || 'portal';
+    }
+    function updateChannelNote() {
+      if (!channelBox) return;
+      const wa = pickedChannel() === 'whatsapp';
+      channelBox.classList.toggle('is-wa', wa);
+      sendBtn.classList.toggle('btn-wa', wa);
+      sendBtn.innerHTML = wa ? '<i class="fa-brands fa-whatsapp"></i> Send' : '<i class="fa-solid fa-paper-plane"></i> Send';
+      if (!wa) { channelNote.textContent = 'Client reads it in the portal and gets an email notice.'; return; }
+      const ends = channelBox.dataset.windowEnds;
+      if (ends) {
+        channelNote.textContent = `Goes to their WhatsApp. Free-form replies allowed until ${formatTime(parseUtc(ends))}.`;
+      } else {
+        channelNote.textContent = channelBox.dataset.hasTemplate === '1'
+          ? 'Over 24h since their last WhatsApp: the message stays in the portal and they get a WhatsApp notice to read it.'
+          : 'Over 24h since their last WhatsApp: WhatsApp won\'t accept a free-form message, so it will go to the portal.';
+      }
+    }
+    channelBox?.addEventListener('change', updateChannelNote);
+    updateChannelNote();
 
     function renderChips() {
       chips.innerHTML = pendingFiles.map((f, i) => `
@@ -496,6 +552,7 @@
       if (clientId) fd.append('client_id', clientId);
       if (sendAs?.value) fd.append('sender_id', sendAs.value);
       if (replyTo) fd.append('reply_to_id', replyTo.id);
+      if (channelBox) fd.append('channel', pickedChannel());
       pendingFiles.forEach(f => fd.append('attachments[]', f));
 
       sendBtn.disabled = true;
@@ -516,12 +573,17 @@
         appendMessages(data.messages);
         lastSeenReported = lastId; // sending already marked it read server-side
         scrollToBottom();
+        // WhatsApp outcome (sent / fell back to portal / failed) worth reading.
+        if (data.message && data.message !== 'Message sent.' && data.message !== 'Sent on WhatsApp.') {
+          showToast(data.message, /failed/i.test(data.message));
+        }
         if (viewer === 'admin') refreshList();
       } catch (err) {
         showToast('Could not send — check your connection and try again.', true);
       } finally {
         sendBtn.disabled = false;
         sendBtn.innerHTML = originalLabel;
+        updateChannelNote();
       }
     });
   }
@@ -611,7 +673,7 @@
           <span class="conv-time">${timeText}</span>
         </div>
         <div class="conv-bottom">
-          <span class="conv-preview">${conv ? esc(conv.preview) : '<i class="fa-regular fa-pen-to-square"></i> No messages yet — click to start'}</span>
+          <span class="conv-preview">${conv ? (conv.channel === 'whatsapp' ? '<i class="fa-brands fa-whatsapp conv-wa"></i> ' : '') + esc(conv.preview) : '<i class="fa-regular fa-pen-to-square"></i> No messages yet — click to start'}</span>
           ${unread ? `<span class="conv-unread">${conv.unread_count}</span>` : ''}
         </div>
         ${meta ? `<div class="conv-meta">${meta}</div>` : ''}
@@ -693,6 +755,13 @@
         badge.textContent = data.unread_total;
         badge.hidden = data.unread_total === 0;
       }
+      const waLink = document.getElementById('waUnmatchedLink');
+      if (waLink) {
+        const waCount = document.getElementById('waUnmatchedCount');
+        waCount.textContent = data.wa_unmatched;
+        waCount.hidden = !data.wa_unmatched;
+        waLink.hidden = !data.wa_unmatched && !waLink.classList.contains('active');
+      }
     } catch (e) { /* next poll retries */ }
   }
 
@@ -751,6 +820,61 @@
       fitToViewport();
     }, 60));
     fitToViewport();
+  }
+
+  // ---------- Unmatched WhatsApp numbers (staff) ----------
+
+  const waBox = document.getElementById('waUnmatched');
+  if (waBox) {
+    waBox.querySelectorAll('[data-utc]').forEach(el => {
+      const d = parseUtc(el.dataset.utc);
+      el.textContent = d.toDateString() === new Date().toDateString() ? formatTime(d) : d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    });
+
+    waBox.addEventListener('click', async (e) => {
+      const card = e.target.closest('.wa-card');
+      if (!card) return;
+      const number = card.dataset.waNumber;
+      const pick = e.target.closest('[data-wa-pick]');
+      if (pick) {
+        card.querySelector('[data-wa-client]').value = pick.dataset.waPick;
+        return;
+      }
+
+      const linkBtn = e.target.closest('[data-wa-link]');
+      const ignoreBtn = e.target.closest('[data-wa-ignore]');
+      if (!linkBtn && !ignoreBtn) return;
+
+      const fd = new FormData();
+      fd.append('wa_number', number);
+      if (linkBtn) {
+        const select = card.querySelector('[data-wa-client]');
+        if (!select.value) { showToast('Pick the client this number belongs to.', true); select.focus(); return; }
+        const name = select.options[select.selectedIndex].text;
+        const ok = await showConfirm(`Link this WhatsApp number to ${name}? Its messages will move into ${name}'s thread, and ${name} will see them in the portal.`, { title: 'Link WhatsApp number', confirmLabel: 'Link' });
+        if (!ok) return;
+        fd.append('action', 'link_wa');
+        fd.append('client_id', select.value);
+      } else {
+        fd.append('action', 'ignore_wa');
+      }
+
+      const btn = linkBtn || ignoreBtn;
+      btn.disabled = true;
+      try {
+        const res = await fetch(endpoint, { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!data.success) { showToast(data.message || 'Something went wrong.', true); return; }
+        showToast(data.message);
+        card.remove();
+        refreshList();
+        if (!waBox.querySelector('.wa-card')) location.reload();
+      } catch (err) {
+        showToast('Network error — please try again.', true);
+      } finally {
+        btn.disabled = false;
+      }
+    });
   }
 
   // ---------- Start ----------

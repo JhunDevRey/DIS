@@ -2433,6 +2433,69 @@ button.msg-edited:hover { color: var(--ink); text-decoration: underline; }
 .conv-unread-toggle input { width: 14px; height: 14px; margin: 0; accent-color: var(--gold); cursor: pointer; }
 .conv-count { padding: 7px 14px; font-size: 11.5px; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--msg-divider); background: var(--surface-alt); }
 .conv-count[hidden] { display: none; }
+
+/* ---------- WhatsApp channel in Messages ---------- */
+:root { --wa: #1DA851; --wa-tint: rgba(37, 211, 102, .12); }
+[data-theme="dark"] { --wa: #3DDC84; --wa-tint: rgba(61, 220, 132, .14); }
+
+.msg-head .msg-sender { margin-right: auto; }
+.msg-via-wa { display: inline-flex; align-items: center; gap: 4px; color: var(--wa); font-weight: 600; }
+.msg-wa-status:empty { display: none; }
+.wa-tick { display: inline-flex; align-items: center; gap: 4px; color: var(--text-muted); font-size: 11px; }
+.wa-tick.read { color: #34B7F1; }
+.wa-tick.failed { color: var(--maple); font-weight: 600; }
+.wa-tick.notice { color: var(--wa); }
+.msg.via-wa .msg-body { border-left: 2px solid var(--wa); padding-left: 8px; }
+.conv-wa { color: var(--wa); }
+
+.msg-channel { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin-bottom: 8px; font-size: 12.5px; color: var(--text-muted); }
+.msg-channel-label { font-weight: 600; }
+.msg-channel-opt {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px;
+  color: var(--text); cursor: pointer; transition: all var(--ease);
+}
+.msg-channel-opt input { position: absolute; opacity: 0; pointer-events: none; }
+.msg-channel-opt:has(input:checked) { border-color: var(--ink); background: var(--surface-hover); font-weight: 600; }
+.msg-channel-opt:has(input[value="whatsapp"]:checked) { border-color: var(--wa); background: var(--wa-tint); color: var(--wa); }
+.msg-channel-opt:has(input:focus-visible) { outline: 2px solid var(--gold); outline-offset: 1px; }
+.msg-channel-opt.disabled { opacity: .5; cursor: not-allowed; }
+.msg-channel-opt .fa-whatsapp { color: var(--wa); }
+.msg-channel-note { flex-basis: 100%; font-size: 11.5px; }
+.btn.btn-wa { background: var(--wa); color: #fff; }
+.btn.btn-wa:hover { filter: brightness(.93); }
+
+.wa-unmatched-link {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 14px; border-bottom: 1px solid var(--line);
+  background: var(--wa-tint); color: var(--ink); font-size: 12.5px; font-weight: 600;
+}
+.wa-unmatched-link[hidden], .wa-unmatched-link .conv-unread[hidden] { display: none; }
+.wa-unmatched-link .fa-whatsapp { color: var(--wa); font-size: 15px; }
+.wa-unmatched-link span:nth-child(2) { flex: 1; }
+.wa-unmatched-link.active { box-shadow: inset 3px 0 0 var(--wa); }
+
+.wa-unmatched { padding: 14px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+.wa-card { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; background: var(--card); }
+.wa-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.wa-card-name { font-weight: 700; color: var(--ink); font-size: 13.5px; }
+.wa-card-number { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.wa-card-recent { margin: 10px 0; display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; }
+.wa-recent-line { display: flex; gap: 6px; align-items: baseline; }
+.wa-recent-dir { color: var(--text-muted); font-weight: 600; flex-shrink: 0; }
+.wa-recent-body { flex: 1; min-width: 0; color: var(--text); overflow-wrap: anywhere; }
+.wa-recent-time { color: var(--text-muted); font-size: 11px; flex-shrink: 0; }
+.wa-card-suggest { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+.wa-suggest-chip {
+  border: 1px dashed var(--wa); background: var(--wa-tint); color: var(--ink);
+  border-radius: 999px; padding: 3px 10px; font: inherit; font-size: 12px; cursor: pointer;
+}
+.wa-card-link { display: flex; gap: 8px; }
+.wa-card-link select {
+  flex: 1; min-width: 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--radius-sm);
+  font: inherit; font-size: 12.5px; background: var(--card); color: var(--text);
+}
+@media (max-width: 600px) { .wa-card-link { flex-direction: column; } }
 .conv-meta { display: flex; align-items: center; gap: 4px; margin-top: 5px; min-width: 0; font-size: 11.5px; color: var(--text-muted); }
 .conv-meta .class-tag { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; font-size: 10.5px; padding: 1px 7px; }
 .conv-meta-item { flex-shrink: 0; white-space: nowrap; }

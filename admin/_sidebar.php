@@ -5,9 +5,11 @@ $activeNav = $activeNav ?? '';
 // Inbox badge = conversations with unread client messages. Wrapped so a
 // missing messages table (code deployed before the migration ran) can
 // never break every admin page — the badge just doesn't show.
+// Unmatched WhatsApp numbers count too: they need someone to link them.
 require_once __DIR__ . '/../includes/messages.php';
+require_once __DIR__ . '/../includes/whatsapp.php';
 try {
-    $navInboxUnread = staffUnreadConversationCount();
+    $navInboxUnread = staffUnreadConversationCount() + (waEnabled() ? waUnmatchedCount() : 0);
 } catch (Throwable $e) {
     $navInboxUnread = 0;
 }

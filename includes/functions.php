@@ -360,6 +360,15 @@ function mimeTypeForExtension(string $filename): string
         'png'  => 'image/png',
         'doc'  => 'application/msword',
         'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        // WhatsApp media (voice notes, videos, stickers) received from clients
+        'webp' => 'image/webp',
+        'ogg'  => 'audio/ogg',
+        'mp3'  => 'audio/mpeg',
+        'm4a'  => 'audio/mp4',
+        'aac'  => 'audio/aac',
+        'amr'  => 'audio/amr',
+        'mp4'  => 'video/mp4',
+        '3gp'  => 'video/3gpp',
     ];
     return $map[$ext] ?? 'application/octet-stream';
 }

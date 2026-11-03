@@ -3,6 +3,7 @@ require_once __DIR__ . '/../includes/admin_auth.php';
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/messages.php';
+require_once __DIR__ . '/../includes/whatsapp.php';
 requireAdmin();
 $activeNav = 'inbox';
 
@@ -16,7 +17,7 @@ $openClient = null;
 $openClientId = (int)($_GET['client_id'] ?? 0);
 if ($openClientId) {
     $stmt = $db->prepare('
-      SELECT c.id, c.full_name, c.email, c.case_type, c.reference_number, p.full_name AS processor_name
+      SELECT c.id, c.full_name, c.email, c.phone, c.whatsapp_number, c.case_type, c.reference_number, p.full_name AS processor_name
       FROM clients c
       LEFT JOIN processors p ON p.id = c.processor_id
       WHERE c.id = ?
@@ -24,6 +25,15 @@ if ($openClientId) {
     $stmt->execute([$openClientId]);
     $openClient = $stmt->fetch() ?: null;
 }
+
+// WhatsApp (only once configured — see includes/whatsapp.php).
+$waOn = waEnabled();
+$waView = $waOn && !$openClient && ($_GET['view'] ?? '') === 'whatsapp';
+$waUnmatched = $waView ? waUnmatchedList() : [];
+$waUnmatchedCount = $waOn ? waUnmatchedCount() : 0;
+$waNumber = $waOn && $openClient ? waNumberForClient($openClient) : null;
+$waWindowEnds = $waOn && $openClient ? waWindowEndsAt((int)$openClient['id']) : null;
+$waDefault = $waOn && $openClient && $waNumber ? waPreferredChannel((int)$openClient['id']) : 'portal';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -46,11 +56,11 @@ if ($openClientId) {
     <div class="main-header">
       <div>
         <h1>Inbox</h1>
-        <p>Messages between your team and clients. Clients see these in the Messages tab of their portal.</p>
+        <p>Messages between your team and clients<?= $waOn ? ', from the portal and WhatsApp' : '' ?>. Clients see these in the Messages tab of their portal.</p>
       </div>
     </div>
 
-    <div class="msg-layout<?= $openClient ? ' has-open' : '' ?>" id="msgApp"
+    <div class="msg-layout<?= $openClient || $waView ? ' has-open' : '' ?>" id="msgApp"
          data-viewer="admin"
          data-endpoint="api/admin_messages.php"
          data-file-endpoint="api/admin_message_file.php"
@@ -90,6 +100,13 @@ if ($openClientId) {
           </div>
           <label class="conv-unread-toggle"><input type="checkbox" id="msgFilterUnread"> Unread only</label>
         </div>
+        <?php if ($waOn): ?>
+          <a class="wa-unmatched-link<?= $waView ? ' active' : '' ?>" href="inbox.php?view=whatsapp" id="waUnmatchedLink"<?= $waUnmatchedCount || $waView ? '' : ' hidden' ?>>
+            <i class="fa-brands fa-whatsapp"></i>
+            <span>Unmatched WhatsApp numbers</span>
+            <span class="conv-unread" id="waUnmatchedCount"<?= $waUnmatchedCount ? '' : ' hidden' ?>><?= $waUnmatchedCount ?></span>
+          </a>
+        <?php endif; ?>
         <div class="conv-count" id="msgConvCount" hidden></div>
         <div class="conv-list" id="msgConvList"></div>
         <?php // Initial data for instant search; api/admin_messages.php?list=1 refreshes it. ?>
@@ -100,7 +117,55 @@ if ($openClientId) {
       </div>
 
       <div class="card msg-panel">
-        <?php if (!$openClient): ?>
+        <?php if ($waView): ?>
+          <div class="msg-panel-head">
+            <div>
+              <h2><i class="fa-brands fa-whatsapp" style="color:#25D366;"></i> Unmatched WhatsApp numbers</h2>
+              <div class="msg-panel-sub">WhatsApp messages from numbers that don't match exactly one client. Clients can't see these until you link the number — then they move into that client's thread.</div>
+            </div>
+          </div>
+          <div class="wa-unmatched" id="waUnmatched">
+            <?php if (!$waUnmatched): ?>
+              <div class="msg-select-prompt"><div class="icon">✅</div>Nothing waiting — every WhatsApp chat is linked to a client.</div>
+            <?php endif; ?>
+            <?php foreach ($waUnmatched as $u): $suggested = $u['suggestions'][0]['id'] ?? 0; ?>
+              <div class="wa-card" data-wa-number="<?= h($u['wa_from']) ?>">
+                <div class="wa-card-head">
+                  <div>
+                    <div class="wa-card-name"><?= h($u['profile_name'] ?: 'Unknown') ?></div>
+                    <div class="wa-card-number"><?= h(waFormatNumber($u['wa_from'])) ?> · <?= (int)$u['message_count'] ?> message<?= (int)$u['message_count'] === 1 ? '' : 's' ?></div>
+                  </div>
+                  <button type="button" class="btn btn-ghost btn-sm" data-wa-ignore title="Hide this number (spam, wrong number)"><i class="fa-solid fa-eye-slash"></i> Ignore</button>
+                </div>
+                <div class="wa-card-recent">
+                  <?php foreach ($u['recent'] as $r): $files = $r['files_json'] ? json_decode($r['files_json'], true) : []; ?>
+                    <div class="wa-recent-line <?= $r['direction'] === 'out' ? 'out' : '' ?>">
+                      <span class="wa-recent-dir"><?= $r['direction'] === 'out' ? 'Office:' : 'Them:' ?></span>
+                      <span class="wa-recent-body"><?= h(mb_strimwidth($r['body'] !== '' ? $r['body'] : implode(', ', array_column($files ?: [], 'original_name')), 0, 160, '…')) ?></span>
+                      <span class="wa-recent-time" data-utc="<?= h($r['created_at']) ?>"></span>
+                    </div>
+                  <?php endforeach; ?>
+                </div>
+                <?php if ($u['suggestions']): ?>
+                  <div class="wa-card-suggest">Possible match:
+                    <?php foreach ($u['suggestions'] as $sg): ?>
+                      <button type="button" class="wa-suggest-chip" data-wa-pick="<?= (int)$sg['id'] ?>"><?= h($sg['full_name']) ?><?= $sg['phone'] ? ' · ' . h($sg['phone']) : '' ?></button>
+                    <?php endforeach; ?>
+                  </div>
+                <?php endif; ?>
+                <div class="wa-card-link">
+                  <select data-wa-client aria-label="Client to link this number to">
+                    <option value="">Link to client…</option>
+                    <?php foreach ($clientDirectory as $c): ?>
+                      <option value="<?= (int)$c['client_id'] ?>"<?= $c['client_id'] === $suggested ? ' selected' : '' ?>><?= h($c['full_name']) ?><?= $c['ref'] !== '' ? ' (#' . h($c['ref']) . ')' : '' ?></option>
+                    <?php endforeach; ?>
+                  </select>
+                  <button type="button" class="btn btn-primary btn-sm" data-wa-link><i class="fa-solid fa-link"></i> Link &amp; move messages</button>
+                </div>
+              </div>
+            <?php endforeach; ?>
+          </div>
+        <?php elseif (!$openClient): ?>
           <div class="msg-select-prompt">
             <div class="icon">💬</div>
             Pick a conversation on the left, or search for any client to start a new one.
@@ -114,6 +179,7 @@ if ($openClientId) {
                 <?= $openClient['reference_number'] ? 'Client No. ' . h($openClient['reference_number']) . ' · ' : '' ?>
                 <?= $openClient['case_type'] ? h($openClient['case_type']) . ' · ' : '' ?>
                 Processor: <?= $openClient['processor_name'] ? h($openClient['processor_name']) : 'Unassigned' ?>
+                <?php if ($waNumber): ?> · <i class="fa-brands fa-whatsapp" style="color:#25D366;"></i> <?= h(waFormatNumber($waNumber)) ?><?php endif; ?>
               </div>
             </div>
             <div class="msg-panel-actions">
@@ -139,6 +205,18 @@ if ($openClientId) {
                 <?php endforeach; ?>
               </select>
             </div>
+            <?php if ($waOn): ?>
+              <div class="msg-channel" id="msgChannel"
+                   data-window-ends="<?= h($waWindowEnds ?? '') ?>"
+                   data-has-template="<?= defined('WA_NOTICE_TEMPLATE') && WA_NOTICE_TEMPLATE !== '' ? '1' : '0' ?>">
+                <span class="msg-channel-label">Send via</span>
+                <label class="msg-channel-opt"><input type="radio" name="msgChannelPick" value="portal"<?= $waDefault === 'portal' ? ' checked' : '' ?>> <i class="fa-solid fa-globe"></i> Portal</label>
+                <label class="msg-channel-opt<?= $waNumber ? '' : ' disabled' ?>" title="<?= $waNumber ? h(waFormatNumber($waNumber)) : 'No WhatsApp number on file. It is saved automatically when this client messages on WhatsApp and you link their number, or when their phone is saved with a country code (+…).' ?>">
+                  <input type="radio" name="msgChannelPick" value="whatsapp"<?= $waDefault === 'whatsapp' ? ' checked' : '' ?><?= $waNumber ? '' : ' disabled' ?>> <i class="fa-brands fa-whatsapp"></i> WhatsApp
+                </label>
+                <span class="msg-channel-note" id="msgChannelNote"></span>
+              </div>
+            <?php endif; ?>
             <div class="msg-chips" id="msgFileChips" hidden></div>
             <div class="msg-composer-row">
               <label class="msg-attach-btn" title="Attach files (PDF, image, Word — up to <?= maxUploadMb() ?> MB each)">
