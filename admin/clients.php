@@ -476,14 +476,25 @@ function renderClientsTable() {
 
 searchInput.addEventListener('input', renderClientsTable);
 
+// The sidebar's Class shortcuts link here as ?class=<slug>; chip clicks
+// keep that URL and the sidebar highlight in step.
+function setClassFilter(slug) {
+  const btn = document.querySelector(`#classFilterBar .class-filter-btn[data-class="${CSS.escape(slug)}"]`);
+  if (!btn) return;
+  document.querySelectorAll('#classFilterBar .class-filter-btn').forEach(b => b.classList.toggle('active', b === btn));
+  activeClassFilter = slug;
+  const url = new URL(location.href);
+  if (slug === 'all') url.searchParams.delete('class'); else url.searchParams.set('class', slug);
+  history.replaceState(null, '', url);
+  document.querySelectorAll('.sidebar [data-nav-class]').forEach(a => a.classList.toggle('active', a.dataset.navClass === slug));
+  document.querySelector('.sidebar [data-nav-clients]')?.classList.toggle('active', !document.querySelector(`.sidebar [data-nav-class="${CSS.escape(slug)}"]`));
+  renderClientsTable();
+}
 document.querySelectorAll('#classFilterBar .class-filter-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('#classFilterBar .class-filter-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    activeClassFilter = btn.dataset.class;
-    renderClientsTable();
-  });
+  btn.addEventListener('click', () => setClassFilter(btn.dataset.class));
 });
+const initialClass = new URLSearchParams(location.search).get('class');
+if (initialClass) setClassFilter(initialClass);
 
 clientGroups.forEach(group => {
   const slug = group.dataset.group;

@@ -605,6 +605,27 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
+/* ---------- Collapsible sidebar (desktop) ----------
+   The saved state is applied by an inline script inside the sidebar
+   itself, so a collapsed sidebar never flashes open on page load. */
+document.addEventListener('DOMContentLoaded', () => {
+  const btn = document.getElementById('sidebarCollapseBtn');
+  const sidebar = document.getElementById('appSidebar');
+  if (!btn || !sidebar) return;
+
+  const sync = () => {
+    const label = sidebar.classList.contains('collapsed') ? 'Expand sidebar' : 'Collapse sidebar';
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
+  };
+  sync();
+  btn.addEventListener('click', () => {
+    sidebar.classList.toggle('collapsed');
+    try { localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed') ? '1' : '0'); } catch (e) {}
+    sync();
+  });
+});
+
 /* ---------- Light/dark theme toggle ----------
    The actual theme (light vs dark) is set as early as possible by a small
    inline script in each page's <head> (before any CSS/JS loads), so the

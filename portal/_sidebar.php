@@ -64,40 +64,50 @@ if ($navClientId) {
     }
 }
 ?>
-<aside class="sidebar">
+<?php
+$navUserName = $_SESSION['client_name'] ?? 'Client';
+$navUserParts = preg_split('/\s+/', trim($navUserName));
+$navUserInitials = strtoupper(substr($navUserParts[0], 0, 1) . (count($navUserParts) > 1 ? substr(end($navUserParts), 0, 1) : ''));
+?>
+<aside class="sidebar" id="appSidebar">
+  <script>try{if(localStorage.getItem('sidebarCollapsed')==='1')document.currentScript.parentElement.classList.add('collapsed')}catch(e){}</script>
   <div class="sidebar-top">
     <div class="brand">
       <span class="brand-logo"><img src="images/duque-logo.png?v=<?= assetVersion('images/duque-logo.png') ?>" alt=""></span>
       <span class="brand-text">Duque Immigration<small>Client Portal</small></span>
     </div>
+    <button type="button" class="sidebar-collapse-btn" id="sidebarCollapseBtn" title="Collapse sidebar" aria-label="Collapse sidebar">
+      <i class="fa-solid fa-angles-left"></i>
+    </button>
     <button type="button" class="mobile-nav-toggle" id="mobileNavToggle" aria-label="Toggle menu">
       <i class="fa-solid fa-bars"></i>
     </button>
   </div>
   <div class="sidebar-drawer">
     <nav>
-      <a href="profile.php" class="<?= $activeNav === 'profile' ? 'active' : '' ?>"><i class="fa-solid fa-id-badge"></i> My Profile</a>
-      <a href="documents.php" class="<?= $activeNav === 'documents' ? 'active' : '' ?>">
-        <i class="fa-solid fa-folder-open"></i> My Documents
+      <a href="profile.php" title="My Profile" class="<?= $activeNav === 'profile' ? 'active' : '' ?>"><i class="fa-solid fa-id-badge"></i><span class="nav-label">My Profile</span></a>
+      <a href="documents.php" title="My Documents" class="<?= $activeNav === 'documents' ? 'active' : '' ?>">
+        <i class="fa-solid fa-folder-open"></i><span class="nav-label">My Documents</span>
         <?php if ($pendingDocsCount > 0): ?><span class="nav-badge" title="<?= $pendingDocsCount ?> document<?= $pendingDocsCount === 1 ? '' : 's' ?> need your attention"><?= $pendingDocsCount ?></span><?php endif; ?>
       </a>
-      <a href="application_review.php" class="<?= $activeNav === 'application_review' ? 'active' : '' ?>">
-        <i class="fa-solid fa-file-signature"></i> Application Review
+      <a href="application_review.php" title="Application Review" class="<?= $activeNav === 'application_review' ? 'active' : '' ?>">
+        <i class="fa-solid fa-file-signature"></i><span class="nav-label">Application Review</span>
         <?php if ($pendingReviewCount > 0): ?><span class="nav-badge" title="<?= $pendingReviewCount ?> form<?= $pendingReviewCount === 1 ? '' : 's' ?> awaiting your review"><?= $pendingReviewCount ?></span><?php endif; ?>
       </a>
-      <a href="messages.php" class="<?= $activeNav === 'messages' ? 'active' : '' ?>">
-        <i class="fa-solid fa-comments"></i> Messages
+      <a href="messages.php" title="Messages" class="<?= $activeNav === 'messages' ? 'active' : '' ?>">
+        <i class="fa-solid fa-comments"></i><span class="nav-label">Messages</span>
         <?php if ($unreadMessagesCount > 0): ?><span class="nav-badge" id="navMessagesBadge" title="<?= $unreadMessagesCount ?> unread message<?= $unreadMessagesCount === 1 ? '' : 's' ?>"><?= $unreadMessagesCount ?></span><?php endif; ?>
       </a>
     </nav>
     <div class="spacer"></div>
     <div class="theme-toggle-row">
-      <span class="theme-toggle-label"><i class="fa-solid fa-moon"></i> Dark mode</span>
+      <span class="theme-toggle-label"><i class="fa-solid fa-moon"></i><span class="nav-label">Dark mode</span></span>
       <button type="button" class="theme-switch" id="themeToggle" aria-label="Toggle dark mode"></button>
     </div>
     <div class="user-box">
-      <div class="name"><i class="fa-solid fa-circle-user"></i> <?= h($_SESSION['client_name'] ?? 'Client') ?></div>
-      <a href="logout.php"><i class="fa-solid fa-right-from-bracket"></i> Sign out</a>
+      <span class="user-avatar" title="<?= h($navUserName) ?>"><?= h($navUserInitials) ?></span>
+      <span class="user-meta"><span class="name"><?= h($navUserName) ?></span><small>Client</small></span>
+      <a href="logout.php" class="user-signout" title="Sign out" aria-label="Sign out"><i class="fa-solid fa-right-from-bracket"></i></a>
     </div>
   </div>
 </aside>
