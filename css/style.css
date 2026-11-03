@@ -977,6 +977,125 @@ tr.row-link:hover td:first-child::before { width: 3px; }
   min-width: 90px;
 }
 
+/* ---------- ClickUp-style grouped list (Clients) ----------
+   One table, one <tbody> per Class group so every group shares the same
+   column widths. Each group's header row doubles as its column header
+   (ClickUp list view), rows are compact single lines, and the table
+   scrolls sideways on narrow screens with the name column pinned. */
+.cu-list {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.cu-table { table-layout: fixed; min-width: 1220px; border-collapse: separate; border-spacing: 0; }
+.cu-table td, .cu-table th { transition: background var(--ease); }
+.cu-table tbody tr:last-child td { border-radius: 0; }
+
+.cu-sticky { position: sticky; left: 0; z-index: 1; background: var(--card); }
+
+/* Group header row: caret + solid colored pill + count, then the column labels. */
+.cu-group-head th {
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+  border-radius: 0 !important;
+  padding: 18px 12px 8px;
+  font-size: 10.5px; font-weight: 600; letter-spacing: .3px;
+  text-transform: uppercase; color: var(--text-muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  vertical-align: bottom;
+}
+.cu-group:first-child .cu-group-head th { padding-top: 12px; }
+.cu-group-head th.cu-sticky { padding-left: 8px; text-transform: none; letter-spacing: 0; overflow: visible; }
+.cu-group-toggle {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: none; border: none; padding: 2px 4px 2px 2px; border-radius: 6px;
+  font-family: inherit; cursor: pointer; color: var(--text-muted);
+}
+.cu-group-toggle:hover { background: var(--surface-hover); }
+.cu-caret { font-size: 12px; width: 12px; transition: transform var(--ease); }
+.cu-group.collapsed .cu-caret { transform: rotate(-90deg); }
+.cu-group-pill {
+  background: var(--grp); color: #fff;
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
+  padding: 4px 9px; border-radius: 5px; line-height: 1.2;
+}
+[data-theme="dark"] .cu-group-pill { color: #141414; }
+.cu-group-count { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.cu-group.collapsed .cu-group-head th:not(.cu-sticky) { color: transparent; }
+.cu-group.collapsed .cu-group-head th { border-bottom-color: transparent; }
+
+/* Rows */
+.cu-row td {
+  padding: 0 12px; height: 40px;
+  font-size: 13px; color: var(--text);
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.cu-row td.cu-sticky { box-shadow: inset 3px 0 0 var(--grp); padding-left: 16px; }
+.cu-row { cursor: pointer; }
+.cu-row:hover td { background: var(--surface-hover); }
+.cu-muted { color: var(--text-muted) !important; font-size: 12.5px; }
+.cu-ellipsis { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.cu-name { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.cu-name a { color: var(--ink); font-weight: 500; }
+.cu-name a:hover { color: var(--gold); text-decoration: underline; text-underline-offset: 2px; }
+.cu-status { width: 11px; height: 11px; border-radius: 3px; flex-shrink: 0; }
+.cu-status-none     { border: 1.5px solid var(--line-strong); }
+.cu-status-pending  { background: var(--pending); }
+.cu-status-received { background: var(--received); }
+.cu-status-revision { background: var(--revision); }
+.cu-status-accepted { background: var(--accepted); }
+
+.cu-row .class-tag { font-size: 11px; }
+
+.cu-assignee { display: inline-flex; align-items: center; gap: 7px; max-width: 100%; font-size: 12.5px; }
+.cu-avatar {
+  width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 9.5px; font-weight: 700; color: #fff; letter-spacing: .2px;
+}
+[data-theme="dark"] .cu-avatar { color: #141414; }
+.cu-assignee-empty { color: var(--text-muted); }
+.cu-assignee-empty .cu-avatar { border: 1.5px dashed var(--line-strong); color: var(--text-muted); font-size: 9px; }
+
+.cu-progress { display: flex; align-items: center; gap: 8px; }
+.cu-bar { flex: 1; display: flex; height: 6px; border-radius: 999px; overflow: hidden; background: var(--surface-hover); }
+.cu-bar span { height: 100%; }
+.cu-seg-accepted { background: var(--accepted); }
+.cu-seg-received { background: var(--received); }
+.cu-seg-revision { background: var(--revision); }
+.cu-seg-pending  { background: var(--line-strong); }
+.cu-progress-text { font-size: 11.5px; font-weight: 600; color: var(--text-muted); min-width: 34px; text-align: right; font-variant-numeric: tabular-nums; }
+
+.cu-row .password-cell .password-value { min-width: 64px; font-size: 12px; }
+.cu-row .icon-btn { width: 24px; height: 24px; font-size: 11px; border-color: transparent; background: transparent; }
+.cu-row .icon-btn:hover { background: var(--card); border-color: var(--line); }
+.cu-hover-action { opacity: 0; transition: opacity var(--ease); }
+.cu-row:hover .cu-hover-action, .cu-hover-action:focus-visible { opacity: 1; }
+@media (hover: none) { .cu-hover-action { opacity: 1; } }
+
+/* "Show N more" + "+ Add client" rows */
+.cu-more-row td, .cu-add-row td { padding: 0; height: 34px; border-bottom: 1px solid var(--line); }
+.cu-group:last-child .cu-add-row td { border-bottom: none; }
+.cu-ghost-link {
+  position: sticky; left: 0;
+  display: inline-flex; align-items: center; gap: 7px;
+  height: 34px; padding: 0 16px 0 37px;
+  background: none; border: none; font-family: inherit;
+  font-size: 12.5px; color: var(--text-muted); cursor: pointer;
+}
+.cu-ghost-link:hover { color: var(--ink); }
+.cu-ghost-link i { font-size: 11px; }
+
+@media (max-width: 700px) {
+  .cu-table { min-width: 1080px; }
+  .cu-table .cu-col-name { width: 190px; }
+}
+
 /* ---------- Search bar ---------- */
 .search-bar { position: relative; max-width: 320px; margin-bottom: 14px; }
 .search-bar i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 12px; }

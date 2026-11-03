@@ -45,6 +45,43 @@ foreach ($clients as $c) {
 // any existing numbers outside that range (rare, but possible for a
 // long-running client base) — so the dropdown is genuinely useful for
 // picking any number, not just ones already on file.
+// ClickUp-style list: one collapsible group per Class, in taxonomy order,
+// then "Other" (custom case types) and "No case type" last.
+$clientGroups = [];
+foreach (classCategoryOrder() as $cat) {
+    $clientGroups[classCategorySlug($cat)] = ['label' => $cat, 'color' => 'var(--class-' . classCategorySlug($cat) . ')', 'rows' => []];
+}
+$clientGroups['other'] = ['label' => 'Other', 'color' => 'var(--slate-light)', 'rows' => []];
+$clientGroups['none']  = ['label' => 'No case type', 'color' => 'var(--pending)', 'rows' => []];
+foreach ($clients as $c) {
+    $slug = $c['class_category'] === null ? 'none' : classCategorySlug($c['class_category']);
+    $clientGroups[$slug]['rows'][] = $c;
+}
+$clientGroups = array_filter($clientGroups, fn($g) => $g['rows']);
+
+// Status square next to each name — the single most actionable doc state.
+function clientDocState(array $c): array
+{
+    if (!$c['total_docs'])      return ['none', 'No checklist yet'];
+    if ($c['revision_count'])   return ['revision', 'Needs revision'];
+    if ($c['received_count'])   return ['received', 'Uploads waiting for review'];
+    if ($c['pending_count'])    return ['pending', 'Waiting on client'];
+    return ['accepted', 'All documents accepted'];
+}
+
+// Assignee avatar: initials, with a stable color per processor name.
+function processorAvatarHtml(?string $name): string
+{
+    if (!$name) {
+        return '<span class="cu-assignee cu-assignee-empty"><span class="cu-avatar"><i class="fa-regular fa-user"></i></span>Unassigned</span>';
+    }
+    $palette = ['economic', 'family', 'work', 'study', 'visit', 'lmia'];
+    $color = $palette[crc32($name) % count($palette)];
+    $parts = preg_split('/\s+/', trim($name));
+    $initials = strtoupper(substr($parts[0], 0, 1) . (count($parts) > 1 ? substr(end($parts), 0, 1) : ''));
+    return '<span class="cu-assignee" title="' . h($name) . '"><span class="cu-avatar" style="background:var(--class-' . $color . ')">' . h($initials) . '</span><span class="cu-ellipsis">' . h($name) . '</span></span>';
+}
+
 $existingClientNumbers = array_values(array_unique(array_filter(array_column($clients, 'reference_number'))));
 $clientNoOptions = array_unique(array_merge(range(1, 100), array_map('strval', $existingClientNumbers)));
 sort($clientNoOptions, SORT_NATURAL);
@@ -87,70 +124,84 @@ sort($clientNoOptions, SORT_NATURAL);
       <button type="button" class="class-filter-btn" data-class="other">Other <span class="count"><?= (int)$classFilterCounts['other'] ?></span></button>
     </div>
 
-    <div class="card">
-      <table class="responsive-table">
-        <thead>
-          <tr>
-            <th>Name of Applicant</th>
-            <th>Case Type</th>
-            <th>Email Address</th>
-            <th>Phone Number</th>
-            <th>Password</th>
-          </tr>
-        </thead>
-        <tbody id="clientsTbody">
-          <?php if (!$clients): ?>
-            <tr><td colspan="5">
-              <div class="empty-state">
-                <div class="icon">📁</div>
-                No clients yet. Add your first client to start a document checklist.
-              </div>
-            </td></tr>
-          <?php endif; ?>
-          <?php foreach ($clients as $c): ?>
-            <tr data-search="<?= h(strtolower($c['full_name'] . ' ' . $c['email'] . ' ' . $c['case_type'] . ' ' . $c['reference_number'] . ' ' . $c['processor_name'])) ?>" data-class="<?= $c['class_category'] ? h(classCategorySlug($c['class_category'])) : '' ?>">
-              <td>
-                <a href="client.php?id=<?= (int)$c['id'] ?>" style="display:flex;align-items:center;gap:12px;color:inherit;">
-                  <div class="avatar"><?= h(strtoupper(substr($c['full_name'], 0, 1))) ?></div>
-                  <div>
-                    <div style="font-weight:600;color:var(--ink);"><?= h($c['full_name']) ?></div>
-                    <div style="font-size:12px;color:var(--text-muted);margin-top:1px;">
-                      <?= $c['reference_number'] ? 'Client No. ' . h($c['reference_number']) : 'No Client No. yet' ?> · <?= $c['processor_name'] ? h($c['processor_name']) : 'Unassigned' ?>
-                    </div>
-                    <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:3px;">
-                      <?php if ($c['pending_count']):  ?><span class="pill status-pending" style="padding:2px 7px;"><?= (int)$c['pending_count'] ?> pending</span><?php endif; ?>
-                      <?php if ($c['received_count']): ?><span class="pill status-received" style="padding:2px 7px;"><?= (int)$c['received_count'] ?> received</span><?php endif; ?>
-                      <?php if ($c['revision_count']): ?><span class="pill status-revision" style="padding:2px 7px;"><?= (int)$c['revision_count'] ?> revision</span><?php endif; ?>
-                      <?php if ($c['accepted_count']): ?><span class="pill status-accepted" style="padding:2px 7px;"><?= (int)$c['accepted_count'] ?> accepted</span><?php endif; ?>
-                      <?php if (!$c['total_docs']): ?><span style="color:var(--text-muted);font-size:12px;">No checklist yet</span><?php endif; ?>
-                    </div>
-                  </div>
-                </a>
-              </td>
-              <td data-label="Case Type"><?= classTagHtml($c['case_type']) ?></td>
-              <td data-label="Email Address"><?= h($c['email']) ?></td>
-              <td data-label="Phone Number"><?= h($c['phone'] ?: '—') ?></td>
-              <td data-label="Password">
-                <div class="password-cell">
-                  <span class="password-value" data-password="<?= h($c['plain_password'] ?: '') ?>" data-visible="0">••••••••</span>
-                  <button type="button" class="icon-btn" data-toggle-password title="Show password" aria-label="Show password"><i class="fa-regular fa-eye"></i></button>
-                  <button type="button" class="icon-btn" data-edit-password="<?= (int)$c['id'] ?>" title="Set a new password for <?= h($c['full_name']) ?>" aria-label="Set a new password for <?= h($c['full_name']) ?>"><i class="fa-solid fa-pen"></i></button>
-                </div>
-              </td>
+    <?php if (!$clients): ?>
+      <div class="card">
+        <div class="empty-state">
+          <div class="icon">📁</div>
+          No clients yet. Add your first client to start a document checklist.
+        </div>
+      </div>
+    <?php endif; ?>
+
+    <div class="cu-list" id="clientsList">
+      <table class="cu-table">
+        <colgroup>
+          <col class="cu-col-name"><col style="width:72px"><col style="width:200px"><col style="width:150px">
+          <col style="width:140px"><col style="width:200px"><col style="width:120px"><col style="width:130px">
+        </colgroup>
+        <?php foreach ($clientGroups as $slug => $g): ?>
+          <tbody class="cu-group" data-group="<?= h($slug) ?>" style="--grp:<?= $g['color'] ?>">
+            <tr class="cu-group-head">
+              <th class="cu-sticky">
+                <button type="button" class="cu-group-toggle" aria-expanded="true">
+                  <i class="fa-solid fa-caret-down cu-caret"></i>
+                  <span class="cu-group-pill"><?= h($g['label']) ?></span>
+                  <span class="cu-group-count"><?= count($g['rows']) ?></span>
+                </button>
+              </th>
+              <th>Client No.</th>
+              <th>Case Type</th>
+              <th>Processor</th>
+              <th>Documents</th>
+              <th>Email</th>
+              <th>Phone</th>
+              <th>Password</th>
             </tr>
-          <?php endforeach; ?>
-        </tbody>
+            <?php foreach ($g['rows'] as $c): [$state, $stateLabel] = clientDocState($c); $total = (int)$c['total_docs']; ?>
+              <tr class="cu-row" data-href="client.php?id=<?= (int)$c['id'] ?>" data-search="<?= h(strtolower($c['full_name'] . ' ' . $c['email'] . ' ' . $c['case_type'] . ' ' . $c['reference_number'] . ' ' . $c['processor_name'])) ?>">
+                <td class="cu-sticky">
+                  <div class="cu-name">
+                    <span class="cu-status cu-status-<?= $state ?>" title="<?= h($stateLabel) ?>"></span>
+                    <a href="client.php?id=<?= (int)$c['id'] ?>" class="cu-ellipsis" title="<?= h($c['full_name']) ?>"><?= h($c['full_name']) ?></a>
+                  </div>
+                </td>
+                <td class="cu-muted"><?= $c['reference_number'] ? '#' . h($c['reference_number']) : '—' ?></td>
+                <td><div class="cu-ellipsis" title="<?= h($c['case_type']) ?>"><?= classTagHtml($c['case_type']) ?></div></td>
+                <td><?= processorAvatarHtml($c['processor_name']) ?></td>
+                <td>
+                  <?php if ($total): ?>
+                    <div class="cu-progress" title="<?= (int)$c['accepted_count'] ?> accepted · <?= (int)$c['received_count'] ?> received · <?= (int)$c['revision_count'] ?> revision · <?= (int)$c['pending_count'] ?> pending">
+                      <div class="cu-bar">
+                        <?php foreach (['accepted', 'received', 'revision', 'pending'] as $s): if ($c[$s . '_count']): ?>
+                          <span class="cu-seg-<?= $s ?>" style="width:<?= round($c[$s . '_count'] / $total * 100, 2) ?>%"></span>
+                        <?php endif; endforeach; ?>
+                      </div>
+                      <span class="cu-progress-text"><?= (int)$c['accepted_count'] ?>/<?= $total ?></span>
+                    </div>
+                  <?php else: ?>
+                    <span class="cu-muted">No checklist</span>
+                  <?php endif; ?>
+                </td>
+                <td><div class="cu-ellipsis" title="<?= h($c['email']) ?>"><?= h($c['email']) ?></div></td>
+                <td class="<?= $c['phone'] ? '' : 'cu-muted' ?>"><div class="cu-ellipsis"><?= h($c['phone'] ?: '—') ?></div></td>
+                <td>
+                  <div class="password-cell">
+                    <span class="password-value" data-password="<?= h($c['plain_password'] ?: '') ?>" data-visible="0">••••••••</span>
+                    <button type="button" class="icon-btn" data-toggle-password title="Show password" aria-label="Show password"><i class="fa-regular fa-eye"></i></button>
+                    <button type="button" class="icon-btn cu-hover-action" data-edit-password="<?= (int)$c['id'] ?>" title="Set a new password for <?= h($c['full_name']) ?>" aria-label="Set a new password for <?= h($c['full_name']) ?>"><i class="fa-solid fa-pen"></i></button>
+                  </div>
+                </td>
+              </tr>
+            <?php endforeach; ?>
+            <tr class="cu-more-row" hidden><td colspan="8"><button type="button" class="cu-ghost-link" data-show-more></button></td></tr>
+            <tr class="cu-add-row"><td colspan="8"><button type="button" class="cu-ghost-link" data-add-client><i class="fa-solid fa-plus"></i> Add client</button></td></tr>
+          </tbody>
+        <?php endforeach; ?>
       </table>
       <div class="empty-state" id="noSearchResults" style="display:none;">
         <div class="icon">🔍</div>
         No clients match your search or filter.
       </div>
-    </div>
-
-    <div class="pagination" id="clientsPagination" style="display:none;">
-      <button type="button" class="btn btn-ghost btn-sm" id="clientsPrevPage"><i class="fa-solid fa-chevron-left"></i> Prev</button>
-      <span class="pagination-info" id="clientsPageInfo">Page 1 of 1</span>
-      <button type="button" class="btn btn-ghost btn-sm" id="clientsNextPage">Next <i class="fa-solid fa-chevron-right"></i></button>
     </div>
   </main>
 </div>
@@ -378,64 +429,85 @@ document.getElementById('formNewClient').addEventListener('submit', async (e) =>
   }
 });
 
-// Search / filter, with pagination over the (possibly filtered) result set.
-// Client-side, since this reuses data already rendered into the table —
-// no extra request needed just to turn a page.
-const CLIENTS_PAGE_SIZE = 15;
+// ClickUp-style grouped list: search + Class filter, collapsible groups
+// (remembered per browser), and a "Show N more" row per group instead of
+// page-by-page pagination.
+const GROUP_ROW_LIMIT = 25;
 const searchInput = document.getElementById('clientSearch');
-const allClientRows = Array.from(document.querySelectorAll('#clientsTbody tr[data-search]'));
-let clientsCurrentPage = 1;
+const clientGroups = Array.from(document.querySelectorAll('#clientsList tbody.cu-group'));
+const expandedGroups = new Set();
 let activeClassFilter = 'all';
+let collapsedGroups;
+try { collapsedGroups = new Set(JSON.parse(localStorage.getItem('clientsCollapsedGroups') || '[]')); }
+catch (e) { collapsedGroups = new Set(); }
+function saveCollapsed() {
+  try { localStorage.setItem('clientsCollapsedGroups', JSON.stringify([...collapsedGroups])); } catch (e) {}
+}
 
 function renderClientsTable() {
   const q = searchInput.value.trim().toLowerCase();
-  const matches = allClientRows.filter(row =>
-    row.dataset.search.includes(q) &&
-    (activeClassFilter === 'all' || row.dataset.class === activeClassFilter)
-  );
-  const totalPages = Math.max(1, Math.ceil(matches.length / CLIENTS_PAGE_SIZE));
-  clientsCurrentPage = Math.min(Math.max(1, clientsCurrentPage), totalPages);
-  const start = (clientsCurrentPage - 1) * CLIENTS_PAGE_SIZE;
-  const end = start + CLIENTS_PAGE_SIZE;
-  const pageRows = matches.slice(start, end);
+  let anyMatch = false;
+  clientGroups.forEach(group => {
+    const slug = group.dataset.group;
+    const rows = Array.from(group.querySelectorAll('tr.cu-row'));
+    const matches = rows.filter(row => row.dataset.search.includes(q));
+    const visible = matches.length > 0 && (activeClassFilter === 'all' || activeClassFilter === slug);
+    group.hidden = !visible;
+    if (!visible) return;
+    anyMatch = true;
 
-  allClientRows.forEach(row => { row.style.display = 'none'; });
-  pageRows.forEach(row => { row.style.display = ''; });
+    // While searching, every group with a hit is opened and fully shown.
+    const collapsed = !q && collapsedGroups.has(slug);
+    const limit = (q || expandedGroups.has(slug)) ? Infinity : GROUP_ROW_LIMIT;
+    group.classList.toggle('collapsed', collapsed);
+    group.querySelector('.cu-group-toggle').setAttribute('aria-expanded', String(!collapsed));
+    group.querySelector('.cu-group-count').textContent = matches.length;
+    rows.forEach(row => { row.hidden = true; });
+    if (!collapsed) matches.slice(0, limit).forEach(row => { row.hidden = false; });
 
-  document.getElementById('noSearchResults').style.display = (allClientRows.length && matches.length === 0) ? 'block' : 'none';
-
-  const pagination = document.getElementById('clientsPagination');
-  if (matches.length > CLIENTS_PAGE_SIZE) {
-    pagination.style.display = 'flex';
-    document.getElementById('clientsPageInfo').textContent = `Page ${clientsCurrentPage} of ${totalPages}`;
-    document.getElementById('clientsPrevPage').disabled = clientsCurrentPage <= 1;
-    document.getElementById('clientsNextPage').disabled = clientsCurrentPage >= totalPages;
-  } else {
-    pagination.style.display = 'none';
-  }
+    const hiddenCount = matches.length - Math.min(matches.length, limit);
+    const moreRow = group.querySelector('.cu-more-row');
+    moreRow.hidden = collapsed || hiddenCount <= 0;
+    moreRow.querySelector('[data-show-more]').innerHTML = `<i class="fa-solid fa-angle-down"></i> Show ${hiddenCount} more`;
+    group.querySelector('.cu-add-row').hidden = collapsed;
+  });
+  document.getElementById('noSearchResults').style.display = (clientGroups.length && !anyMatch) ? 'block' : 'none';
 }
 
-searchInput.addEventListener('input', () => {
-  clientsCurrentPage = 1;
-  renderClientsTable();
-});
+searchInput.addEventListener('input', renderClientsTable);
 
 document.querySelectorAll('#classFilterBar .class-filter-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('#classFilterBar .class-filter-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     activeClassFilter = btn.dataset.class;
-    clientsCurrentPage = 1;
     renderClientsTable();
   });
 });
-document.getElementById('clientsPrevPage').addEventListener('click', () => {
-  clientsCurrentPage--;
-  renderClientsTable();
+
+clientGroups.forEach(group => {
+  const slug = group.dataset.group;
+  group.querySelector('.cu-group-toggle').addEventListener('click', () => {
+    if (collapsedGroups.has(slug)) collapsedGroups.delete(slug); else collapsedGroups.add(slug);
+    saveCollapsed();
+    renderClientsTable();
+  });
+  group.querySelector('[data-show-more]').addEventListener('click', () => {
+    expandedGroups.add(slug);
+    renderClientsTable();
+  });
+  group.querySelector('[data-add-client]').addEventListener('click', () => openModal('modalNewClient'));
 });
-document.getElementById('clientsNextPage').addEventListener('click', () => {
-  clientsCurrentPage++;
-  renderClientsTable();
+
+// Whole row opens the client (the name is a real link, for middle-click /
+// copy-link); clicks on the row's own buttons and links are left alone.
+document.querySelectorAll('#clientsList tr.cu-row').forEach(row => {
+  row.addEventListener('click', (e) => {
+    if (e.target.closest('a, button, input')) return;
+    if (window.getSelection().toString()) return; // let people select/copy text
+    if (e.ctrlKey || e.metaKey) window.open(row.dataset.href, '_blank');
+    else location.href = row.dataset.href;
+  });
 });
 
 renderClientsTable();
