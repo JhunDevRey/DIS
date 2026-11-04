@@ -61,13 +61,8 @@ if ($dropboxAddedMonth !== '' && $dropboxAddedYear !== '') {
 
 // Validate each CC email individually so a typo gets a clear error now,
 // rather than that address silently never receiving anything later.
-if ($ccEmailsRaw !== '') {
-    foreach (array_map('trim', explode(',', $ccEmailsRaw)) as $cc) {
-        if ($cc !== '' && !filter_var($cc, FILTER_VALIDATE_EMAIL)) {
-            jsonResponse(false, '"' . $cc . '" in the additional emails field doesn\'t look like a valid email address.');
-        }
-    }
-}
+// Any separator (comma, semicolon, space, new line) is fine — saved tidied.
+$ccEmailsRaw = (string)ccEmailsForSaving($ccEmailsRaw, $email);
 
 $db = getDb();
 

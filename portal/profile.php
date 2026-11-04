@@ -60,8 +60,8 @@ $client = $stmt->fetch();
           </div>
           <div class="field">
             <label>Additional emails <span style="font-weight:400;text-transform:none;">(CC)</span></label>
-            <input type="text" name="cc_emails" value="<?= h($client['cc_emails']) ?>" placeholder="e.g. spouse@example.com, agent@example.com">
-            <p class="help-text">Separate multiple with commas. Anyone listed here will be CC'd on every email we send you — useful for a spouse, agent, or anyone else who should stay in the loop.</p>
+            <input type="text" name="cc_emails" data-email-chips value="<?= h($client['cc_emails']) ?>" placeholder="e.g. spouse@example.com">
+            <p class="help-text">Type or paste an email and press Enter — you can add as many as you need. Anyone listed here will be CC'd on every email we send you — useful for a spouse, agent, or anyone else who should stay in the loop.</p>
           </div>
           <div class="field-row">
             <div class="field">

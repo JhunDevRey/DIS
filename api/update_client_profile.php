@@ -18,13 +18,10 @@ if ($action === 'update_contact_info') {
     $designatedName = trim($_POST['designated_person_name'] ?? '');
     $designatedPhone = trim($_POST['designated_person_phone'] ?? '');
 
-    if ($ccEmailsRaw !== '') {
-        foreach (array_map('trim', explode(',', $ccEmailsRaw)) as $cc) {
-            if ($cc !== '' && !filter_var($cc, FILTER_VALIDATE_EMAIL)) {
-                jsonResponse(false, '"' . $cc . '" in the additional emails field doesn\'t look like a valid email address.');
-            }
-        }
-    }
+    // Any separator (comma, semicolon, space, new line) is fine — saved tidied.
+    $stmt = $db->prepare('SELECT email FROM clients WHERE id = ?');
+    $stmt->execute([$clientId]);
+    $ccEmailsRaw = (string)ccEmailsForSaving($ccEmailsRaw, (string)$stmt->fetchColumn());
 
     $db->prepare('UPDATE clients SET phone = ?, cc_emails = ?, designated_person_name = ?, designated_person_phone = ? WHERE id = ?')
        ->execute([$phone ?: null, $ccEmailsRaw ?: null, $designatedName ?: null, $designatedPhone ?: null, $clientId]);

@@ -389,6 +389,45 @@ function sanitizeFilename(string $name): string
 }
 
 /**
+ * Splits the "Additional emails (CC)" field into clean addresses. Accepts
+ * whatever people type or paste between them — commas, semicolons
+ * (Outlook), spaces or new lines — and "Name <email>" entries. Drops
+ * repeats (any letter case) and the client's own login email, which is
+ * already the To: address. Returns [valid[], invalid[]].
+ */
+function splitCcEmails(?string $raw, string $ownEmail = ''): array
+{
+    $raw = preg_replace('/"[^"]*"/', ' ', (string)$raw); // quoted display names may contain commas
+    $raw = preg_replace('/[^<>,;\n]*<([^<>]+)>/', '$1', $raw);
+    $seen = [strtolower(trim($ownEmail)) => true];
+    $valid = [];
+    $invalid = [];
+    foreach (preg_split('/[\s,;]+/', $raw, -1, PREG_SPLIT_NO_EMPTY) as $part) {
+        $part = trim($part, "\"'");
+        $key = strtolower($part);
+        if ($part === '' || isset($seen[$key])) continue;
+        $seen[$key] = true;
+        if (filter_var($part, FILTER_VALIDATE_EMAIL)) $valid[] = $part;
+        else $invalid[] = $part;
+    }
+    return [$valid, $invalid];
+}
+
+/**
+ * Validates + tidies the CC field for saving: the cleaned "a@x.com, b@y.com"
+ * string (or null when empty). Ends the request with a JSON error naming
+ * the first address that isn't a valid email.
+ */
+function ccEmailsForSaving(?string $raw, string $ownEmail = ''): ?string
+{
+    [$valid, $invalid] = splitCcEmails($raw, $ownEmail);
+    if ($invalid) {
+        jsonResponse(false, '"' . $invalid[0] . '" in the additional emails field doesn\'t look like a valid email address.');
+    }
+    return $valid ? implode(', ', $valid) : null;
+}
+
+/**
  * Normalizes a $_FILES['fieldname'] entry into a flat list of single-file
  * arrays, regardless of whether the <input> had the "multiple" attribute.
  *

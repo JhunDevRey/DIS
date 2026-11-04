@@ -224,8 +224,8 @@ sort($clientNoOptions, SORT_NATURAL);
           </div>
           <div class="field">
             <label>Additional emails <span style="font-weight:400;text-transform:none;">(CC, optional)</span></label>
-            <input type="text" name="cc_emails" placeholder="e.g. spouse@example.com, agent@example.com">
-            <p class="help-text">Separate multiple with commas. Anyone listed here is CC'd on every notification email sent to this client.</p>
+            <input type="text" name="cc_emails" data-email-chips placeholder="e.g. spouse@example.com">
+            <p class="help-text">Type or paste an email and press Enter — add as many as you need. Everyone listed is CC'd on every notification email sent to this client.</p>
           </div>
           <div class="field">
             <label>Case type</label>

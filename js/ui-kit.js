@@ -586,6 +586,114 @@ function initAllLiveLinkEditors(root = document) {
 }
 document.addEventListener('DOMContentLoaded', () => initAllLiveLinkEditors());
 
+/* ---------- Email chips (input[data-email-chips]) ----------
+   Turns the "Additional emails (CC)" text box into chips: type or paste
+   addresses and they split on comma, semicolon, space, Enter or Tab
+   (pasted "Name <email>" works too). Each chip has an ×, Backspace in the
+   empty box removes the last one, and anything that isn't a valid email
+   turns red straight away. The original <input> stays in the form (hidden)
+   holding "a@x.com, b@y.com", so form submit code needs no changes. */
+const EMAIL_CHIP_RE = /^[^\s@,;<>"]+@[^\s@,;<>"]+\.[^\s@,;<>"]{2,}$/;
+
+function splitEmailText(text) {
+  return String(text)
+    .replace(/"[^"]*"/g, ' ') // quoted display names may contain commas
+    .replace(/[^<>,;\n]*<([^<>]+)>/g, '$1')
+    .split(/[\s,;]+/)
+    .map(s => s.replace(/^["']+|["']+$/g, '').trim())
+    .filter(Boolean);
+}
+
+function initEmailChips(original) {
+  if (original.dataset.chipsReady) return;
+  original.dataset.chipsReady = '1';
+
+  const box = document.createElement('div');
+  box.className = 'email-chips';
+  const typer = document.createElement('input');
+  typer.type = 'text';
+  typer.className = 'email-chips-input';
+  typer.autocomplete = 'off';
+  typer.placeholder = original.placeholder || 'Add an email…';
+  typer.setAttribute('aria-label', 'Add an email address');
+  box.appendChild(typer);
+  original.type = 'hidden';
+  original.after(box);
+
+  let emails = [];
+
+  function sync() {
+    // Text still being typed counts too, so pressing Save without Enter keeps it.
+    const pending = splitEmailText(typer.value);
+    original.value = emails.concat(pending).join(', ');
+    typer.placeholder = emails.length ? '' : (original.placeholder || 'Add an email…');
+  }
+
+  function render() {
+    box.querySelectorAll('.email-chip').forEach(c => c.remove());
+    emails.forEach((email, i) => {
+      const ok = EMAIL_CHIP_RE.test(email);
+      const chip = document.createElement('span');
+      chip.className = 'email-chip' + (ok ? '' : ' invalid');
+      chip.title = ok ? email : `"${email}" doesn't look like an email address`;
+      chip.innerHTML = `<span class="email-chip-text"></span><button type="button" aria-label="Remove ${escapeHtml(email)}"><i class="fa-solid fa-xmark"></i></button>`;
+      chip.querySelector('.email-chip-text').textContent = email;
+      chip.querySelector('button').addEventListener('click', () => {
+        emails.splice(i, 1);
+        render();
+        typer.focus();
+      });
+      box.insertBefore(chip, typer);
+    });
+    sync();
+  }
+
+  function add(text) {
+    for (const email of splitEmailText(text)) {
+      if (!emails.some(e => e.toLowerCase() === email.toLowerCase())) emails.push(email);
+    }
+    render();
+  }
+
+  function commitTyped() {
+    if (typer.value.trim()) {
+      add(typer.value);
+      typer.value = '';
+      sync();
+    }
+  }
+
+  typer.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab') {
+      commitTyped(); // and let focus move on as usual
+    } else if (['Enter', ',', ';', ' '].includes(e.key)) {
+      if (!typer.value.trim()) { if (e.key === 'Enter') e.preventDefault(); return; }
+      e.preventDefault();
+      commitTyped();
+    } else if (e.key === 'Backspace' && typer.value === '' && emails.length) {
+      emails.pop();
+      render();
+    }
+  });
+  typer.addEventListener('paste', (e) => {
+    const text = (e.clipboardData || window.clipboardData).getData('text');
+    if (!/[\s,;<]/.test(text)) return; // a single plain address: let it paste normally
+    e.preventDefault();
+    add(typer.value + ' ' + text);
+    typer.value = '';
+    sync();
+  });
+  typer.addEventListener('input', sync);
+  typer.addEventListener('blur', commitTyped);
+  box.addEventListener('click', (e) => { if (e.target === box) typer.focus(); });
+
+  add(original.value);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('input[data-email-chips]').forEach(initEmailChips);
+});
+
 /* ---------- Mobile hamburger nav ---------- */
 document.addEventListener('DOMContentLoaded', () => {
   const toggle = document.getElementById('mobileNavToggle');

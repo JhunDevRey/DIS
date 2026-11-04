@@ -85,9 +85,10 @@ function parseCcEmails(?string $raw): array
     if (!$raw) {
         return [];
     }
-    $parts = array_map('trim', explode(',', $raw));
-    $valid = array_filter($parts, fn($e) => $e !== '' && filter_var($e, FILTER_VALIDATE_EMAIL) !== false);
-    return array_values(array_unique($valid));
+    // Same splitting as when the field is saved (older rows may still use
+    // other separators); invalid entries are just skipped here.
+    require_once __DIR__ . '/functions.php';
+    return splitCcEmails($raw)[0];
 }
 
 /**

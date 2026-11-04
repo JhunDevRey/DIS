@@ -35,13 +35,8 @@ if ($fullName === '' || $email === '') {
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     jsonResponse(false, 'Please enter a valid email address.');
 }
-if ($ccEmailsRaw !== '') {
-    foreach (array_map('trim', explode(',', $ccEmailsRaw)) as $cc) {
-        if ($cc !== '' && !filter_var($cc, FILTER_VALIDATE_EMAIL)) {
-            jsonResponse(false, '"' . $cc . '" in the additional emails field doesn\'t look like a valid email address.');
-        }
-    }
-}
+// Any separator (comma, semicolon, space, new line) is fine — saved tidied.
+$ccEmailsRaw = (string)ccEmailsForSaving($ccEmailsRaw, $email);
 
 // Portal creation date: only build it if all three parts were actually
 // given, and only accept it if it's a real calendar date.
