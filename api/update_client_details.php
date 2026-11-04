@@ -3,6 +3,7 @@ require_once __DIR__ . '/../includes/admin_auth.php';
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/dropbox.php';
+require_once __DIR__ . '/../includes/mailer.php';
 requireAdmin();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -145,4 +146,7 @@ $db->prepare('UPDATE clients SET full_name = ?, email = ?, case_type = ?, phone 
        $clientId,
    ]);
 
-jsonResponse(true, 'Client updated.', ['dropbox_warning' => $dropboxWarning]);
+// Anyone newly added to Additional emails gets a short welcome (best-effort).
+$welcomed = notifyNewCcEmails(['full_name' => $fullName, 'email' => $email], $client['cc_emails'], $ccEmailsRaw, 'staff');
+
+jsonResponse(true, 'Client updated.' . ($welcomed ? ' Welcome email sent to ' . $welcomed . ' new contact' . ($welcomed === 1 ? '' : 's') . '.' : ''), ['dropbox_warning' => $dropboxWarning]);

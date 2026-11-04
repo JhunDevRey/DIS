@@ -606,7 +606,68 @@ function notifyClientWelcome(array $client, string $plainPassword): bool
         $portalLoginUrl
     );
 
-    return sendMail($client['email'], $client['full_name'], $subject, $textBody, $htmlBody, parseCcEmails($client['cc_emails'] ?? null));
+    // To the client only — never CC'd, since it carries their portal
+    // password. Additional emails get notifyCcWelcome() instead.
+    return sendMail($client['email'], $client['full_name'], $subject, $textBody, $htmlBody);
+}
+
+/**
+ * Welcome for someone just added to a client's "Additional emails" (a
+ * spouse, agent, sponsor…): explains why they'll start getting copies of
+ * case emails. Deliberately no login details and no case information —
+ * the portal password only ever goes to the client. $addedBy is 'client'
+ * (they added it in their portal) or 'staff'. Best-effort.
+ */
+function notifyCcWelcome(string $ccEmail, array $client, string $addedBy): bool
+{
+    $name = trim($client['full_name']);
+    $firstName = explode(' ', $name)[0];
+    $subject = "You've been added to " . $name . "'s case updates — Duque Immigration";
+    $intro = $addedBy === 'client'
+        ? $name . ' has added you as an additional contact on their immigration case with Duque Immigration.'
+        : 'Duque Immigration has added you as an additional contact on ' . $name . "'s immigration case.";
+
+    $textBody = "Hello,\n\n"
+        . $intro . "\n\n"
+        . "From now on you'll receive a copy of the email updates we send " . $firstName . " — things like "
+        . "document requests, reminders and new-message notices.\n\n"
+        . "There's nothing you need to do, and you don't need an account.\n\n"
+        . "If you weren't expecting this, or would rather not receive these updates, just reply to this "
+        . "email and we'll take you off the list.\n\n"
+        . "— Duque Immigration";
+
+    $safeName = htmlspecialchars($name, ENT_QUOTES, 'UTF-8');
+    $safeFirst = htmlspecialchars($firstName, ENT_QUOTES, 'UTF-8');
+    $htmlBody = buildEmailHtml('there', [
+        htmlspecialchars($intro, ENT_QUOTES, 'UTF-8'),
+        "From now on you'll receive a copy of the email updates we send <strong>" . $safeFirst . "</strong> — things like document requests, reminders and new-message notices.",
+        "There's nothing you need to do, and you don't need an account.",
+        "If you weren't expecting this, or would rather not receive these updates, just reply to this email and we'll take you off <strong>" . $safeName . "</strong>'s list.",
+    ]);
+
+    return sendMail($ccEmail, '', $subject, $textBody, $htmlBody);
+}
+
+/**
+ * Sends notifyCcWelcome() to every address that's in $newRaw but wasn't in
+ * $oldRaw (any letter case), so re-saving a form never re-welcomes anyone.
+ * Returns how many were sent.
+ */
+function notifyNewCcEmails(array $client, ?string $oldRaw, ?string $newRaw, string $addedBy): int
+{
+    $before = array_map('strtolower', parseCcEmails($oldRaw));
+    $sent = 0;
+    foreach (parseCcEmails($newRaw) as $email) {
+        if (in_array(strtolower($email), $before, true) || strcasecmp($email, (string)($client['email'] ?? '')) === 0) {
+            continue;
+        }
+        try {
+            if (notifyCcWelcome($email, $client, $addedBy)) $sent++;
+        } catch (Throwable $e) {
+            error_log('notifyCcWelcome ' . $email . ': ' . $e->getMessage());
+        }
+    }
+    return $sent;
 }
 
 /**

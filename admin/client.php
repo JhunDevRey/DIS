@@ -736,6 +736,7 @@ document.getElementById('formEditClient').addEventListener('submit', async (e) =
     const data = await res.json();
     if (data.success) {
       if (data.dropbox_warning) await showNotice(data.dropbox_warning, { title: 'Details saved' });
+      else if (/welcome email/i.test(data.message || '')) await showNotice(data.message, { title: 'Details saved' });
       location.reload();
     } else {
       errEl.textContent = data.message || 'Could not save changes.';

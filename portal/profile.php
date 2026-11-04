@@ -116,7 +116,7 @@ document.getElementById('formProfile').addEventListener('submit', async (e) => {
     const res = await fetch('api/update_client_profile.php', { method: 'POST', body: fd });
     const data = await res.json();
     if (data.success) {
-      showToast('Profile updated.');
+      showToast(data.message || 'Profile updated.');
     } else {
       errEl.textContent = data.message || 'Could not save changes.';
       errEl.style.display = 'block';
