@@ -10,6 +10,10 @@
 // New messages are picked up by polling every POLL_MS while the tab is
 // visible (and immediately when it becomes visible again) — no
 // websockets needed on shared hosting.
+//
+// Staff can edit their own messages for 2 hours after sending (the server
+// sends edit_until; the server also re-checks it). Edits show as "edited"
+// on both sides and reach open conversations through the same polling.
 
 (function () {
   const app = document.getElementById('msgApp');
@@ -32,6 +36,7 @@
 
   let lastId = 0;
   let lastSeenReported = 0;
+  const byId = new Map(); // message id -> latest data, for re-rendering after an edit
   let loading = false;
   let pendingFiles = [];
 
@@ -82,7 +87,13 @@
     const el = document.createElement('div');
     el.className = 'msg' + (m.mine ? ' mine' : '') + (m.sender_type === 'client' ? ' from-client' : '');
     el.dataset.id = m.id;
+    byId.set(m.id, m);
+    el.innerHTML = bubbleHtml(m);
+    thread.appendChild(el);
+  }
 
+  function bubbleHtml(m) {
+    const when = parseUtc(m.created_at);
     const filesHtml = m.files.map(f => `
       <div class="msg-file">
         <i class="fa-regular fa-file-lines"></i>
@@ -91,11 +102,114 @@
         <a class="icon-btn" href="${fileEndpoint}?file_id=${f.id}" title="Download" aria-label="Download ${esc(f.name)}"><i class="fa-solid fa-download"></i></a>
       </div>`).join('');
 
-    el.innerHTML = `
-      <div class="msg-head"><span class="msg-sender">${esc(m.sender)}</span><span class="msg-time" title="${esc(when.toLocaleString())}">${formatTime(when)}</span></div>
+    // "edited" label; staff can click it to see what was originally sent.
+    const edited = m.edited_at ? (viewer === 'admin'
+      ? `<button type="button" class="msg-edited" data-history title="Edited ${esc(parseUtc(m.edited_at).toLocaleString())} — click to see earlier versions">edited</button>`
+      : `<span class="msg-edited" title="Edited ${esc(parseUtc(m.edited_at).toLocaleString())}">edited</span>`) : '';
+    const editBtn = m.edit_until && parseUtc(m.edit_until) > new Date()
+      ? `<button type="button" class="msg-edit-btn" data-edit data-edit-until="${esc(m.edit_until)}" title="Edit (possible until ${esc(formatTime(parseUtc(m.edit_until)))})" aria-label="Edit message"><i class="fa-solid fa-pen"></i></button>` : '';
+
+    return `
+      <div class="msg-head"><span class="msg-sender">${esc(m.sender)}</span>${editBtn}${edited}<span class="msg-time" title="${esc(when.toLocaleString())}">${formatTime(when)}</span></div>
       ${m.body_html ? `<div class="msg-body">${m.body_html}</div>` : ''}
       ${filesHtml ? `<div class="msg-files">${filesHtml}</div>` : ''}`;
-    thread.appendChild(el);
+  }
+
+  // Swap in edited text (from our own save, or picked up while polling).
+  function applyEdits(edits) {
+    for (const e of edits || []) {
+      const m = byId.get(e.id);
+      if (!m || m.edited_at === e.edited_at) continue;
+      Object.assign(m, { body_html: e.body_html, edited_at: e.edited_at, body: e.body ?? m.body });
+      const el = thread.querySelector(`.msg[data-id="${e.id}"]`);
+      if (el && !el.classList.contains('editing')) el.innerHTML = bubbleHtml(m);
+    }
+  }
+
+  // Edit buttons disappear once their 2-hour window has passed.
+  function expireEditButtons() {
+    const now = new Date();
+    thread.querySelectorAll('[data-edit-until]').forEach(btn => {
+      if (parseUtc(btn.dataset.editUntil) <= now) btn.remove();
+    });
+  }
+
+  if (viewer === 'admin' && thread) {
+    thread.addEventListener('click', async (e) => {
+      const el = e.target.closest('.msg');
+      if (!el) return;
+      const m = byId.get(Number(el.dataset.id));
+      if (!m) return;
+      if (e.target.closest('[data-edit]')) startEdit(el, m);
+      else if (e.target.closest('[data-history]')) showHistory(m);
+    });
+  }
+
+  function startEdit(el, m) {
+    if (el.classList.contains('editing')) return;
+    el.classList.add('editing');
+    const body = el.querySelector('.msg-body');
+    const box = document.createElement('div');
+    box.className = 'msg-edit-box';
+    box.innerHTML = `
+      <textarea maxlength="5000" aria-label="Edit message"></textarea>
+      <div class="msg-edit-actions">
+        <span class="msg-edit-hint">Esc to cancel · Ctrl + Enter to save</span>
+        <button type="button" class="btn btn-ghost btn-sm" data-cancel>Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" data-save>Save</button>
+      </div>`;
+    const ta = box.querySelector('textarea');
+    ta.value = m.body || '';
+    if (body) body.replaceWith(box); else el.querySelector('.msg-head').after(box);
+    ta.focus();
+    ta.setSelectionRange(ta.value.length, ta.value.length);
+    const grow = () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; };
+    grow();
+    ta.addEventListener('input', grow);
+
+    const stop = () => { el.classList.remove('editing'); el.innerHTML = bubbleHtml(byId.get(m.id)); };
+    const save = async () => {
+      const text = ta.value.trim();
+      if (text === (m.body || '').trim()) { stop(); return; }
+      const saveBtn = box.querySelector('[data-save]');
+      saveBtn.disabled = true;
+      const fd = new FormData();
+      fd.append('action', 'edit');
+      fd.append('client_id', clientId);
+      fd.append('message_id', m.id);
+      fd.append('body', text);
+      const sendAs = document.getElementById('msgSendAs');
+      if (sendAs?.value) fd.append('sender_id', sendAs.value);
+      try {
+        const res = await fetch(endpoint, { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!data.success) { showToast(data.message || 'Could not save the edit.', true); saveBtn.disabled = false; return; }
+        if (data.messages && data.messages[0]) byId.set(m.id, Object.assign(m, data.messages[0]));
+        stop();
+        showToast('Message updated.');
+      } catch (err) {
+        showToast('Could not save — check your connection and try again.', true);
+        saveBtn.disabled = false;
+      }
+    };
+    box.querySelector('[data-cancel]').addEventListener('click', stop);
+    box.querySelector('[data-save]').addEventListener('click', save);
+    ta.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); stop(); }
+      else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); save(); }
+    });
+  }
+
+  async function showHistory(m) {
+    try {
+      const res = await fetch(`${endpoint}?client_id=${encodeURIComponent(clientId)}&history=${m.id}`, { headers: { Accept: 'application/json' } });
+      const data = await res.json();
+      if (!data.success) return;
+      const versions = data.versions.map((v, i) =>
+        `${i === 0 ? 'Originally sent' : 'Earlier version'} (changed ${parseUtc(v.edited_at).toLocaleString()}${v.edited_by ? ' by ' + v.edited_by : ''}):\n${v.old_body || '(no text)'}`);
+      versions.push(`Current (edited ${parseUtc(m.edited_at).toLocaleString()}):\n${m.body || '(no text)'}`);
+      await showNotice(versions.join('\n\n'), { title: 'Edit history — staff only' });
+    } catch (e) { /* not critical */ }
   }
 
   function appendMessages(messages) {
@@ -136,6 +250,8 @@
       const data = await res.json();
       if (!data.success) return;
       if (appendMessages(data.messages) && wasNearBottom) scrollToBottom();
+      applyEdits(data.edits);
+      expireEditButtons();
       if (initial) scrollToBottom();
       reportSeen();
     } catch (e) {

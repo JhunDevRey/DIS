@@ -2063,6 +2063,32 @@ html.file-viewer-html, .file-viewer-html body { height: 100%; margin: 0; }
 .msg-sender { font-weight: 700; color: var(--slate); }
 .msg-body { white-space: pre-wrap; word-break: break-word; color: var(--text); line-height: 1.5; }
 .msg-body a { color: var(--gold); text-decoration: underline; }
+
+/* Editing sent messages (staff, 2h window) */
+.msg-head { align-items: center; }
+.msg-head .msg-sender { margin-right: auto; }
+.msg-edit-btn {
+  width: 22px; height: 22px; border-radius: 6px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: none; background: none; color: var(--text-muted); font-size: 10.5px; cursor: pointer;
+  opacity: 0; transition: all var(--ease);
+}
+.msg:hover .msg-edit-btn, .msg-edit-btn:focus-visible { opacity: 1; }
+.msg-edit-btn:hover { background: var(--surface-hover); color: var(--ink); }
+@media (hover: none) { .msg-edit-btn { opacity: 1; } }
+.msg-edited { font-style: italic; color: var(--text-muted); font-size: 11px; }
+button.msg-edited { background: none; border: none; padding: 0; font-family: inherit; cursor: pointer; }
+button.msg-edited:hover { color: var(--ink); text-decoration: underline; }
+.msg.editing { min-width: min(420px, 100%); }
+.msg-edit-box textarea {
+  width: 100%; min-height: 60px; max-height: 300px; resize: none;
+  padding: 8px 10px; border: 1px solid var(--gold); border-radius: var(--radius-sm);
+  font: inherit; font-size: 13.5px; line-height: 1.5; background: var(--card); color: var(--text);
+}
+.msg-edit-box textarea:focus { outline: none; }
+.msg-edit-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-top: 6px; }
+.msg-edit-hint { margin-right: auto; font-size: 11px; color: var(--text-muted); }
+.confirm-dialog .confirm-message { white-space: pre-line; }
 .msg-files { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
 .msg-file {
   display: flex; align-items: center; gap: 8px;

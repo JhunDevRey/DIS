@@ -16,6 +16,8 @@ require_once __DIR__ . '/functions.php';
 
 define('MESSAGE_MAX_LENGTH', 5000);
 define('MESSAGE_MAX_FILES', 5);
+// Staff can correct a message they sent for this long (see editStaffMessage()).
+define('MESSAGE_EDIT_WINDOW_MINUTES', 120);
 define('MESSAGE_UPLOAD_DIR', UPLOAD_DIR . '/messages');
 
 /**
@@ -163,6 +165,10 @@ function messagesForJson(array $messages, string $viewer): array
             // Line breaks are kept by the .msg-body white-space: pre-wrap rule.
             'body_html'   => linkifyComment($m['body']),
             'created_at'  => $m['created_at'],
+            'edited_at'   => $m['edited_at'] ?? null,
+            // Staff only: the raw text + deadline for the Edit button.
+            'body'        => $viewer === 'admin' && $m['sender_type'] === 'admin' ? $m['body'] : null,
+            'edit_until'  => $viewer === 'admin' ? messageEditDeadline($m) : null,
             'files'       => array_map(fn($f) => [
                 'id'   => (int)$f['id'],
                 'name' => $f['original_name'],
@@ -170,6 +176,91 @@ function messagesForJson(array $messages, string $viewer): array
             ], $m['files']),
         ];
     }, $messages);
+}
+
+/**
+ * When a staff message stops being editable ('Y-m-d H:i:s' UTC), or null
+ * if it isn't editable at all (client messages, or the window has passed).
+ */
+function messageEditDeadline(array $m): ?string
+{
+    if (($m['sender_type'] ?? '') !== 'admin' || ($m['channel'] ?? 'portal') !== 'portal') {
+        return null;
+    }
+    $until = strtotime($m['created_at'] . ' UTC') + MESSAGE_EDIT_WINDOW_MINUTES * 60;
+    return $until > time() ? gmdate('Y-m-d H:i:s', $until) : null;
+}
+
+/**
+ * Replaces the text of a staff message, keeping the previous version in
+ * message_edits. Only staff messages, only within MESSAGE_EDIT_WINDOW_MINUTES
+ * of sending (checked again here — the button hiding in the browser is
+ * just a convenience). Returns null on success or an error message.
+ */
+function editStaffMessage(int $clientId, int $messageId, string $newBody, string $editorName): ?string
+{
+    $db = getDb();
+    $stmt = $db->prepare('SELECT m.*, (SELECT COUNT(*) FROM message_files f WHERE f.message_id = m.id) AS file_count FROM messages m WHERE m.id = ? AND m.client_id = ?');
+    $stmt->execute([$messageId, $clientId]);
+    $m = $stmt->fetch();
+    if (!$m || $m['sender_type'] !== 'admin') {
+        return 'Only messages sent by your team can be edited.';
+    }
+    if (messageEditDeadline($m) === null) {
+        return 'This message can no longer be edited — messages can be edited for ' . (MESSAGE_EDIT_WINDOW_MINUTES / 60) . ' hours after sending.';
+    }
+    if ($newBody === '' && !(int)$m['file_count']) {
+        return 'A message can\'t be empty.';
+    }
+    if (mb_strlen($newBody) > MESSAGE_MAX_LENGTH) {
+        return 'Message is too long (max ' . MESSAGE_MAX_LENGTH . ' characters).';
+    }
+    if ($newBody === $m['body']) {
+        return null; // nothing changed
+    }
+
+    $db->beginTransaction();
+    try {
+        $db->prepare('INSERT INTO message_edits (message_id, old_body, edited_by) VALUES (?, ?, ?)')
+           ->execute([$messageId, $m['body'], $editorName]);
+        // created_at = created_at keeps the original send time even if the
+        // column were ever set to auto-update.
+        $db->prepare('UPDATE messages SET body = ?, edited_at = UTC_TIMESTAMP(), created_at = created_at WHERE id = ?')
+           ->execute([$newBody, $messageId]);
+        $db->commit();
+    } catch (Throwable $e) {
+        $db->rollBack();
+        throw $e;
+    }
+    return null;
+}
+
+/**
+ * Messages in this thread edited recently, so an open conversation (staff
+ * or client) can swap in the new text while polling. Edits can only happen
+ * within the edit window, so a few hours back covers every open tab.
+ */
+function recentMessageEdits(int $clientId, string $viewer): array
+{
+    $stmt = getDb()->prepare('SELECT * FROM messages WHERE client_id = ? AND edited_at IS NOT NULL AND edited_at > UTC_TIMESTAMP() - INTERVAL ? MINUTE');
+    $stmt->execute([$clientId, MESSAGE_EDIT_WINDOW_MINUTES + 60]);
+    $rows = $stmt->fetchAll();
+    foreach ($rows as &$r) $r['files'] = [];
+    unset($r);
+    return array_map(fn($m) => [
+        'id'        => $m['id'],
+        'body_html' => $m['body_html'],
+        'body'      => $m['body'],
+        'edited_at' => $m['edited_at'],
+    ], messagesForJson($rows, $viewer));
+}
+
+/** Earlier versions of a message, oldest first (staff only). */
+function messageEditHistory(int $clientId, int $messageId): array
+{
+    $stmt = getDb()->prepare('SELECT e.old_body, e.edited_by, e.edited_at FROM message_edits e JOIN messages m ON m.id = e.message_id WHERE e.message_id = ? AND m.client_id = ? ORDER BY e.id ASC');
+    $stmt->execute([$messageId, $clientId]);
+    return $stmt->fetchAll();
 }
 
 /**

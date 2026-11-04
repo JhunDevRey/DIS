@@ -20,7 +20,10 @@ $clientId = (int)$_SESSION['client_id'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $afterId = max(0, (int)($_GET['after_id'] ?? 0));
-    jsonResponse(true, '', ['messages' => messagesForJson(fetchMessages($clientId, $afterId), 'client')]);
+    jsonResponse(true, '', [
+        'messages' => messagesForJson(fetchMessages($clientId, $afterId), 'client'),
+        'edits'    => recentMessageEdits($clientId, 'client'),
+    ]);
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {

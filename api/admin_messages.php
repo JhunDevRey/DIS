@@ -6,6 +6,8 @@
  *   GET  ?client_id=N&after_id=M       -> messages in one conversation newer than M (polling)
  *   POST action=send, client_id, body, attachments[]  -> send a message
  *   POST action=seen, client_id, up_to_id             -> mark conversation read
+ *   POST action=edit, client_id, message_id, body     -> edit a staff message (within 2h)
+ *   GET  ?client_id=N&history=ID                      -> earlier versions of an edited message
  */
 require_once __DIR__ . '/../includes/admin_auth.php';
 require_once __DIR__ . '/../includes/db.php';
@@ -30,7 +32,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     if ($clientId <= 0) {
         jsonResponse(false, 'Missing client.');
     }
-    jsonResponse(true, '', ['messages' => messagesForJson(fetchMessages($clientId, $afterId), 'admin')]);
+    if (!empty($_GET['history'])) {
+        jsonResponse(true, '', ['versions' => messageEditHistory($clientId, (int)$_GET['history'])]);
+    }
+    jsonResponse(true, '', [
+        'messages' => messagesForJson(fetchMessages($clientId, $afterId), 'admin'),
+        'edits'    => recentMessageEdits($clientId, 'admin'),
+    ]);
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -50,6 +58,35 @@ if (!$client) {
 if ($action === 'seen') {
     markMessagesSeen($clientId, 'admin', (int)($_POST['up_to_id'] ?? 0));
     jsonResponse(true);
+}
+
+// Who's acting: staff share one login, so it's whoever is picked in the
+// inbox's "Sending as" menu — looked up from processors by id (never
+// trusted as free text). No pick = the team name.
+function inboxActorName(PDO $db): string
+{
+    $senderId = (int)($_POST['sender_id'] ?? 0);
+    if ($senderId > 0) {
+        $stmt = $db->prepare('SELECT full_name FROM processors WHERE id = ? AND is_active = 1');
+        $stmt->execute([$senderId]);
+        $name = trim((string)$stmt->fetchColumn());
+        if ($name !== '') return $name;
+    }
+    return 'Duque Immigration';
+}
+
+if ($action === 'edit') {
+    $messageId = (int)($_POST['message_id'] ?? 0);
+    try {
+        $error = editStaffMessage($clientId, $messageId, trim($_POST['body'] ?? ''), inboxActorName($db));
+    } catch (Throwable $e) {
+        error_log('admin_messages edit failed: ' . $e->getMessage());
+        $error = 'Could not save the edit. Please try again.';
+    }
+    if ($error !== null) {
+        jsonResponse(false, $error);
+    }
+    jsonResponse(true, 'Message updated.', ['messages' => messagesForJson(array_values(array_filter(fetchMessages($clientId), fn($m) => (int)$m['id'] === $messageId)), 'admin')]);
 }
 
 if ($action !== 'send') {
@@ -80,16 +117,7 @@ $stmt = $db->prepare("
 $stmt->execute([$clientId, (int)$client['client_messages_seen_id']]);
 $alreadyNotified = (int)$stmt->fetchColumn() > 0;
 
-// Staff share one login, so the sender is whoever picked their name in
-// the inbox's "Sending as" menu — looked up here from processors by id
-// (never trusted as free text). No pick = the team name.
-$senderName = 'Duque Immigration';
-$senderId = (int)($_POST['sender_id'] ?? 0);
-if ($senderId > 0) {
-    $stmt = $db->prepare('SELECT full_name FROM processors WHERE id = ? AND is_active = 1');
-    $stmt->execute([$senderId]);
-    $senderName = trim((string)$stmt->fetchColumn()) ?: $senderName;
-}
+$senderName = inboxActorName($db);
 
 try {
     $messageId = createMessage($clientId, 'admin', $senderName, $body, $files);
