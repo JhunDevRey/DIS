@@ -206,6 +206,9 @@ function editStaffMessage(int $clientId, int $messageId, string $newBody, string
     if (!$m || $m['sender_type'] !== 'admin') {
         return 'Only messages sent by your team can be edited.';
     }
+    if (($m['channel'] ?? 'portal') !== 'portal') {
+        return 'Messages sent on WhatsApp can\'t be edited — WhatsApp doesn\'t allow changing a message once it\'s delivered.';
+    }
     if (messageEditDeadline($m) === null) {
         return 'This message can no longer be edited — messages can be edited for ' . (MESSAGE_EDIT_WINDOW_MINUTES / 60) . ' hours after sending.';
     }
