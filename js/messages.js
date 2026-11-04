@@ -165,6 +165,7 @@
     ta.setSelectionRange(ta.value.length, ta.value.length);
     const grow = () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; };
     grow();
+    box.scrollIntoView({ block: 'nearest' });
     ta.addEventListener('input', grow);
 
     const stop = () => { el.classList.remove('editing'); el.innerHTML = bubbleHtml(byId.get(m.id)); };
