@@ -613,63 +613,39 @@ function notifyClientWelcome(array $client, string $plainPassword): bool
 
 /**
  * Welcome for someone just added to a client's "Additional emails" (a
- * spouse, agent, sponsor…): they'll get copies of case emails, and they can
- * sign in to the client's portal with their OWN login (never the client's
- * password — that only ever goes to the client). $setupUrl is their one-time
- * "set your password" link, or null if they already have a contact login
- * from another file. $addedBy is 'client' or 'staff'. Best-effort.
+ * spouse, agent, sponsor…): explains why they'll start getting copies of
+ * case emails. Deliberately no login details and no case information —
+ * the portal password only ever goes to the client. $addedBy is 'client'
+ * (they added it in their portal) or 'staff'. Best-effort.
  */
-function notifyCcWelcome(string $ccEmail, array $client, string $addedBy, ?string $setupUrl = null): bool
+function notifyCcWelcome(string $ccEmail, array $client, string $addedBy): bool
 {
     $name = trim($client['full_name']);
     $firstName = explode(' ', $name)[0];
-    $portalLogin = rtrim(PORTAL_APP_URL, '/') . '/login.php';
-    $subject = "You've been added to " . $name . "'s case — Duque Immigration";
+    $subject = "You've been added to " . $name . "'s case updates — Duque Immigration";
     $intro = $addedBy === 'client'
         ? $name . ' has added you as an additional contact on their immigration case with Duque Immigration.'
         : 'Duque Immigration has added you as an additional contact on ' . $name . "'s immigration case.";
-    $what = "You'll receive a copy of the email updates we send " . $firstName . ", and you can sign in to "
-        . $firstName . "'s client portal to see their documents, upload files and message the case team.";
-    $how = $setupUrl
-        ? 'To get started, set up your own password (this link works for ' . CONTACT_SETUP_LINK_DAYS . ' days):'
-        : 'You already have a contact login with us — sign in with your email and your usual password:';
 
     $textBody = "Hello,\n\n"
         . $intro . "\n\n"
-        . $what . "\n\n"
-        . $how . "\n" . ($setupUrl ?: $portalLogin) . "\n\n"
-        . "If you weren't expecting this, just reply to this email and we'll remove you.\n\n"
+        . "From now on you'll receive a copy of the email updates we send " . $firstName . " — things like "
+        . "document requests, reminders and new-message notices.\n\n"
+        . "There's nothing you need to do, and you don't need an account.\n\n"
+        . "If you weren't expecting this, or would rather not receive these updates, just reply to this "
+        . "email and we'll take you off the list.\n\n"
         . "— Duque Immigration";
 
     $safeName = htmlspecialchars($name, ENT_QUOTES, 'UTF-8');
+    $safeFirst = htmlspecialchars($firstName, ENT_QUOTES, 'UTF-8');
     $htmlBody = buildEmailHtml('there', [
         htmlspecialchars($intro, ENT_QUOTES, 'UTF-8'),
-        htmlspecialchars($what, ENT_QUOTES, 'UTF-8'),
-        htmlspecialchars($how, ENT_QUOTES, 'UTF-8'),
-        "If you weren't expecting this, just reply to this email and we'll remove you from <strong>" . $safeName . "</strong>'s file.",
-    ], $setupUrl ? 'Set up my access' : 'Sign in to the portal', $setupUrl ?: $portalLogin);
+        "From now on you'll receive a copy of the email updates we send <strong>" . $safeFirst . "</strong> — things like document requests, reminders and new-message notices.",
+        "There's nothing you need to do, and you don't need an account.",
+        "If you weren't expecting this, or would rather not receive these updates, just reply to this email and we'll take you off <strong>" . $safeName . "</strong>'s list.",
+    ]);
 
     return sendMail($ccEmail, '', $subject, $textBody, $htmlBody);
-}
-
-/**
- * "Set up / reset your contact login" link, requested from
- * portal/contact_setup.php. $clientNames are the files they're listed on.
- */
-function notifyContactSetupLink(string $email, string $setupUrl, array $clientNames, bool $isReset): bool
-{
-    $files = implode(', ', $clientNames);
-    $subject = ($isReset ? 'Reset your' : 'Set up your') . ' Duque Immigration portal login';
-    $lead = 'You asked for a link to ' . ($isReset ? 'reset' : 'set up') . ' your contact login for the Duque Immigration client portal'
-        . ' (you\'re a contact on ' . $files . "'s file).";
-    $textBody = "Hello,\n\n" . $lead . "\n\nThis link works for " . CONTACT_SETUP_LINK_DAYS . " days:\n" . $setupUrl
-        . "\n\nIf you didn't ask for this, you can ignore this email — nothing changes until the link is used.\n\n— Duque Immigration";
-    $htmlBody = buildEmailHtml('there', [
-        htmlspecialchars($lead, ENT_QUOTES, 'UTF-8'),
-        'This link works for ' . CONTACT_SETUP_LINK_DAYS . ' days.',
-        "If you didn't ask for this, you can ignore this email — nothing changes until the link is used.",
-    ], $isReset ? 'Reset my password' : 'Set up my access', $setupUrl);
-    return sendMail($email, '', $subject, $textBody, $htmlBody);
 }
 
 /**
@@ -686,8 +662,7 @@ function notifyNewCcEmails(array $client, ?string $oldRaw, ?string $newRaw, stri
             continue;
         }
         try {
-            require_once __DIR__ . '/portal_contacts.php';
-            if (notifyCcWelcome($email, $client, $addedBy, contactInviteLink($email))) $sent++;
+            if (notifyCcWelcome($email, $client, $addedBy)) $sent++;
         } catch (Throwable $e) {
             error_log('notifyCcWelcome ' . $email . ': ' . $e->getMessage());
         }

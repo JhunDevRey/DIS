@@ -19,38 +19,12 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // Session expired but this device was remembered ("Keep me signed in")?
-// Sign back in silently — as the client, or as one of their CC contacts
-// (see includes/client_remember.php and includes/portal_contacts.php).
+// Sign back in silently — see includes/client_remember.php.
 require_once __DIR__ . '/client_remember.php';
-require_once __DIR__ . '/portal_contacts.php';
-if (empty($_SESSION['client_id']) && empty($_SESSION['contact_id'])) {
-    clientRememberTryLogin() || rememberTryLogin('contact');
-}
+clientRememberTryLogin();
 
 function requireClient(): void
 {
-    $isApi = strpos($_SERVER['REQUEST_URI'] ?? '', '/api/') !== false;
-
-    // A CC contact: re-check on every request that they're still listed on
-    // this client (taking them off Additional emails ends access at once),
-    // and pick the client for them if needed.
-    if (!empty($_SESSION['contact_id'])) {
-        $state = contactResolveClient();
-        if ($state === 'none') {
-            rememberForgetCurrent('contact');
-        } elseif ($state === 'choose') {
-            if ($isApi) {
-                header('Content-Type: application/json');
-                http_response_code(409);
-                echo json_encode(['success' => false, 'message' => 'Choose which client to open first.']);
-                exit;
-            }
-            $back = basename($_SERVER['SCRIPT_NAME'] ?? '') . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : '');
-            header('Location: choose_client.php?redirect=' . urlencode($back));
-            exit;
-        }
-    }
-
     if (empty($_SESSION['client_id'])) {
         if (strpos($_SERVER['REQUEST_URI'] ?? '', '/api/') !== false) {
             header('Content-Type: application/json');

@@ -27,7 +27,7 @@ if (!$request) {
     jsonResponse(false, 'You do not have access to this document.');
 }
 
-$authorName = portalActorName(); // the applicant, or "Name (contact)"
+$authorName = $_SESSION['client_name'] ?? 'Client';
 
 $db->prepare('INSERT INTO comments (request_id, author_type, author_name, comment_text) VALUES (?, ?, ?, ?)')
    ->execute([$requestId, 'client', $authorName, $commentText]);

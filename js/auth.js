@@ -9,7 +9,6 @@
   const eye = document.getElementById('togglePassword');
   const caps = document.getElementById('capsWarning');
   const submit = document.getElementById('authSubmit');
-  const submitLabel = submit.innerHTML;
 
   eye.addEventListener('click', () => {
     const show = password.type === 'password';
@@ -32,13 +31,13 @@
     // Only fires once the browser's own required-field checks pass.
     password.type = 'password';
     submit.disabled = true;
-    submit.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> ' + (submit.dataset.busy || 'Signing in…');
+    submit.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Signing in…';
   });
 
   // Coming back via the browser's Back button can restore the page with
   // the button still disabled — reset it.
   window.addEventListener('pageshow', () => {
     submit.disabled = false;
-    submit.innerHTML = submitLabel;
+    submit.innerHTML = 'Sign in <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>';
   });
 })();

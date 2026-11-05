@@ -33,7 +33,7 @@ if (!$request || !$request['is_review']) {
     jsonResponse(false, 'You do not have access to this review.');
 }
 
-$clientName = portalActorName(); // the applicant, or "Name (contact)"
+$clientName = $_SESSION['client_name'] ?? 'Client';
 $newReviewStatus = $action === 'confirm' ? 'confirmed' : 'changes_requested';
 // Mirrored onto the ordinary status column too, so this field surfaces in
 // the same dashboards/stat boxes/filters as any other accepted or
@@ -76,7 +76,7 @@ if ($clientRow && $clientRow['processor_id']) {
     notifyProcessorRealtime(
         (int)$clientRow['processor_id'],
         (int)$_SESSION['client_id'],
-        $_SESSION['client_name'] ?? 'Client',
+        $clientName,
         $action === 'confirm' ? 'review_confirmed' : 'review_flagged',
         $summary
     );

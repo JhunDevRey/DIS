@@ -65,14 +65,7 @@ if ($navClientId) {
 }
 ?>
 <?php
-// A CC contact sees their own name, whose file they're in, and (if they're
-// on several files) a way to switch.
-$navIsContact = !empty($_SESSION['contact_id']);
-$navUserName = $navIsContact
-    ? (trim((string)($_SESSION['contact_name'] ?? '')) ?: (string)($_SESSION['contact_email'] ?? 'Contact'))
-    : ($_SESSION['client_name'] ?? 'Client');
-$navUserRole = $navIsContact ? 'Contact · ' . explode(' ', trim($_SESSION['client_name'] ?? ''))[0] . "'s file" : 'Client';
-$navCanSwitch = $navIsContact && count(contactClientsFor((string)($_SESSION['contact_email'] ?? ''))) > 1;
+$navUserName = $_SESSION['client_name'] ?? 'Client';
 $navUserParts = preg_split('/\s+/', trim($navUserName));
 $navUserInitials = strtoupper(substr($navUserParts[0], 0, 1) . (count($navUserParts) > 1 ? substr(end($navUserParts), 0, 1) : ''));
 ?>
@@ -116,7 +109,7 @@ $navUserInitials = strtoupper(substr($navUserParts[0], 0, 1) . (count($navUserPa
     </div>
     <div class="user-box">
       <span class="user-avatar" title="<?= h($navUserName) ?>"><?= h($navUserInitials) ?></span>
-      <span class="user-meta"><span class="name"><?= h($navUserName) ?></span><small><?= h($navUserRole) ?><?php if ($navCanSwitch): ?> · <a href="choose_client.php" class="user-switch">Switch</a><?php endif; ?></small></span>
+      <span class="user-meta"><span class="name"><?= h($navUserName) ?></span><small>Client</small></span>
       <a href="logout.php" class="user-signout" title="Sign out" aria-label="Sign out"><i class="fa-solid fa-right-from-bracket"></i></a>
     </div>
   </div>
