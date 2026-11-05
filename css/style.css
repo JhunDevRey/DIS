@@ -496,6 +496,93 @@ input, select, textarea { font-family: inherit; }
   margin: 0 0 10px;
 }
 
+/* ---------- Client page polish (admin/client.php, main.client-page) ----------
+   Same layout as before — header, notes, then the two columns — just a
+   tidier header panel and calmer checklist rows. Scoped to .client-page so
+   the client portal's own checklist (same .doc-* classes) is untouched. */
+.client-back {
+  display: inline-flex; align-items: center; gap: 6px; margin-bottom: 12px;
+  font-size: 12.5px; font-weight: 600; color: var(--text-muted);
+}
+.client-back:hover { color: var(--ink); }
+.client-hero {
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 18px 20px 14px; margin-bottom: 14px;
+}
+.client-hero-top { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.client-hero-avatar {
+  width: 48px; height: 48px; border-radius: 12px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--gold-tint); color: var(--gold); font-weight: 800; font-size: 17px; letter-spacing: .3px;
+}
+.client-hero-id { min-width: 0; }
+.client-hero-id h1 {
+  margin: 0 0 5px; font-family: var(--font-display); font-size: 21px; font-weight: 800;
+  letter-spacing: -.3px; color: var(--ink); line-height: 1.2; overflow-wrap: anywhere;
+}
+.client-hero-contact { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; font-size: 13px; color: var(--text-muted); }
+.client-hero-contact > a, .client-hero-contact > span:not(.class-tag) { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); overflow-wrap: anywhere; }
+.client-hero-contact > a:hover { color: var(--ink); }
+.client-hero-contact i { font-size: 11.5px; }
+.client-hero-meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 0; padding: 14px 0 0; border-top: 1px solid var(--line); }
+.client-chip {
+  display: inline-flex; align-items: center; gap: 6px; max-width: 100%;
+  padding: 5px 10px; border-radius: 999px; background: var(--surface-alt); border: 1px solid var(--line);
+  font-size: 12.5px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.client-chip i { font-size: 11px; }
+.client-chip strong { color: var(--ink); font-weight: 600; }
+.client-chip-link { color: var(--ink); font-weight: 600; transition: all var(--ease); }
+.client-chip-link .fa-dropbox { color: #0061FE; }
+.client-chip-link:hover { border-color: var(--line-strong); background: var(--surface-hover); }
+.client-chip .client-chip-ext { font-size: 9.5px; color: var(--text-muted); }
+.client-hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.client-hero-notif { margin-left: auto; font-size: 12px; color: var(--text-muted); }
+
+.client-notes { margin-bottom: 18px; }
+.client-notes-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.client-notes-head h3 { margin: 0; display: flex; align-items: center; gap: 8px; font-family: var(--font-display); font-size: 15px; font-weight: 700; color: var(--ink); }
+.client-notes-private { font-size: 10.5px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--text-muted); }
+.client-notes-private i { font-size: 9px; }
+.client-notes textarea {
+  width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm);
+  font: inherit; font-size: 13.5px; line-height: 1.5; resize: vertical; color: var(--text); background: var(--surface-alt);
+  transition: all var(--ease);
+}
+.client-notes textarea:focus { outline: none; border-color: var(--gold); background: var(--card); }
+.client-notes-foot { display: flex; justify-content: flex-end; margin-top: 8px; }
+
+/* Checklist rows */
+.client-page .doc-item {
+  /* Fixed-minimum actions column, so file boxes line up item to item
+     whatever the status label's width. */
+  grid-template-columns: 26px minmax(0, 1fr) minmax(196px, auto);
+  padding: 16px 8px; border-radius: var(--radius-sm); transition: background var(--ease);
+}
+.client-page .doc-actions { justify-content: flex-end; }
+@container doc-rail (max-width: 640px) {
+  .client-page .doc-item { grid-template-columns: 22px minmax(0, 1fr); }
+  .client-page .doc-item .doc-actions { justify-content: flex-start; }
+}
+.client-page .file-row { justify-content: flex-start; }
+.client-page .file-row .file-info { flex: 1; }
+.client-page .file-row .file-actions { margin-left: auto; }
+.client-page .doc-item:hover { background: var(--surface-alt); }
+.client-page .doc-actions { flex-direction: row; align-items: center; gap: 6px; }
+.client-page .doc-actions .icon-btn-tooltip {
+  width: 30px; height: 30px; padding: 0; justify-content: center; border-radius: var(--radius-sm);
+}
+.client-page .doc-actions .btn-danger { background: transparent; border-color: var(--line); color: var(--maple); }
+.client-page .doc-actions .btn-danger:hover { background: var(--maple-tint); border-color: var(--maple-border); }
+.client-page .doc-meta { flex-direction: column; align-items: stretch; gap: 6px; }
+.client-page .doc-meta .file-row { margin-bottom: 0; background: var(--card); }
+.client-page .multi-select-bar { gap: 10px; padding: 0 2px 2px; }
+.client-page .multi-select-bar .multi-select-count { margin-right: 0; }
+.client-page .comment-toggle { margin-top: 6px; }
+/* The dark "primary" button disappears into a dark background otherwise. */
+[data-theme="dark"] .client-page .btn-primary { background: #2E2E31; box-shadow: inset 0 0 0 1px #45454A; }
+[data-theme="dark"] .client-page .btn-primary:hover { background: #3A3A3E; }
+
 .main {
   flex: 1;
   min-width: 0;

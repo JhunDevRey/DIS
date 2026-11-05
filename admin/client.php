@@ -226,48 +226,58 @@ function renderAdminDocItem(array $r, int $displayNumber, array $filesByRequest,
 <div class="app-shell">
   <?php include __DIR__ . '/_sidebar.php'; ?>
 
-  <main class="main">
-    <div class="main-header">
-      <div>
-        <p style="margin-bottom:6px;"><a href="clients.php" style="color:var(--slate);font-weight:600;"><i class="fa-solid fa-arrow-left"></i> All clients</a></p>
-        <h1><?= h($client['full_name']) ?></h1>
-        <p style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><?= h($client['email']) ?><?php if ($client['case_type']): ?> · <?= classTagHtml($client['case_type']) ?><?php endif; ?><?= $client['phone'] ? ' · ' . h($client['phone']) : '' ?></p>
-        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;font-size:13px;color:var(--text-muted);align-items:center;">
-          <span><i class="fa-solid fa-hashtag"></i> Client No: <?= $client['reference_number'] ? h($client['reference_number']) : '—' ?></span>
-          <span><i class="fa-solid fa-user-tie"></i> Processor: <?= $client['processor_name'] ? h($client['processor_name']) : 'Unassigned' ?></span>
-          <?php if ($client['designated_person_name']): ?>
-            <span><i class="fa-solid fa-user-shield"></i> Designated: <?= h($client['designated_person_name']) ?><?= $client['designated_person_phone'] ? ' (' . h($client['designated_person_phone']) . ')' : '' ?></span>
-          <?php endif; ?>
-          <?php if ($client['dropbox_folder_link']): ?>
-            <a href="<?= h($client['dropbox_folder_link']) ?>" target="_blank" style="color:var(--slate);font-weight:600;"><i class="fa-brands fa-dropbox"></i> Open Dropbox folder</a>
-          <?php elseif ($client['dropbox_folder_path']): ?>
-            <span><i class="fa-brands fa-dropbox"></i> <?= h($client['dropbox_folder_path']) ?> (no link yet)</span>
-          <?php endif; ?>
-          <button type="button" class="btn btn-ghost btn-sm" id="btnEditClient"><i class="fa-solid fa-pen"></i> Edit details</button>
-          <a class="btn btn-ghost btn-sm" href="inbox.php?client_id=<?= (int)$clientId ?>"><i class="fa-solid fa-comments"></i> Message</a>
-          <button type="button" class="btn btn-ghost btn-sm" id="btnSendReminder"><i class="fa-regular fa-bell"></i> Send reminder</button>
-          <a class="btn btn-ghost btn-sm" href="api/admin_download_all_for_client.php?client_id=<?= (int)$clientId ?>"><i class="fa-solid fa-download"></i> Download all documents</a>
-          <button type="button" class="btn btn-ghost btn-sm" id="btnSendClientNotif" title="Send this client's pending notifications now">
-            <i class="fa-solid fa-bell"></i> Send new updates now
-          </button>
-          <span id="lastNotifText" style="font-size:12px;color:var(--text-muted);"><?= $lastDigestSentDisplay ?></span>
+  <main class="main client-page">
+    <a class="client-back" href="clients.php"><i class="fa-solid fa-arrow-left"></i> All clients</a>
+    <?php
+      $heroParts = preg_split('/\s+/', trim($client['full_name']));
+      $heroInitials = strtoupper(substr($heroParts[0], 0, 1) . (count($heroParts) > 1 ? substr(end($heroParts), 0, 1) : ''));
+    ?>
+    <div class="client-hero">
+      <div class="client-hero-top">
+        <span class="client-hero-avatar" aria-hidden="true"><?= h($heroInitials) ?></span>
+        <div class="client-hero-id">
+          <h1><?= h($client['full_name']) ?></h1>
+          <div class="client-hero-contact">
+            <a href="mailto:<?= h($client['email']) ?>"><i class="fa-regular fa-envelope"></i> <?= h($client['email']) ?></a>
+            <?php if ($client['phone']): ?><span><i class="fa-solid fa-phone"></i> <?= h($client['phone']) ?></span><?php endif; ?>
+            <?php if ($client['case_type']): ?><?= classTagHtml($client['case_type']) ?><?php endif; ?>
+          </div>
         </div>
+      </div>
+
+      <div class="client-hero-meta">
+        <span class="client-chip"><i class="fa-solid fa-hashtag"></i> Client No. <strong><?= $client['reference_number'] ? h($client['reference_number']) : '—' ?></strong></span>
+        <span class="client-chip"><i class="fa-solid fa-user-tie"></i> Processor <strong><?= $client['processor_name'] ? h($client['processor_name']) : 'Unassigned' ?></strong></span>
+        <?php if ($client['designated_person_name']): ?>
+          <span class="client-chip"><i class="fa-solid fa-user-shield"></i> Designated <strong><?= h($client['designated_person_name']) ?><?= $client['designated_person_phone'] ? ' · ' . h($client['designated_person_phone']) : '' ?></strong></span>
+        <?php endif; ?>
+        <?php if ($client['dropbox_folder_link']): ?>
+          <a class="client-chip client-chip-link" href="<?= h($client['dropbox_folder_link']) ?>" target="_blank" rel="noopener"><i class="fa-brands fa-dropbox"></i> Open Dropbox folder <i class="fa-solid fa-arrow-up-right-from-square client-chip-ext"></i></a>
+        <?php elseif ($client['dropbox_folder_path']): ?>
+          <span class="client-chip" title="<?= h($client['dropbox_folder_path']) ?>"><i class="fa-brands fa-dropbox"></i> <?= h($client['dropbox_folder_path']) ?> (no link yet)</span>
+        <?php endif; ?>
+      </div>
+
+      <div class="client-hero-actions">
+        <button type="button" class="btn btn-ghost btn-sm" id="btnEditClient"><i class="fa-solid fa-pen"></i> Edit details</button>
+        <a class="btn btn-ghost btn-sm" href="inbox.php?client_id=<?= (int)$clientId ?>"><i class="fa-solid fa-comments"></i> Message</a>
+        <button type="button" class="btn btn-ghost btn-sm" id="btnSendReminder"><i class="fa-regular fa-bell"></i> Send reminder</button>
+        <a class="btn btn-ghost btn-sm" href="api/admin_download_all_for_client.php?client_id=<?= (int)$clientId ?>"><i class="fa-solid fa-download"></i> Download all documents</a>
+        <button type="button" class="btn btn-ghost btn-sm" id="btnSendClientNotif" title="Send this client's pending notifications now">
+          <i class="fa-solid fa-paper-plane"></i> Send new updates now
+        </button>
+        <span class="client-hero-notif" id="lastNotifText"><?= $lastDigestSentDisplay ?></span>
       </div>
     </div>
 
-    <div class="card card-pad" style="margin-bottom:14px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:6px;">
-        <h3 style="font-family:var(--font-display);font-size:15px;font-weight:700;color:var(--ink);margin:0;display:flex;align-items:center;gap:8px;">
-          <i class="fa-solid fa-note-sticky"></i> Staff Notes
-        </h3>
-        <span style="font-size:10.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;font-weight:700;">
-          <i class="fa-solid fa-lock" style="font-size:9px;"></i> Private — never shown to the client
-        </span>
+    <div class="card card-pad client-notes">
+      <div class="client-notes-head">
+        <h3><i class="fa-solid fa-note-sticky"></i> Staff Notes</h3>
+        <span class="client-notes-private"><i class="fa-solid fa-lock"></i> Private — never shown to the client</span>
       </div>
       <textarea id="staffNotesTextarea" rows="3"
-        style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius-sm);font-size:13.5px;font-family:inherit;resize:vertical;color:var(--text);"
         placeholder="Internal notes about this client — case history, communication preferences, anything staff should know..."><?= h($client['notes']) ?></textarea>
-      <div style="display:flex;justify-content:flex-end;margin-top:8px;">
+      <div class="client-notes-foot">
         <button type="button" class="btn btn-ghost btn-sm" id="btnSaveNotes"><i class="fa-solid fa-floppy-disk"></i> Save notes</button>
       </div>
     </div>
