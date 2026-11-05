@@ -100,6 +100,9 @@ $navUserInitials = strtoupper(substr($navUserParts[0], 0, 1) . (count($navUserPa
       </a>
     </nav>
     <div class="spacer"></div>
+    <button type="button" class="nav-install" id="navInstallApp" title="Install the app on this device" hidden>
+      <i class="fa-solid fa-download"></i><span class="nav-label">Install app</span>
+    </button>
     <div class="theme-toggle-row">
       <span class="theme-toggle-label"><i class="fa-solid fa-moon"></i><span class="nav-label">Dark mode</span></span>
       <button type="button" class="theme-switch" id="themeToggle" aria-label="Toggle dark mode"></button>

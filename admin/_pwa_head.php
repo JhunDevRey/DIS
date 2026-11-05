@@ -12,6 +12,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <script>if ('serviceWorker' in navigator) { window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); }); }</script>
 <script src="js/pwa-install.js?v=<?= assetVersion('js/pwa-install.js') ?>" defer
+        data-name="Duque Staff"
         data-title="Add Duque Staff to your home screen"
         data-blurb="Open the shared inbox and client files in one tap, like an app."
         data-icon="images/staff-app-icon-192.png"></script>

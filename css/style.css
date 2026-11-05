@@ -321,6 +321,21 @@ input, select, textarea { font-family: inherit; }
 
 .sidebar .spacer { flex: 1; min-height: 16px; }
 
+/* "Install app" (js/pwa-install.js shows it unless already running as the app) */
+.nav-install {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  height: 32px; padding: 0 8px; margin-bottom: 2px;
+  border: none; border-radius: 6px; background: none; cursor: pointer;
+  font: inherit; font-size: 13px; font-weight: 500; color: var(--sidebar-text);
+  white-space: nowrap; text-align: left; transition: all var(--ease);
+}
+.nav-install[hidden] { display: none; }
+.nav-install i { width: 16px; text-align: center; color: var(--gold); font-size: 13px; flex-shrink: 0; }
+.nav-install:hover { background: var(--sidebar-hover); color: var(--ink); }
+.nav-install:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+@media (min-width: 861px) { .sidebar.collapsed .nav-install { justify-content: center; padding: 0; } }
+@media (max-width: 860px) { .nav-install { height: auto; padding: 12px 11px; font-size: 15px; } }
+
 /* ---- Theme toggle switch (sidebar) ---- */
 .theme-toggle-row {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
