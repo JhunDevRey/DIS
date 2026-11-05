@@ -15,6 +15,9 @@ if (session_status() === PHP_SESSION_NONE) {
     session_name('duque_admin_session');
     session_start();
 }
+// Signing out also forgets this device, so it asks for the password next time.
+require_once __DIR__ . '/../includes/admin_remember.php';
+adminRememberForgetCurrent();
 session_destroy();
 header('Location: login.php');
 exit;

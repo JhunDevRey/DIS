@@ -24,6 +24,11 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// Session expired but this device was remembered ("Keep me signed in")?
+// Sign back in silently — see includes/admin_remember.php.
+require_once __DIR__ . '/admin_remember.php';
+adminRememberTryLogin();
+
 function requireAdmin(): void
 {
     if (empty($_SESSION['admin_id'])) {

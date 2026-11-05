@@ -1,0 +1,20 @@
+{
+  "name": "Duque Immigration Staff",
+  "short_name": "Duque Staff",
+  "description": "Duque Immigration staff portal: clients, documents and the shared inbox.",
+  "id": "./",
+  "start_url": "inbox.php?source=app",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#1B1B1D",
+  "icons": [
+    { "src": "images/staff-app-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "images/staff-app-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "images/staff-app-icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Inbox", "url": "inbox.php?source=app", "icons": [{ "src": "images/staff-app-icon-192.png", "sizes": "192x192" }] },
+    { "name": "Clients", "url": "clients.php?source=app", "icons": [{ "src": "images/staff-app-icon-192.png", "sizes": "192x192" }] }
+  ]
+}

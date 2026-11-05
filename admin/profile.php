@@ -9,6 +9,8 @@ $db = getDb();
 $stmt = $db->prepare('SELECT * FROM admin_users WHERE id = ?');
 $stmt->execute([$_SESSION['admin_id']]);
 $admin = $stmt->fetch();
+$thisDeviceRemembered = adminRememberThisDevice((int)$_SESSION['admin_id']);
+$otherDevices = adminRememberOtherDeviceCount((int)$_SESSION['admin_id']);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -17,6 +19,7 @@ $admin = $stmt->fetch();
 <meta name="csrf-token" content="<?= h(csrfToken()) ?>">
 <script>(function(){var t=localStorage.getItem("theme")||(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t);})();</script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<?php include __DIR__ . '/_pwa_head.php'; ?>
 <title>My Profile · Duque Immigration Document Portal</title>
 <link rel="icon" type="image/png" href="images/duqueimmigration_logo.png?v=<?= assetVersion('images/duqueimmigration_logo.png') ?>">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -79,6 +82,22 @@ $admin = $stmt->fetch();
           <button type="submit" class="btn btn-primary">Update password</button>
         </form>
       </div>
+
+      <div class="card card-pad">
+        <h3 style="font-family:var(--font-display);font-size:16px;margin:0 0 6px;color:var(--ink);">Signed-in devices</h3>
+        <p class="help-text" style="margin:0 0 14px;font-size:13px;">
+          <?php if ($thisDeviceRemembered): ?>
+            <i class="fa-solid fa-circle-check" style="color:var(--accepted);"></i> This device stays signed in for up to <?= ADMIN_REMEMBER_DAYS ?> days.
+          <?php else: ?>
+            This device will ask for the password each time. To stay signed in, sign out and tick “Keep me signed in on this device” when you sign back in.
+          <?php endif; ?>
+        </p>
+        <p style="margin:0 0 14px;font-size:13.5px;color:var(--text);" id="otherDevicesText">
+          <?= $otherDevices ? 'This staff login is also signed in on <strong>' . $otherDevices . '</strong> other device' . ($otherDevices === 1 ? '' : 's') . '.' : 'Not signed in on any other device.' ?>
+        </p>
+        <button type="button" class="btn btn-ghost" id="btnForgetDevices"<?= $otherDevices ? '' : ' disabled' ?>><i class="fa-solid fa-right-from-bracket"></i> Sign out of all other devices</button>
+        <p class="help-text" style="margin-top:10px;">The team shares one login, so this signs out every other staff computer and phone — use it if a device is lost or a staff member leaves. They just sign in again. Changing the password does the same.</p>
+      </div>
     </div>
   </main>
 </div>
@@ -126,8 +145,12 @@ document.getElementById('formPassword').addEventListener('submit', async (e) => 
     const res = await fetch('api/update_admin_profile.php', { method: 'POST', body: fd });
     const data = await res.json();
     if (data.success) {
-      showToast('Password updated.');
+      showToast(data.message || 'Password updated.');
       form.reset();
+      if (/signed out/.test(data.message || '')) {
+        document.getElementById('otherDevicesText').textContent = 'Not signed in on any other device.';
+        document.getElementById('btnForgetDevices').disabled = true;
+      }
     } else {
       errEl.textContent = data.message || 'Could not update password.';
       errEl.style.display = 'block';
@@ -135,6 +158,25 @@ document.getElementById('formPassword').addEventListener('submit', async (e) => 
   } catch (err) {
     errEl.textContent = 'Network error. Please try again.';
     errEl.style.display = 'block';
+  }
+});
+
+document.getElementById('btnForgetDevices').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  const ok = await showConfirm('Sign out every other computer and phone using the staff login? Staff will need the password to sign back in. This device stays signed in.', { title: 'Sign out other devices', confirmLabel: 'Sign them out' });
+  if (!ok) return;
+  btn.disabled = true;
+  const fd = new FormData();
+  fd.append('action', 'forget_devices');
+  try {
+    const res = await fetch('api/update_admin_profile.php', { method: 'POST', body: fd });
+    const data = await res.json();
+    showToast(data.message || 'Done.', !data.success);
+    if (data.success) document.getElementById('otherDevicesText').textContent = 'Not signed in on any other device.';
+    else btn.disabled = false;
+  } catch (err) {
+    showToast('Network error. Please try again.', true);
+    btn.disabled = false;
   }
 });
 </script>
