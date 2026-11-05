@@ -52,7 +52,14 @@ if ($action === 'update_password') {
     $db->prepare('UPDATE clients SET password_hash = ?, plain_password = ? WHERE id = ?')
        ->execute([password_hash($new, PASSWORD_DEFAULT), $new, $clientId]);
 
-    jsonResponse(true, 'Password updated.');
+    // Other remembered devices must sign in with the new password; this one stays.
+    $signedOut = clientRememberForgetAll($clientId, true);
+    jsonResponse(true, 'Password updated.' . ($signedOut ? ' Your other devices have been signed out.' : ''));
+}
+
+if ($action === 'forget_devices') {
+    $n = clientRememberForgetAll($clientId, true);
+    jsonResponse(true, $n ? 'Signed out of ' . $n . ' other device' . ($n === 1 ? '' : 's') . '.' : 'No other devices were signed in.');
 }
 
 jsonResponse(false, 'Unknown action.');

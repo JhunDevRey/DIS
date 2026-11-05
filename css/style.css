@@ -1569,6 +1569,27 @@ body.auth-page { background: #F7F7F5; }
 .auth-caps { margin: 7px 0 0; font-size: 12.5px; font-weight: 600; color: #B35C00; display: flex; align-items: center; gap: 6px; }
 .auth-caps[hidden] { display: none; }
 
+/* "Keep me signed in on this device" (client portal login) */
+.auth-remember {
+  display: flex; align-items: flex-start; gap: 10px; margin: 4px 0 6px; cursor: pointer;
+  font-size: 13.5px; font-weight: 600; color: var(--ink); line-height: 1.35;
+}
+.auth-remember input { width: 17px; height: 17px; margin: 1px 0 0; flex-shrink: 0; accent-color: var(--gold); cursor: pointer; }
+.auth-remember small { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: var(--text-muted); }
+
+/* "Add Duque Portal to your home screen" banner (js/pwa-install.js) */
+.pwa-banner {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin: 0 0 18px; padding: 12px 14px;
+  background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--gold);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+}
+.pwa-banner-icon { width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--line); flex-shrink: 0; }
+.pwa-banner-text { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 2px; font-size: 13px; color: var(--text-muted); line-height: 1.45; }
+.pwa-banner-text strong { color: var(--ink); font-size: 14px; }
+.pwa-share { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; color: var(--ink); }
+.pwa-banner-actions { display: flex; gap: 8px; }
+
 .auth-submit {
   width: 100%; height: 46px; margin-top: 8px;
   display: inline-flex; align-items: center; justify-content: center; gap: 9px;

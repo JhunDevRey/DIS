@@ -18,6 +18,11 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// Session expired but this device was remembered ("Keep me signed in")?
+// Sign back in silently — see includes/client_remember.php.
+require_once __DIR__ . '/client_remember.php';
+clientRememberTryLogin();
+
 function requireClient(): void
 {
     if (empty($_SESSION['client_id'])) {

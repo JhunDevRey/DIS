@@ -12,6 +12,9 @@ if (session_status() === PHP_SESSION_NONE) {
     session_name('duque_client_session');
     session_start();
 }
+// Signing out also forgets this device, so it asks for the password next time.
+require_once __DIR__ . '/../includes/client_remember.php';
+clientRememberForgetCurrent();
 session_destroy();
 header('Location: login.php');
 exit;

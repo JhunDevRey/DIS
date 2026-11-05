@@ -46,6 +46,7 @@ $recentComments = $stmt->fetchAll();
 <meta name="csrf-token" content="<?= h(csrfToken()) ?>">
 <script>(function(){var t=localStorage.getItem("theme")||(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t);})();</script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<?php include __DIR__ . '/_pwa_head.php'; ?>
 <title>Dashboard · Duque Immigration</title>
 <link rel="icon" type="image/png" href="images/duqueimmigration_logo.png?v=<?= assetVersion('images/duqueimmigration_logo.png') ?>">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">

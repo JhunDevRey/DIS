@@ -19,6 +19,11 @@ if (session_status() === PHP_SESSION_NONE) {
 
 $redirect = safeRelativeRedirect($_GET['redirect'] ?? $_POST['redirect'] ?? '');
 
+// A remembered device goes straight through (e.g. the "Read message" link
+// in a notification email lands here with ?redirect=messages.php).
+require_once __DIR__ . '/../includes/client_remember.php';
+clientRememberTryLogin();
+
 if (!empty($_SESSION['client_id'])) {
     header('Location: ' . ($redirect ?: 'documents.php'));
     exit;
@@ -43,6 +48,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             session_regenerate_id(true);
             $_SESSION['client_id'] = $client['id'];
             $_SESSION['client_name'] = $client['full_name'];
+            if (!empty($_POST['remember'])) {
+                clientRememberIssue((int)$client['id']);
+            }
             header('Location: ' . ($redirect ?: 'documents.php'));
             exit;
         }
@@ -57,6 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <meta charset="UTF-8">
 <script>(function(){var t=localStorage.getItem("theme")||(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t);})();</script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<?php include __DIR__ . '/_pwa_head.php'; ?>
 <title>Client Login · Duque Immigration Document Portal</title>
 <link rel="icon" type="image/png" href="images/duqueimmigration_logo.png?v=<?= assetVersion('images/duqueimmigration_logo.png') ?>">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -111,6 +120,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           </div>
           <p class="auth-caps" id="capsWarning" hidden><i class="fa-solid fa-arrow-up" aria-hidden="true"></i> Caps Lock is on</p>
         </div>
+        <label class="auth-remember">
+          <input type="checkbox" name="remember" value="1"<?= $_SERVER['REQUEST_METHOD'] !== 'POST' || !empty($_POST['remember']) ? ' checked' : '' ?>>
+          <span>Keep me signed in on this device<small>For 30 days. Untick on a shared or public computer.</small></span>
+        </label>
         <button type="submit" class="auth-submit" id="authSubmit">Sign in <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button>
       </form>
     <p class="auth-help">Forgot your password or don't have login details? Email us at <a href="mailto:info@duqueimmigration.ca">info@duqueimmigration.ca</a> and we'll help you get in.</p>
