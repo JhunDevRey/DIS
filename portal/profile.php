@@ -64,7 +64,7 @@ $otherDevices = clientRememberOtherDeviceCount((int)$_SESSION['client_id']);
           <div class="field">
             <label>Additional emails <span style="font-weight:400;text-transform:none;">(CC)</span></label>
             <input type="text" name="cc_emails" data-email-chips value="<?= h($client['cc_emails']) ?>" placeholder="e.g. spouse@example.com">
-            <p class="help-text">Type or paste an email and press Enter — you can add as many as you need. Anyone listed here will be CC'd on every email we send you — useful for a spouse, agent, or anyone else who should stay in the loop.</p>
+            <p class="help-text">Type or paste an email and press Enter — you can add as many as you need. Anyone listed here is CC'd on every email we send you <strong>and is emailed your portal login (email and password)</strong>, so they can sign in to your portal as you. Only add people you trust with your file, like a spouse or your agent.</p>
           </div>
           <div class="field-row">
             <div class="field">

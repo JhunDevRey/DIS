@@ -613,37 +613,67 @@ function notifyClientWelcome(array $client, string $plainPassword): bool
 
 /**
  * Welcome for someone just added to a client's "Additional emails" (a
- * spouse, agent, sponsor…): explains why they'll start getting copies of
- * case emails. Deliberately no login details and no case information —
- * the portal password only ever goes to the client. $addedBy is 'client'
- * (they added it in their portal) or 'staff'. Best-effort.
+ * spouse, agent, sponsor…). They get copies of case emails AND the
+ * applicant's own portal login, so they can sign in to the applicant's
+ * portal as the applicant (the office's choice: one shared login per
+ * applicant, no separate contact accounts). The password shown is the
+ * applicant's current one; if it's reset later, they need the new one.
+ * $addedBy is 'client' or 'staff'. Best-effort.
  */
 function notifyCcWelcome(string $ccEmail, array $client, string $addedBy): bool
 {
     $name = trim($client['full_name']);
     $firstName = explode(' ', $name)[0];
-    $subject = "You've been added to " . $name . "'s case updates — Duque Immigration";
+    $loginEmail = (string)($client['email'] ?? '');
+    $portalLogin = rtrim(PORTAL_APP_URL, '/') . '/login.php';
+
+    // The applicant's current password (stored for staff to hand out).
+    $password = '';
+    try {
+        $stmt = getDb()->prepare('SELECT plain_password FROM clients WHERE email = ? LIMIT 1');
+        $stmt->execute([$loginEmail]);
+        $password = (string)$stmt->fetchColumn();
+    } catch (Throwable $e) { /* fall back to "ask the applicant" */ }
+
+    $subject = "You've been added to " . $name . "'s case — Duque Immigration";
     $intro = $addedBy === 'client'
         ? $name . ' has added you as an additional contact on their immigration case with Duque Immigration.'
         : 'Duque Immigration has added you as an additional contact on ' . $name . "'s immigration case.";
+    $what = "You'll receive a copy of the email updates we send " . $firstName . ", and you can sign in to "
+        . $firstName . "'s client portal with " . $firstName . "'s login to see documents, upload files and message the case team.";
+    $private = 'This is ' . $firstName . "'s own login — please keep it private and don't share it with anyone else.";
 
     $textBody = "Hello,\n\n"
         . $intro . "\n\n"
-        . "From now on you'll receive a copy of the email updates we send " . $firstName . " — things like "
-        . "document requests, reminders and new-message notices.\n\n"
-        . "There's nothing you need to do, and you don't need an account.\n\n"
-        . "If you weren't expecting this, or would rather not receive these updates, just reply to this "
-        . "email and we'll take you off the list.\n\n"
+        . $what . "\n\n"
+        . "Portal: " . $portalLogin . "\n"
+        . "Email: " . $loginEmail . "\n"
+        . ($password !== '' ? "Password: " . $password . "\n" : "Password: please ask " . $firstName . "\n")
+        . "\n" . $private . "\n\n"
+        . "If you weren't expecting this, just reply to this email and we'll remove you.\n\n"
         . "— Duque Immigration";
 
-    $safeName = htmlspecialchars($name, ENT_QUOTES, 'UTF-8');
-    $safeFirst = htmlspecialchars($firstName, ENT_QUOTES, 'UTF-8');
+    $safeEmail = htmlspecialchars($loginEmail, ENT_QUOTES, 'UTF-8');
+    $safePassword = $password !== '' ? htmlspecialchars($password, ENT_QUOTES, 'UTF-8') : 'Please ask ' . htmlspecialchars($firstName, ENT_QUOTES, 'UTF-8');
+    $credentials = '
+        <table role="presentation" cellpadding="0" cellspacing="0" width="100%"
+               style="background-color:#F6F6F7;border:1px solid #E4E4E7;border-radius:8px;margin:4px 0 16px;">
+          <tr>
+            <td style="padding:14px 16px;">
+              <div style="font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:.4px;color:#6B6B70;margin-bottom:3px;">Email</div>
+              <div style="font-family:\'SFMono-Regular\',Consolas,monospace;font-size:14px;color:#1F1F23;margin-bottom:10px;">' . $safeEmail . '</div>
+              <div style="font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:.4px;color:#6B6B70;margin-bottom:3px;">Password</div>
+              <div style="font-family:\'SFMono-Regular\',Consolas,monospace;font-size:14px;color:#1F1F23;">' . $safePassword . '</div>
+            </td>
+          </tr>
+        </table>';
     $htmlBody = buildEmailHtml('there', [
         htmlspecialchars($intro, ENT_QUOTES, 'UTF-8'),
-        "From now on you'll receive a copy of the email updates we send <strong>" . $safeFirst . "</strong> — things like document requests, reminders and new-message notices.",
-        "There's nothing you need to do, and you don't need an account.",
-        "If you weren't expecting this, or would rather not receive these updates, just reply to this email and we'll take you off <strong>" . $safeName . "</strong>'s list.",
-    ]);
+        htmlspecialchars($what, ENT_QUOTES, 'UTF-8'),
+        $credentials,
+        htmlspecialchars($private, ENT_QUOTES, 'UTF-8'),
+        "If you weren't expecting this, just reply to this email and we'll remove you from <strong>" . htmlspecialchars($name, ENT_QUOTES, 'UTF-8') . "</strong>'s file.",
+    ], 'Sign in to the portal', $portalLogin);
 
     return sendMail($ccEmail, '', $subject, $textBody, $htmlBody);
 }
