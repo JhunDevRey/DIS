@@ -41,6 +41,21 @@ if ($action === 'update_password') {
         jsonResponse(false, 'New password must be at least 6 characters.');
     }
 
+    // A CC contact changes their OWN login, never the applicant's.
+    if (portalIsContact()) {
+        $contactId = (int)$_SESSION['contact_id'];
+        $stmt = $db->prepare('SELECT password_hash FROM portal_contacts WHERE id = ?');
+        $stmt->execute([$contactId]);
+        $row = $stmt->fetch();
+        if (!$row || !$row['password_hash'] || !password_verify($current, $row['password_hash'])) {
+            jsonResponse(false, 'Current password is incorrect.');
+        }
+        $db->prepare('UPDATE portal_contacts SET password_hash = ? WHERE id = ?')
+           ->execute([password_hash($new, PASSWORD_DEFAULT), $contactId]);
+        $signedOut = rememberForgetAll('contact', $contactId, true);
+        jsonResponse(true, 'Password updated.' . ($signedOut ? ' Your other devices have been signed out.' : ''));
+    }
+
     $stmt = $db->prepare('SELECT password_hash FROM clients WHERE id = ?');
     $stmt->execute([$clientId]);
     $row = $stmt->fetch();
@@ -58,7 +73,9 @@ if ($action === 'update_password') {
 }
 
 if ($action === 'forget_devices') {
-    $n = clientRememberForgetAll($clientId, true);
+    $n = portalIsContact()
+        ? rememberForgetAll('contact', (int)$_SESSION['contact_id'], true)
+        : clientRememberForgetAll($clientId, true);
     jsonResponse(true, $n ? 'Signed out of ' . $n . ' other device' . ($n === 1 ? '' : 's') . '.' : 'No other devices were signed in.');
 }
 

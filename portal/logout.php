@@ -15,6 +15,7 @@ if (session_status() === PHP_SESSION_NONE) {
 // Signing out also forgets this device, so it asks for the password next time.
 require_once __DIR__ . '/../includes/client_remember.php';
 clientRememberForgetCurrent();
+rememberForgetCurrent('contact');
 session_destroy();
 header('Location: login.php');
 exit;

@@ -22,9 +22,18 @@ $redirect = safeRelativeRedirect($_GET['redirect'] ?? $_POST['redirect'] ?? '');
 // A remembered device goes straight through (e.g. the "Read message" link
 // in a notification email lands here with ?redirect=messages.php).
 require_once __DIR__ . '/../includes/client_remember.php';
-clientRememberTryLogin();
+require_once __DIR__ . '/../includes/portal_contacts.php';
+if (empty($_SESSION['client_id']) && empty($_SESSION['contact_id'])) {
+    clientRememberTryLogin() || rememberTryLogin('contact');
+}
 
 if (!empty($_SESSION['client_id'])) {
+    header('Location: ' . ($redirect ?: 'documents.php'));
+    exit;
+}
+if (!empty($_SESSION['contact_id'])) {
+    // A contact who still has to pick a client (or whose access ended) —
+    // requireClient() on the next page sorts that out.
     header('Location: ' . ($redirect ?: 'documents.php'));
     exit;
 }
@@ -54,8 +63,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: ' . ($redirect ?: 'documents.php'));
             exit;
         }
-        recordFailedLogin('portal');
-        $error = 'Incorrect email or password.';
+
+        // Not the applicant — one of their CC contacts, with their own password?
+        $contact = contactFindByEmail($email);
+        if ($contact && $contact['password_hash'] && password_verify($password, $contact['password_hash'])) {
+            if (!contactClientsFor($contact['email'])) {
+                $error = 'Your contact access has ended — you are no longer listed on any client\'s file. Contact us at info@duqueimmigration.ca if this is a mistake.';
+            } else {
+                clearLoginAttempts('portal');
+                contactStartSession($contact);
+                if (!empty($_POST['remember'])) {
+                    rememberIssue('contact', (int)$contact['id']);
+                }
+                header('Location: ' . ($redirect ?: 'documents.php'));
+                exit;
+            }
+        } else {
+            recordFailedLogin('portal');
+            $error = 'Incorrect email or password.';
+        }
     }
 }
 ?>
@@ -126,7 +152,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </label>
         <button type="submit" class="auth-submit" id="authSubmit">Sign in <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button>
       </form>
-    <p class="auth-help">Forgot your password or don't have login details? Email us at <a href="mailto:info@duqueimmigration.ca">info@duqueimmigration.ca</a> and we'll help you get in.</p>
+    <p class="auth-help"><strong>Added as a family member, agent or other contact on someone's file?</strong> <a href="contact_setup.php">Set up or reset your contact login</a>.</p>
+    <p class="auth-help" style="border-top:none;padding-top:0;margin-top:10px;">Applicant who forgot your password or doesn't have login details? Email us at <a href="mailto:info@duqueimmigration.ca">info@duqueimmigration.ca</a> and we'll help you get in.</p>
     </div>
   </main>
 </div>

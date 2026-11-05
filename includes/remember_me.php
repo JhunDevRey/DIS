@@ -34,24 +34,39 @@ function rememberRealm(string $realm): array
             'cookie' => 'duque_admin_remember', 'days' => 14,
             'session_id' => 'admin_id', 'session_name' => 'admin_name',
         ],
+        // A client's CC contact signing in to that client's portal
+        // (includes/portal_contacts.php picks which client afterwards).
+        'contact' => [
+            'table' => 'contact_remember_tokens', 'owner' => 'contact_id',
+            'cookie' => 'duque_contact_remember', 'days' => 30,
+            'session_id' => 'contact_id', 'session_name' => 'contact_name',
+        ],
     ];
     return $realms[$realm];
 }
 
-/** [id, display name] if the account may sign in, else null. */
+/** Session values to sign this account in with, or null if it may no longer sign in. */
 function rememberLookupAccount(string $realm, int $id): ?array
 {
     if ($realm === 'client') {
         $stmt = getDb()->prepare('SELECT full_name, is_active FROM clients WHERE id = ?');
         $stmt->execute([$id]);
         $c = $stmt->fetch();
-        return $c && (int)$c['is_active'] ? [$id, $c['full_name']] : null;
+        return $c && (int)$c['is_active'] ? ['client_id' => $id, 'client_name' => $c['full_name']] : null;
+    }
+    if ($realm === 'contact') {
+        // Only while they still have a password and are still listed on at
+        // least one client — the client they open is resolved afterwards.
+        require_once __DIR__ . '/portal_contacts.php';
+        $contact = contactFind($id);
+        if (!$contact || !$contact['password_hash'] || !contactClientsFor($contact['email'])) return null;
+        return ['contact_id' => $id, 'contact_email' => $contact['email'], 'contact_name' => $contact['name'] ?: ''];
     }
     // Live admin_users has admin_name; older schema copies have full_name.
     $stmt = getDb()->prepare('SELECT * FROM admin_users WHERE id = ?');
     $stmt->execute([$id]);
     $a = $stmt->fetch();
-    return $a ? [$id, $a['admin_name'] ?? $a['full_name'] ?? 'Staff'] : null;
+    return $a ? ['admin_id' => $id, 'admin_name' => $a['admin_name'] ?? $a['full_name'] ?? 'Staff'] : null;
 }
 
 function rememberSetCookie(string $realm, string $value, int $expires): void
@@ -140,8 +155,9 @@ function rememberTryLogin(string $realm): bool
     }
 
     session_regenerate_id(true);
-    $_SESSION[$r['session_id']] = $account[0];
-    $_SESSION[$r['session_name']] = $account[1];
+    foreach ($account as $key => $value) {
+        $_SESSION[$key] = $value;
+    }
 
     // A parallel tab already swapped the secret a moment ago: the browser
     // is about to store that new cookie, so leave it alone.

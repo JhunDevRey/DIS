@@ -449,7 +449,7 @@ $dropboxAddedYear = $client['dropbox_added_at'] ? (int)date('Y', strtotime($clie
           <div class="field">
             <label>Additional emails <span style="font-weight:400;text-transform:none;">(CC, optional)</span></label>
             <input type="text" name="cc_emails" data-email-chips value="<?= h($client['cc_emails']) ?>" placeholder="e.g. spouse@example.com">
-            <p class="help-text">Type or paste an email and press Enter — add as many as you need. CC'd on every notification email sent to this client. Clients can also manage this themselves.</p>
+            <p class="help-text">Type or paste an email and press Enter — add as many as you need. Everyone listed is CC'd on every notification email <strong>and can sign in to this client's portal with full access</strong>, using their own password (they're emailed a setup link). Remove an address to end their access. Clients can also manage this themselves.</p>
           </div>
           <div class="field">
             <label>Case type</label>

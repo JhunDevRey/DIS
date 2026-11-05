@@ -9,8 +9,13 @@ $db = getDb();
 $stmt = $db->prepare('SELECT id, full_name, case_type, email, phone, cc_emails, designated_person_name, designated_person_phone FROM clients WHERE id = ?');
 $stmt->execute([$_SESSION['client_id']]);
 $client = $stmt->fetch();
-$thisDeviceRemembered = clientRememberThisDevice((int)$_SESSION['client_id']);
-$otherDevices = clientRememberOtherDeviceCount((int)$_SESSION['client_id']);
+// Password + signed-in devices belong to whoever is signed in: the
+// applicant, or (for a CC contact) the contact's own login.
+$isContact = portalIsContact();
+$deviceRealm = $isContact ? 'contact' : 'client';
+$deviceOwner = $isContact ? (int)$_SESSION['contact_id'] : (int)$_SESSION['client_id'];
+$thisDeviceRemembered = rememberThisDevice($deviceRealm, $deviceOwner);
+$otherDevices = rememberOtherDeviceCount($deviceRealm, $deviceOwner);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -30,6 +35,15 @@ $otherDevices = clientRememberOtherDeviceCount((int)$_SESSION['client_id']);
   <?php include __DIR__ . '/_sidebar.php'; ?>
 
   <main class="main">
+    <?php if ($isContact): ?>
+      <div class="pwa-banner" style="border-left-color:var(--received);">
+        <i class="fa-solid fa-user-group" style="color:var(--received);font-size:18px;"></i>
+        <div class="pwa-banner-text">
+          <strong>You're signed in as a contact on <?= h($_SESSION['client_name'] ?? '') ?>'s file</strong>
+          <span>Contact details below are <?= h(explode(' ', trim($_SESSION['client_name'] ?? ''))[0]) ?>'s. The password and signed-in devices further down are your own login (<?= h($_SESSION['contact_email'] ?? '') ?>).</span>
+        </div>
+      </div>
+    <?php endif; ?>
     <div class="main-header">
       <div>
         <h1>My Profile</h1>
@@ -64,7 +78,7 @@ $otherDevices = clientRememberOtherDeviceCount((int)$_SESSION['client_id']);
           <div class="field">
             <label>Additional emails <span style="font-weight:400;text-transform:none;">(CC)</span></label>
             <input type="text" name="cc_emails" data-email-chips value="<?= h($client['cc_emails']) ?>" placeholder="e.g. spouse@example.com">
-            <p class="help-text">Type or paste an email and press Enter — you can add as many as you need. Anyone listed here will be CC'd on every email we send you — useful for a spouse, agent, or anyone else who should stay in the loop.</p>
+            <p class="help-text">Type or paste an email and press Enter — you can add as many as you need. Anyone listed here is CC'd on every email we send you <strong>and can sign in to your portal with their own password — seeing and doing everything you can</strong> (documents, uploads, messages, Application Review). Only add people you trust with your file, like a spouse or your agent. Remove someone to end their access.</p>
           </div>
           <div class="field-row">
             <div class="field">

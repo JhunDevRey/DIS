@@ -67,7 +67,7 @@ $stmt = $db->prepare("
 $stmt->execute([$clientId, (int)$client['staff_messages_seen_id']]);
 $alreadyNotified = (int)$stmt->fetchColumn() > 0;
 
-$senderName = $_SESSION['client_name'] ?? $client['full_name'];
+$senderName = portalActorName(); // the applicant, or "Name (contact)"
 
 try {
     $messageId = createMessage($clientId, 'client', $senderName, $body, $files);
@@ -84,7 +84,7 @@ if (!$alreadyNotified && $client['processor_id']) {
     notifyProcessorRealtime(
         (int)$client['processor_id'],
         $clientId,
-        $senderName,
+        $_SESSION['client_name'] ?? $client['full_name'],
         'message',
         $senderName . ' sent a message: "' . $preview . '"'
     );
