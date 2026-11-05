@@ -59,37 +59,64 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Client Login · Duque Immigration Document Portal</title>
 <link rel="icon" type="image/png" href="images/duqueimmigration_logo.png?v=<?= assetVersion('images/duqueimmigration_logo.png') ?>">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="css/style.css?v=<?= cssVersion() ?>">
 </head>
-<body>
+<body class="auth-page">
 <div class="auth-shell">
-  <div class="auth-card">
-    <img class="auth-logo" src="images/duque-logo.png?v=<?= assetVersion('images/duque-logo.png') ?>" alt="Duque Immigration logo">
-    <div class="brand-mark">Duque Immigration</div>
-    <div class="brand-sub">Client Document Portal</div>
+  <aside class="auth-brand">
+    <div class="auth-brand-top">
+      <span class="auth-logo"><img src="images/duque-logo.png?v=<?= assetVersion('images/duque-logo.png') ?>" alt=""></span>
+      <span class="auth-brand-name">Duque Immigration<small>Client Portal</small></span>
+    </div>
+    <div class="auth-brand-copy">
+      <h1>Your immigration case, step by step.</h1>
+      <p>Upload your documents, see what's still needed, and talk to your case team — all in one secure place.</p>
+      <ul class="auth-points">
+        <li><span class="auth-point-icon"><i class="fa-solid fa-file-arrow-up" aria-hidden="true"></i></span>Upload documents securely</li>
+        <li><span class="auth-point-icon"><i class="fa-solid fa-chart-simple" aria-hidden="true"></i></span>Track each document's status</li>
+        <li><span class="auth-point-icon"><i class="fa-solid fa-comments" aria-hidden="true"></i></span>Message your case team directly</li>
+      </ul>
+    </div>
+    <div class="auth-brand-foot">&copy; <?= date('Y') ?> Duque Immigration</div>
+  </aside>
 
-    <?php if ($error): ?>
-      <p class="error-text"><?= h($error) ?></p>
-    <?php endif; ?>
+  <main class="auth-main">
+    <div class="auth-card">
+      <div class="auth-card-logo"><span class="auth-logo"><img src="images/duque-logo.png?v=<?= assetVersion('images/duque-logo.png') ?>" alt=""></span><span>Duque Immigration<small>Client Portal</small></span></div>
+      <h2>Welcome back</h2>
+      <p class="auth-sub">Sign in with the email and password we sent you.</p>
 
-    <form method="POST">
-      <?php if ($redirect): ?>
-        <input type="hidden" name="redirect" value="<?= h($redirect) ?>">
+      <?php if ($error): ?>
+        <div class="auth-alert" role="alert"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i><span><?= h($error) ?></span></div>
       <?php endif; ?>
-      <div class="field">
+
+      <form method="POST" id="authForm">
+        <?php if ($redirect): ?>
+          <input type="hidden" name="redirect" value="<?= h($redirect) ?>">
+        <?php endif; ?>
+      <div class="auth-field">
         <label for="email">Email</label>
-        <input type="email" id="email" name="email" required autofocus>
+        <div class="auth-input">
+          <i class="fa-regular fa-envelope" aria-hidden="true"></i>
+          <input type="email" id="email" name="email" value="<?= h($email ?? '') ?>" autocomplete="email" autocapitalize="none" spellcheck="false" placeholder="you@example.com" required<?= empty($email) ? ' autofocus' : '' ?>>
+        </div>
       </div>
-      <div class="field">
-        <label for="password">Password</label>
-        <input type="password" id="password" name="password" required>
-      </div>
-      <button type="submit" class="btn btn-primary">Sign in</button>
-    </form>
-    <p class="help-text" style="margin-top:18px;text-align:center;">
-      Don't have login details? Contact us at <a href="mailto:info@duqueimmigration.ca" style="color:var(--slate);font-weight:600;">info@duqueimmigration.ca</a>
-    </p>
-  </div>
+        <div class="auth-field">
+          <label for="password">Password</label>
+          <div class="auth-input">
+            <i class="fa-solid fa-lock" aria-hidden="true"></i>
+            <input type="password" id="password" name="password" autocomplete="current-password" required<?= !empty($email) ? ' autofocus' : '' ?>>
+            <button type="button" class="auth-eye" id="togglePassword" aria-label="Show password" title="Show password"><i class="fa-regular fa-eye"></i></button>
+          </div>
+          <p class="auth-caps" id="capsWarning" hidden><i class="fa-solid fa-arrow-up" aria-hidden="true"></i> Caps Lock is on</p>
+        </div>
+        <button type="submit" class="auth-submit" id="authSubmit">Sign in <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button>
+      </form>
+    <p class="auth-help">Forgot your password or don't have login details? Email us at <a href="mailto:info@duqueimmigration.ca">info@duqueimmigration.ca</a> and we'll help you get in.</p>
+    </div>
+  </main>
 </div>
+<script src="js/auth.js?v=<?= assetVersion('js/auth.js') ?>"></script>
 </body>
 </html>
