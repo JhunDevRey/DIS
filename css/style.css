@@ -118,6 +118,7 @@
 
 /* ---- Dark theme overrides ---- */
 [data-theme="dark"] {
+  /* Text tokens brightened (Nov 2026): the earlier greys were hard to read on dark. */
   --gold: #EF5D5D;
   --gold-dark: #F58080;
   --gold-tint: rgba(239, 93, 93, .14);
@@ -130,7 +131,7 @@
   --client-tint: rgba(239, 93, 93, .10);
   --client-tint-border: rgba(239, 93, 93, .22);
 
-  --pending: #9B9A97;
+  --pending: #BDBCB8;
   --pending-tint: rgba(155, 154, 151, .16);
   --received: #62AEEB;
   --received-tint: rgba(98, 174, 235, .14);
@@ -162,15 +163,15 @@
   --surface-hover: #2C2C2C;
   --line: #313131;
   --line-strong: #3D3D3D;
-  --ink: #EDEDEC;
-  --text: #E3E2DF;
-  --text-muted: #8B8A87;
-  --slate: #C6C4C0;
-  --slate-light: #9E9C98;
+  --ink: #FAFAF9;
+  --text: #F1F0ED;
+  --text-muted: #B9B7B2;
+  --slate: #DDDBD6;
+  --slate-light: #C2C0BB;
 
   --sidebar-bg: #1D1D1D;
-  --sidebar-text: #C9C8C4;
-  --sidebar-icon: #8B8A87;
+  --sidebar-text: #E6E5E1;
+  --sidebar-icon: #AEACA7;
   --sidebar-hover: rgba(255, 255, 255, .06);
   --sidebar-active-bg: var(--gold-tint);
   --sidebar-active-text: var(--gold);
@@ -182,6 +183,7 @@
 }
 
 * { box-sizing: border-box; }
+[data-theme="dark"] ::placeholder { color: var(--text-muted); opacity: .85; }
 html, body { margin: 0; padding: 0; }
 body {
   font-family: var(--font-body);
