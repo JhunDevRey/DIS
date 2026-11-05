@@ -1,6 +1,6 @@
 <?php
 // Included in the <head> of the staff admin pages: makes the admin
-// installable as its own home-screen app ("Duque Staff", opens the Inbox) —
+// installable as its own home-screen app ("Duque Staff", opens on Clients) —
 // see admin/manifest.json, admin/sw.js and js/pwa-install.js.
 ?>
 <link rel="manifest" href="manifest.json?v=<?= assetVersion('admin/manifest.json') ?>">
