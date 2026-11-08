@@ -1601,7 +1601,7 @@ body.auth-page { background: #F7F7F5; }
   background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--gold);
   border-radius: var(--radius); box-shadow: var(--shadow);
 }
-.pwa-banner-icon { width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--line); flex-shrink: 0; }
+.pwa-banner-icon { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); flex-shrink: 0; }
 .pwa-banner-text { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 2px; font-size: 13px; color: var(--text-muted); line-height: 1.45; }
 .pwa-banner-text strong { color: var(--ink); font-size: 14px; }
 .pwa-share { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; color: var(--ink); }

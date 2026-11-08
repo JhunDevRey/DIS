@@ -15,4 +15,4 @@
         data-name="Duque Staff"
         data-title="Add Duque Staff to your home screen"
         data-blurb="Open the shared inbox and client files in one tap, like an app."
-        data-icon="images/app-icon-192.png"></script>
+        data-icon="images/app-icon-round-192.png"></script>

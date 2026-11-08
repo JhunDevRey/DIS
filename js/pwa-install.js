@@ -15,7 +15,7 @@
   const NAME = opts.name || 'Duque Portal';
   const TITLE = opts.title || 'Add Duque Portal to your home screen';
   const BLURB = opts.blurb || 'Open your messages and documents in one tap, like an app.';
-  const ICON = opts.icon || 'images/app-icon-192.png';
+  const ICON = opts.icon || 'images/app-icon-round-192.png';
   const HIDE_KEY = 'duquePwaBannerHiddenUntil';
 
   const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
