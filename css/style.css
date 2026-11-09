@@ -187,6 +187,12 @@
 
 * { box-sizing: border-box; }
 [data-theme="dark"] ::placeholder { color: var(--text-muted); opacity: .85; }
+/* Theme switch circular reveal (js/ui-kit.js drives the clip-path on the new snapshot). */
+::view-transition-old(root),
+::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+::view-transition-old(root) { z-index: 1; }
+::view-transition-new(root) { z-index: 2; }
+.theme-switching, .theme-switching *, .theme-switching *::before, .theme-switching *::after { transition: none !important; }
 /* #AF0404 is too dark for text on dark surfaces — text links brighten on hover instead. */
 [data-theme="dark"] .doc-instructions a:hover,
 [data-theme="dark"] .link-edit-popup-apply:hover,

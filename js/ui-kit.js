@@ -743,10 +743,37 @@ document.addEventListener('DOMContentLoaded', () => {
   const toggle = document.getElementById('themeToggle');
   if (!toggle) return;
 
-  toggle.addEventListener('click', () => {
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    const next = isDark ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', next);
+  const root = document.documentElement;
+  const applyTheme = (next) => {
+    root.setAttribute('data-theme', next);
     localStorage.setItem('theme', next);
+  };
+
+  toggle.addEventListener('click', () => {
+    const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // Browsers without View Transitions (or people who asked for less motion) just switch.
+    if (!document.startViewTransition || reduceMotion) {
+      applyTheme(next);
+      return;
+    }
+
+    // Circular reveal: the new theme grows out of the switch until it covers the screen.
+    const rect = toggle.getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+    const radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+
+    // Colour transitions off while switching, so the new snapshot is already in its final colours.
+    root.classList.add('theme-switching');
+    const transition = document.startViewTransition(() => applyTheme(next));
+    transition.ready.then(() => {
+      root.animate(
+        { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
+        { duration: 600, easing: 'cubic-bezier(.4, 0, .2, 1)', pseudoElement: '::view-transition-new(root)' }
+      );
+    }).catch(() => {});
+    transition.finished.finally(() => root.classList.remove('theme-switching'));
   });
 });
