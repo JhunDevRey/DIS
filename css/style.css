@@ -2423,4 +2423,82 @@ button.msg-edited:hover { color: var(--ink); text-decoration: underline; }
 .conv-meta-item { flex-shrink: 0; white-space: nowrap; }
 .conv-meta > * + .conv-meta-item::before { content: '·'; margin-right: 4px; }
 .msg-layout > .card + .card { margin-top: 0; }
+
+/* ---- Messenger-style replies (js/messages.js) ---- */
+.msg-thread { overflow-x: hidden; }
+.msg { position: relative; transition: transform .2s ease, box-shadow .2s ease; }
+/* Reply arrow sits just outside the bubble, toward the middle. */
+.msg-reply-btn {
+  position: absolute; top: 50%; right: -36px; transform: translateY(-50%);
+  width: 28px; height: 28px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: none; background: var(--card); color: var(--text-muted);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .12); font-size: 11.5px; cursor: pointer;
+  opacity: 0; transition: opacity var(--ease), color var(--ease), background var(--ease);
+}
+.msg.mine .msg-reply-btn { right: auto; left: -36px; }
+.msg:hover .msg-reply-btn, .msg-reply-btn:focus-visible { opacity: 1; }
+.msg-reply-btn:hover { color: var(--gold); background: var(--surface-hover); }
+.msg.editing .msg-reply-btn { display: none; }
+/* Touch: swipe to reply; the arrow fades in as the bubble is dragged. */
+@media (hover: none) {
+  /* The arrow appears in the gap the bubble leaves behind as it slides. */
+  .msg-reply-btn { opacity: 0; pointer-events: none; right: auto; left: -36px; }
+  .msg.mine .msg-reply-btn { left: auto; right: -36px; }
+  .msg.swipe-ready .msg-reply-btn { opacity: 1; color: var(--gold); }
+}
+
+/* Quote of the original, at the top of a reply bubble. */
+.msg-quote {
+  display: flex; flex-direction: column; gap: 2px; width: 100%;
+  margin: 0 0 7px; padding: 6px 9px;
+  border: none; border-left: 3px solid var(--gold); border-radius: 6px;
+  background: rgba(0, 0, 0, .045); text-align: left;
+  font: inherit; color: var(--text-muted); cursor: pointer;
+}
+[data-theme="dark"] .msg-quote { background: rgba(255, 255, 255, .06); }
+.msg-quote:hover { background: rgba(0, 0, 0, .075); }
+[data-theme="dark"] .msg-quote:hover { background: rgba(255, 255, 255, .1); }
+.msg-quote-who { font-size: 11px; font-weight: 700; }
+.msg-quote-who .fa-reply { font-size: 9.5px; margin-right: 3px; }
+.msg-quote-text {
+  font-size: 12.5px; line-height: 1.4; color: var(--text);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  word-break: break-word; opacity: .85;
+}
+
+/* Jumping to the original from a quote. */
+.msg.flash { animation: msgFlash 1.6s ease; }
+@keyframes msgFlash {
+  0%, 35% { box-shadow: 0 0 0 3px var(--gold-tint), 0 0 0 1px var(--gold); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.msg.replying-to { box-shadow: 0 0 0 2px var(--gold-tint), 0 0 0 1px var(--gold); }
+
+/* "Replying to …" bar above the composer. */
+.msg-replying {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 8px; padding: 7px 8px 7px 11px;
+  border-left: 3px solid var(--gold); border-radius: var(--radius-sm);
+  background: var(--surface-alt);
+  animation: msgReplyIn .16s ease-out;
+}
+.msg-replying[hidden] { display: none; }
+@keyframes msgReplyIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.msg-replying-main {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px;
+  border: none; background: none; padding: 0; text-align: left; font: inherit; cursor: pointer;
+}
+.msg-replying-who { font-size: 12px; color: var(--text-muted); }
+.msg-replying-who .fa-reply { font-size: 10px; margin-right: 4px; }
+.msg-replying-who strong { color: var(--ink); }
+.msg-replying-text { font-size: 12.5px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.msg-replying-close {
+  flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%;
+  border: none; background: none; color: var(--text-muted); cursor: pointer;
+}
+.msg-replying-close:hover { background: var(--surface-hover); color: var(--ink); }
+@media (prefers-reduced-motion: reduce) {
+  .msg, .msg.flash, .msg-replying { animation: none; transition: none; }
+}
 .conv-item.no-thread .conv-preview { font-style: italic; }

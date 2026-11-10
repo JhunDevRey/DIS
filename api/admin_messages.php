@@ -4,7 +4,7 @@
  * Staff side of Messages.
  *   GET  ?list=1                       -> conversation list + unread total (inbox sidebar refresh)
  *   GET  ?client_id=N&after_id=M       -> messages in one conversation newer than M (polling)
- *   POST action=send, client_id, body, attachments[]  -> send a message
+ *   POST action=send, client_id, body, attachments[], reply_to_id?  -> send a message
  *   POST action=seen, client_id, up_to_id             -> mark conversation read
  *   POST action=edit, client_id, message_id, body     -> edit a staff message (within 2h)
  *   GET  ?client_id=N&history=ID                      -> earlier versions of an edited message
@@ -120,7 +120,7 @@ $alreadyNotified = (int)$stmt->fetchColumn() > 0;
 $senderName = inboxActorName($db);
 
 try {
-    $messageId = createMessage($clientId, 'admin', $senderName, $body, $files);
+    $messageId = createMessage($clientId, 'admin', $senderName, $body, $files, (int)($_POST['reply_to_id'] ?? 0));
 } catch (Throwable $e) {
     error_log('admin_messages send failed: ' . $e->getMessage());
     jsonResponse(false, 'Could not send the message. Please try again.');

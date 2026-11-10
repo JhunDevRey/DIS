@@ -5,7 +5,7 @@
  * never from the request, so a client can only ever reach their own
  * conversation.
  *   GET  ?after_id=M                         -> messages newer than M (polling)
- *   POST action=send, body, attachments[]    -> send a message to the case team
+ *   POST action=send, body, attachments[], reply_to_id?    -> send a message to the case team
  *   POST action=seen, up_to_id               -> mark conversation read
  */
 require_once __DIR__ . '/../includes/client_auth.php';
@@ -70,7 +70,7 @@ $alreadyNotified = (int)$stmt->fetchColumn() > 0;
 $senderName = $_SESSION['client_name'] ?? $client['full_name'];
 
 try {
-    $messageId = createMessage($clientId, 'client', $senderName, $body, $files);
+    $messageId = createMessage($clientId, 'client', $senderName, $body, $files, (int)($_POST['reply_to_id'] ?? 0));
 } catch (Throwable $e) {
     error_log('client_messages send failed: ' . $e->getMessage());
     jsonResponse(false, 'Could not send your message. Please try again.');

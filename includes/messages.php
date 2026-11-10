@@ -136,11 +136,36 @@ function fetchMessages(int $clientId, int $afterId = 0): array
         $filesByMessage[$f['message_id']][] = $f;
     }
 
+    // Messages these are replies to (may be older than $afterId, so fetched
+    // separately), for the quote shown at the top of a reply.
+    $replyIds = array_values(array_unique(array_filter(array_map('intval', array_column($messages, 'reply_to_id')))));
+    $parents = [];
+    if ($replyIds) {
+        $placeholders = implode(',', array_fill(0, count($replyIds), '?'));
+        $stmt = $db->prepare("SELECT m.id, m.sender_type, m.sender_name, m.body,
+            (SELECT COUNT(*) FROM message_files f WHERE f.message_id = m.id) AS file_count
+          FROM messages m WHERE m.client_id = ? AND m.id IN ($placeholders)");
+        $stmt->execute(array_merge([$clientId], $replyIds));
+        foreach ($stmt->fetchAll() as $p) {
+            $parents[$p['id']] = $p;
+        }
+    }
+
     foreach ($messages as &$m) {
         $m['files'] = $filesByMessage[$m['id']] ?? [];
+        $m['reply'] = $parents[(int)($m['reply_to_id'] ?? 0)] ?? null;
     }
     unset($m);
     return $messages;
+}
+
+/** Who sent a message, as the viewer sees it ('You' for a client's own). */
+function messageSenderLabel(array $m, string $viewer): string
+{
+    if ($m['sender_type'] === 'admin') {
+        return $m['sender_name'] ?: 'Duque Immigration';
+    }
+    return $viewer === 'client' ? 'You' : ($m['sender_name'] ?: 'Client');
 }
 
 /**
@@ -152,11 +177,8 @@ function fetchMessages(int $clientId, int $afterId = 0): array
 function messagesForJson(array $messages, string $viewer): array
 {
     return array_map(function (array $m) use ($viewer) {
-        if ($m['sender_type'] === 'admin') {
-            $sender = $m['sender_name'] ?: 'Duque Immigration';
-        } else {
-            $sender = $viewer === 'client' ? 'You' : ($m['sender_name'] ?: 'Client');
-        }
+        $sender = messageSenderLabel($m, $viewer);
+        $reply = $m['reply'] ?? null;
         return [
             'id'          => (int)$m['id'],
             'mine'        => $m['sender_type'] === $viewer,
@@ -169,6 +191,14 @@ function messagesForJson(array $messages, string $viewer): array
             // Staff only: the raw text + deadline for the Edit button.
             'body'        => $viewer === 'admin' && $m['sender_type'] === 'admin' ? $m['body'] : null,
             'edit_until'  => $viewer === 'admin' ? messageEditDeadline($m) : null,
+            // Messenger-style quote of the message this one replies to.
+            // Plain text (escaped in the browser), one line, trimmed.
+            'reply_to'    => $reply ? [
+                'id'      => (int)$reply['id'],
+                'sender'  => messageSenderLabel($reply, $viewer),
+                'snippet' => mb_strimwidth(trim(preg_replace('/\s+/u', ' ', $reply['body'])), 0, 160, '…'),
+                'files'   => (int)$reply['file_count'],
+            ] : null,
             'files'       => array_map(fn($f) => [
                 'id'   => (int)$f['id'],
                 'name' => $f['original_name'],
@@ -248,7 +278,7 @@ function recentMessageEdits(int $clientId, string $viewer): array
     $stmt = getDb()->prepare('SELECT * FROM messages WHERE client_id = ? AND edited_at IS NOT NULL AND edited_at > UTC_TIMESTAMP() - INTERVAL ? MINUTE');
     $stmt->execute([$clientId, MESSAGE_EDIT_WINDOW_MINUTES + 60]);
     $rows = $stmt->fetchAll();
-    foreach ($rows as &$r) $r['files'] = [];
+    foreach ($rows as &$r) { $r['files'] = []; $r['reply'] = null; }
     unset($r);
     return array_map(fn($m) => [
         'id'        => $m['id'],
@@ -290,9 +320,16 @@ function validateMessageAttachments(array $files): ?string
  * transaction. Returns the new message id. Throws on failure — callers
  * catch and respond with JSON.
  */
-function createMessage(int $clientId, string $senderType, string $senderName, string $body, array $files): int
+function createMessage(int $clientId, string $senderType, string $senderName, string $body, array $files, int $replyToId = 0): int
 {
     $db = getDb();
+    // A reply can only quote a message from this same conversation;
+    // anything else is quietly sent as an ordinary message.
+    if ($replyToId > 0) {
+        $stmt = $db->prepare('SELECT id FROM messages WHERE id = ? AND client_id = ?');
+        $stmt->execute([$replyToId, $clientId]);
+        $replyToId = (int)$stmt->fetchColumn();
+    }
     if ($files && !is_dir(MESSAGE_UPLOAD_DIR)) {
         mkdir(MESSAGE_UPLOAD_DIR, 0755, true);
     }
@@ -300,8 +337,8 @@ function createMessage(int $clientId, string $senderType, string $senderName, st
     $movedPaths = [];
     $db->beginTransaction();
     try {
-        $db->prepare('INSERT INTO messages (client_id, sender_type, sender_name, body) VALUES (?, ?, ?, ?)')
-           ->execute([$clientId, $senderType, $senderName, $body]);
+        $db->prepare('INSERT INTO messages (client_id, sender_type, sender_name, body, reply_to_id) VALUES (?, ?, ?, ?, ?)')
+           ->execute([$clientId, $senderType, $senderName, $body, $replyToId ?: null]);
         $messageId = (int)$db->lastInsertId();
 
         foreach ($files as $i => $file) {

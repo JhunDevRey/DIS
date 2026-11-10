@@ -14,6 +14,10 @@
 // Staff can edit their own messages for 2 hours after sending (the server
 // sends edit_until; the server also re-checks it). Edits show as "edited"
 // on both sides and reach open conversations through the same polling.
+//
+// Replies work like Messenger: hover a message (or swipe it sideways on a
+// phone) and hit the reply arrow; the sent message carries a quote of the
+// original, and clicking the quote jumps back to it.
 
 (function () {
   const app = document.getElementById('msgApp');
@@ -39,6 +43,7 @@
   const byId = new Map(); // message id -> latest data, for re-rendering after an edit
   let loading = false;
   let pendingFiles = [];
+  let replyTo = null; // message being replied to, while composing
 
   // ---------- Rendering ----------
 
@@ -109,10 +114,54 @@
     const editBtn = m.edit_until && parseUtc(m.edit_until) > new Date()
       ? `<button type="button" class="msg-edit-btn" data-edit data-edit-until="${esc(m.edit_until)}" title="Edit (possible until ${esc(formatTime(parseUtc(m.edit_until)))})" aria-label="Edit message"><i class="fa-solid fa-pen"></i></button>` : '';
 
+    // Reply arrow beside the bubble (only where there's a composer).
+    const replyBtn = form ? `<button type="button" class="msg-reply-btn" data-reply title="Reply" aria-label="Reply to this message"><i class="fa-solid fa-reply"></i></button>` : '';
+
     return `
+      ${replyBtn}
+      ${quoteHtml(m)}
       <div class="msg-head"><span class="msg-sender">${esc(m.sender)}</span>${editBtn}${edited}<span class="msg-time" title="${esc(when.toLocaleString())}">${formatTime(when)}</span></div>
       ${m.body_html ? `<div class="msg-body">${m.body_html}</div>` : ''}
       ${filesHtml ? `<div class="msg-files">${filesHtml}</div>` : ''}`;
+  }
+
+  // "you" / "yourself" for the client's own messages, otherwise the name.
+  function replyName(target, from) {
+    if (target === 'You') return from === 'You' ? 'yourself' : 'you';
+    return target;
+  }
+
+  function snippetText(r) {
+    if (r.snippet) return r.snippet;
+    return r.files ? `📎 ${r.files} attachment${r.files === 1 ? '' : 's'}` : '(message)';
+  }
+
+  function quoteHtml(m) {
+    const r = m.reply_to;
+    if (!r) return '';
+    return `
+      <button type="button" class="msg-quote" data-jump="${r.id}" title="Show the original message">
+        <span class="msg-quote-who"><i class="fa-solid fa-reply"></i> Replying to ${esc(replyName(r.sender, m.sender))}</span>
+        <span class="msg-quote-text">${esc(snippetText(r))}</span>
+      </button>`;
+  }
+
+  // Plain one-line text from a message (for quotes of messages edited
+  // while the thread is open, and the "Replying to" bar).
+  function plainSnippet(m) {
+    const div = document.createElement('div');
+    div.innerHTML = m.body_html || '';
+    const text = div.textContent.replace(/\s+/g, ' ').trim();
+    return text.length > 160 ? text.slice(0, 159) + '…' : text;
+  }
+
+  function jumpTo(id) {
+    const el = thread.querySelector(`.msg[data-id="${id}"]`);
+    if (!el) { showToast('The original message is no longer available.', true); return; }
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.remove('flash');
+    void el.offsetWidth; // restart the highlight animation
+    el.classList.add('flash');
   }
 
   // Swap in edited text (from our own save, or picked up while polling).
@@ -123,6 +172,16 @@
       Object.assign(m, { body_html: e.body_html, edited_at: e.edited_at, body: e.body ?? m.body });
       const el = thread.querySelector(`.msg[data-id="${e.id}"]`);
       if (el && !el.classList.contains('editing')) el.innerHTML = bubbleHtml(m);
+      // Quotes of this message in later replies show the new text too.
+      const snip = plainSnippet(m);
+      for (const other of byId.values()) {
+        if (other.reply_to && other.reply_to.id === e.id && snip) {
+          other.reply_to.snippet = snip;
+          const q = thread.querySelector(`.msg[data-id="${other.id}"] .msg-quote-text`);
+          if (q) q.textContent = snip;
+        }
+      }
+      if (replyTo && replyTo.id === e.id) setReply(m);
     }
   }
 
@@ -134,15 +193,94 @@
     });
   }
 
-  if (viewer === 'admin' && thread) {
+  if (thread) {
     thread.addEventListener('click', async (e) => {
       const el = e.target.closest('.msg');
       if (!el) return;
       const m = byId.get(Number(el.dataset.id));
       if (!m) return;
-      if (e.target.closest('[data-edit]')) startEdit(el, m);
+      const jump = e.target.closest('[data-jump]');
+      if (jump) jumpTo(jump.dataset.jump);
+      else if (e.target.closest('[data-reply]')) setReply(m);
+      else if (viewer !== 'admin') return;
+      else if (e.target.closest('[data-edit]')) startEdit(el, m);
       else if (e.target.closest('[data-history]')) showHistory(m);
     });
+  }
+
+  // ---------- Replying (Messenger-style) ----------
+
+  let replyBar = null;
+  function setReply(m) {
+    if (!form) return;
+    const stick = nearBottom(); // the bar takes room — stay at the latest message
+    replyTo = m;
+    if (!replyBar) {
+      replyBar = document.createElement('div');
+      replyBar.className = 'msg-replying';
+      replyBar.innerHTML = `
+        <button type="button" class="msg-replying-main" title="Show the original message">
+          <span class="msg-replying-who"></span>
+          <span class="msg-replying-text"></span>
+        </button>
+        <button type="button" class="msg-replying-close" title="Cancel reply (Esc)" aria-label="Cancel reply"><i class="fa-solid fa-xmark"></i></button>`;
+      replyBar.querySelector('.msg-replying-close').addEventListener('click', () => { clearReply(); textarea.focus(); });
+      replyBar.querySelector('.msg-replying-main').addEventListener('click', () => replyTo && jumpTo(replyTo.id));
+      form.prepend(replyBar);
+    }
+    const name = m.sender === 'You' ? 'yourself' : m.sender;
+    replyBar.querySelector('.msg-replying-who').innerHTML = `<i class="fa-solid fa-reply"></i> Replying to <strong>${esc(name)}</strong>`;
+    replyBar.querySelector('.msg-replying-text').textContent =
+      plainSnippet(m) || (m.files.length ? '📎 ' + m.files.map(f => f.name).join(', ') : '(message)');
+    replyBar.hidden = false;
+    thread.querySelectorAll('.msg.replying-to').forEach(x => x.classList.remove('replying-to'));
+    thread.querySelector(`.msg[data-id="${m.id}"]`)?.classList.add('replying-to');
+    if (stick) scrollToBottom();
+    textarea.focus();
+  }
+
+  function clearReply() {
+    replyTo = null;
+    if (replyBar) replyBar.hidden = true;
+    thread.querySelectorAll('.msg.replying-to').forEach(x => x.classList.remove('replying-to'));
+  }
+
+  // Phones: swipe a message toward the middle (right for theirs, left for
+  // yours) to reply, like Messenger.
+  if (thread && form) {
+    const SWIPE_AT = 56, SWIPE_MAX = 80;
+    let sw = null;
+    thread.addEventListener('touchstart', (e) => {
+      const el = e.target.closest('.msg');
+      if (!el || el.classList.contains('editing') || e.touches.length !== 1) { sw = null; return; }
+      const t = e.touches[0];
+      sw = { el, x: t.clientX, y: t.clientY, d: 0, axis: null, dir: el.classList.contains('mine') ? -1 : 1 };
+    }, { passive: true });
+    thread.addEventListener('touchmove', (e) => {
+      if (!sw) return;
+      const t = e.touches[0], dx = t.clientX - sw.x, dy = t.clientY - sw.y;
+      if (!sw.axis && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) sw.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+      if (sw.axis !== 'x') return;
+      sw.d = Math.max(0, Math.min(SWIPE_MAX, dx * sw.dir));
+      sw.el.style.transition = 'none';
+      sw.el.style.transform = `translateX(${sw.d * sw.dir}px)`;
+      sw.el.classList.toggle('swipe-ready', sw.d >= SWIPE_AT);
+    }, { passive: true });
+    const endSwipe = () => {
+      if (!sw) return;
+      const { el, d } = sw;
+      el.style.transition = '';
+      el.style.transform = '';
+      el.classList.remove('swipe-ready');
+      if (d >= SWIPE_AT) {
+        const m = byId.get(Number(el.dataset.id));
+        if (m) setReply(m);
+        if (navigator.vibrate) { try { navigator.vibrate(10); } catch (err) { /* not supported */ } }
+      }
+      sw = null;
+    };
+    thread.addEventListener('touchend', endSwipe);
+    thread.addEventListener('touchcancel', endSwipe);
   }
 
   function startEdit(el, m) {
@@ -332,6 +470,9 @@
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
         form.requestSubmit();
+      } else if (e.key === 'Escape' && replyTo) {
+        e.preventDefault();
+        clearReply();
       }
     });
 
@@ -354,6 +495,7 @@
       fd.append('body', body);
       if (clientId) fd.append('client_id', clientId);
       if (sendAs?.value) fd.append('sender_id', sendAs.value);
+      if (replyTo) fd.append('reply_to_id', replyTo.id);
       pendingFiles.forEach(f => fd.append('attachments[]', f));
 
       sendBtn.disabled = true;
@@ -370,6 +512,7 @@
         textarea.style.height = '';
         pendingFiles = [];
         renderChips();
+        clearReply();
         appendMessages(data.messages);
         lastSeenReported = lastId; // sending already marked it read server-side
         scrollToBottom();
