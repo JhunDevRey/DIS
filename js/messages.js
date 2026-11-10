@@ -675,6 +675,11 @@
     renderConvList();
   }
 
+  // Full-screen mode (phones/tablets) hides the page's top bar, so its
+  // ☰ button opens the usual menu drawer.
+  document.querySelectorAll('[data-open-nav]').forEach(btn =>
+    btn.addEventListener('click', () => document.getElementById('mobileNavToggle')?.click()));
+
   // ---------- Start ----------
 
   if (thread) {

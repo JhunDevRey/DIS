@@ -38,7 +38,7 @@ if ($openClientId) {
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="css/style.css?v=<?= cssVersion() ?>">
 </head>
-<body>
+<body class="page-messages">
 <div class="app-shell">
   <?php include __DIR__ . '/_sidebar.php'; ?>
 
@@ -57,6 +57,11 @@ if ($openClientId) {
          data-client-id="<?= $openClient ? (int)$openClient['id'] : '' ?>">
 
       <div class="card conv-panel">
+        <?php // Full-screen (phones/tablets) title bar — hidden on desktop. ?>
+        <div class="msg-fs-bar">
+          <button type="button" class="msg-fs-icon msg-fs-menu" data-open-nav aria-label="Open menu" title="Menu"><i class="fa-solid fa-bars"></i></button>
+          <span class="msg-fs-title">Inbox</span>
+        </div>
         <div class="conv-tools">
           <input type="search" id="msgConvSearch" placeholder="Search name, case type, #client no.…" aria-label="Search clients" autocomplete="off">
           <div class="conv-filters">
@@ -94,7 +99,8 @@ if ($openClientId) {
           </div>
         <?php else: ?>
           <div class="msg-panel-head">
-            <div>
+            <a class="msg-fs-icon msg-fs-back" href="inbox.php" aria-label="All conversations" title="All conversations"><i class="fa-solid fa-arrow-left"></i></a>
+            <div class="msg-panel-title">
               <h2><?= h($openClient['full_name']) ?></h2>
               <div class="msg-panel-sub">
                 <?= $openClient['reference_number'] ? 'Client No. ' . h($openClient['reference_number']) . ' · ' : '' ?>
@@ -102,9 +108,9 @@ if ($openClientId) {
                 Processor: <?= $openClient['processor_name'] ? h($openClient['processor_name']) : 'Unassigned' ?>
               </div>
             </div>
-            <div style="display:flex;gap:6px;">
-              <a class="btn btn-ghost btn-sm" href="inbox.php"><i class="fa-solid fa-arrow-left"></i> All</a>
-              <a class="btn btn-ghost btn-sm" href="client.php?id=<?= (int)$openClient['id'] ?>"><i class="fa-solid fa-folder-open"></i> Client file</a>
+            <div class="msg-panel-actions">
+              <a class="btn btn-ghost btn-sm msg-all-btn" href="inbox.php"><i class="fa-solid fa-arrow-left"></i> All</a>
+              <a class="btn btn-ghost btn-sm" href="client.php?id=<?= (int)$openClient['id'] ?>" title="Client file"><i class="fa-solid fa-folder-open"></i><span class="msg-btn-label"> Client file</span></a>
             </div>
           </div>
 

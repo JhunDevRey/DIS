@@ -2424,6 +2424,77 @@ button.msg-edited:hover { color: var(--ink); text-decoration: underline; }
 .conv-meta > * + .conv-meta-item::before { content: '·'; margin-right: 4px; }
 .msg-layout > .card + .card { margin-top: 0; }
 
+/* ---- Full-screen Inbox / Messages on phones and tablets ----
+   body.page-messages = admin/inbox.php and portal/messages.php. Up to
+   1024px the conversation takes the whole screen like a chat app: no top
+   bar or page title, edge-to-edge panels, the ☰ button in the pane header
+   opens the menu drawer. Phones show one pane at a time (list, or the open
+   thread with a back arrow); tablets (768px+) keep list + thread side by
+   side on the staff Inbox. */
+.msg-fs-bar, .msg-fs-icon { display: none; }
+.msg-panel-head > .msg-panel-title { min-width: 0; }
+.msg-panel-actions { display: flex; gap: 6px; }
+@media (max-width: 1024px) {
+  body.page-messages { overflow: hidden; }
+  body.page-messages .msg-layout {
+    position: fixed; inset: 0; z-index: 100;
+    height: 100vh; height: 100dvh; min-height: 0; max-width: none;
+    margin: 0; gap: 0;
+    grid-template-columns: minmax(0, 1fr);
+    background: var(--card);
+  }
+  body.page-messages .msg-layout > .card {
+    border: none; border-radius: 0; box-shadow: none; margin: 0; height: auto; min-height: 0;
+  }
+  body.page-messages .msg-layout.has-open .conv-panel { display: none; }
+  body.page-messages .msg-layout:not(.has-open) .msg-panel { display: none; }
+
+  .msg-fs-icon {
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+    width: 38px; height: 38px; margin-left: -6px; border-radius: 50%;
+    border: none; background: none; color: var(--ink); font-size: 17px;
+    text-decoration: none; cursor: pointer;
+  }
+  .msg-fs-icon:hover, .msg-fs-icon:active { background: var(--surface-hover); }
+  .msg-fs-bar {
+    display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+    padding: 10px 14px; padding-top: max(10px, env(safe-area-inset-top));
+    border-bottom: 1px solid var(--msg-divider);
+  }
+  .msg-fs-title { font-family: var(--font-display); font-size: 20px; font-weight: 800; color: var(--ink); }
+
+  body.page-messages .msg-panel-head {
+    flex-wrap: nowrap; justify-content: flex-start; gap: 8px;
+    padding: 10px 14px; padding-top: max(10px, env(safe-area-inset-top));
+  }
+  body.page-messages .msg-panel-title { flex: 1; }
+  body.page-messages .msg-panel-head h2,
+  body.page-messages .msg-panel-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  body.page-messages .msg-panel-head h2 { font-size: 16px; }
+  body.page-messages .msg-all-btn { display: none; }
+  body.page-messages .msg-btn-label { display: none; }
+  body.page-messages .msg-composer { padding-bottom: max(10px, env(safe-area-inset-bottom)); }
+  body.page-messages .msg-thread { padding: 14px 12px; }
+  /* 16px stops iOS zooming into the field on focus. */
+  body.page-messages .msg-composer textarea,
+  body.page-messages .conv-tools input[type=search] { font-size: 16px; }
+  body.page-messages .msg-hint { display: none; }
+  body.page-messages .msg-composer textarea::placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}
+/* On phones the back arrow returns to the list. */
+@media (max-width: 767px) {
+  .msg-fs-back { display: inline-flex; }
+  body.page-messages .msg { max-width: 86%; }
+}
+@media (min-width: 768px) and (max-width: 1024px) {
+  .msg-fs-back { display: none; }
+  /* Tablets: list and thread side by side. */
+  body.page-messages .msg-layout:not(.single) { grid-template-columns: 300px minmax(0, 1fr); }
+  body.page-messages .msg-layout:not(.single).has-open .conv-panel,
+  body.page-messages .msg-layout:not(.single):not(.has-open) .msg-panel { display: flex; }
+  body.page-messages .msg-layout:not(.single) > .conv-panel { border-right: 1px solid var(--msg-divider); }
+}
+
 /* ---- Messenger-style replies (js/messages.js) ---- */
 .msg-thread { overflow-x: hidden; }
 .msg { position: relative; transition: transform .2s ease, box-shadow .2s ease; }

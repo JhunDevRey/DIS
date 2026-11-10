@@ -28,7 +28,7 @@ $client = $stmt->fetch();
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="css/style.css?v=<?= cssVersion() ?>">
 </head>
-<body>
+<body class="page-messages">
 <div class="app-shell">
   <?php include __DIR__ . '/_sidebar.php'; ?>
 
@@ -46,7 +46,8 @@ $client = $stmt->fetch();
          data-file-endpoint="api/client_message_file.php">
       <div class="card msg-panel">
         <div class="msg-panel-head">
-          <div>
+          <button type="button" class="msg-fs-icon msg-fs-menu" data-open-nav aria-label="Open menu" title="Menu"><i class="fa-solid fa-bars"></i></button>
+          <div class="msg-panel-title">
             <h2>Your case team</h2>
             <div class="msg-panel-sub">
               <?= $client['processor_name'] ? 'Your processor: ' . h($client['processor_name']) : 'Messages go to the whole Duque Immigration team.' ?>
