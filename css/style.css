@@ -1528,6 +1528,12 @@ body.auth-page { background: #F7F7F5; }
   mask-image: linear-gradient(to bottom, transparent, #000 60%, transparent);
 }
 .auth-brand > * { position: relative; z-index: 1; }
+/* Live ember/particle layer (js/auth-embers.js) — sits behind the text. */
+.auth-brand > canvas.auth-embers {
+  position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%;
+  pointer-events: none; animation: authEmbersIn 1.2s ease-out both;
+}
+@keyframes authEmbersIn { from { opacity: 0; } to { opacity: 1; } }
 .auth-brand-top, .auth-card-logo { display: flex; align-items: center; gap: 12px; }
 .auth-logo {
   width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
