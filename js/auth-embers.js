@@ -1,8 +1,10 @@
 // js/auth-embers.js
-// Live background for the login pages' brand panel (.auth-brand only):
-// glowing embers drift up from the bottom with a gentle sway and flicker,
-// a few quick sparks shoot past, and the pointer pushes nearby embers
-// aside. Drawn on one canvas behind the panel's text.
+// Live background for the login pages' brand panel (.auth-brand only),
+// in the style of the Dota 2 menu: embers carried up on a turbulent
+// diagonal wind at three depths (big soft out-of-focus embers up close,
+// small sharp ones far back), streaked by their speed, with tumbling ash,
+// slow smoke, a flickering fire glow from below and the odd gust that
+// throws out a burst of sparks. The pointer stirs the air.
 // Pauses when the panel is hidden (phones) or the tab is in the
 // background, and draws a single still frame for "reduce motion" users.
 (function () {
@@ -17,43 +19,91 @@
   if (!ctx) return;
 
   const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  // Warm brand palette: deep red → orange → pale gold for the hottest.
-  const HUES = [[255, 59, 48], [255, 96, 52], [255, 140, 66], [255, 196, 120]];
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const TAU = Math.PI * 2;
+
+  // Pre-rendered soft glow sprites — far cheaper than a gradient per ember.
+  function sprite(size, stops) {
+    const c = document.createElement('canvas');
+    c.width = c.height = size;
+    const g = c.getContext('2d');
+    const grad = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    stops.forEach(([o, col]) => grad.addColorStop(o, col));
+    g.fillStyle = grad;
+    g.fillRect(0, 0, size, size);
+    return c;
+  }
+  const GLOWS = [
+    sprite(64, [[0, 'rgba(255,235,190,1)'], [0.12, 'rgba(255,170,70,.9)'], [0.4, 'rgba(255,80,20,.35)'], [1, 'rgba(200,20,0,0)']]),  // hot gold
+    sprite(64, [[0, 'rgba(255,210,160,1)'], [0.12, 'rgba(255,110,40,.9)'], [0.4, 'rgba(230,40,10,.35)'], [1, 'rgba(160,0,0,0)']]),   // orange
+    sprite(64, [[0, 'rgba(255,170,140,1)'], [0.12, 'rgba(240,50,30,.85)'], [0.4, 'rgba(190,10,10,.3)'], [1, 'rgba(120,0,0,0)']])     // deep red
+  ];
+  const SMOKE = sprite(128, [[0, 'rgba(70,30,30,.55)'], [0.5, 'rgba(45,20,22,.25)'], [1, 'rgba(20,10,12,0)']]);
+
+  // Depth layers: far = small, slow, dim, sharp; near = big, fast, soft.
+  const LAYERS = [
+    { share: 0.55, size: [0.9, 1.6], speed: 0.55, alpha: 0.95, blur: 1.0 },
+    { share: 0.33, size: [1.3, 2.4], speed: 1.0,  alpha: 1.0,  blur: 1.6 },
+    { share: 0.12, size: [3.0, 6.0], speed: 1.6,  alpha: 0.35, blur: 4.2 }  // out-of-focus bokeh
+  ];
 
   let w = 0, h = 0, dpr = 1;
-  let embers = [], sparks = [];
-  let running = false, last = 0, frame = 0;
-  const pointer = { x: -9999, y: -9999, active: false };
+  let embers = [], ash = [], smoke = [], sparks = [];
+  let running = false, last = 0, frame = 0, time = 0;
+  let gust = 0, nextGust = rand(4, 8);
+  const pointer = { x: 0, y: 0, vx: 0, vy: 0, active: false };
 
-  const rand = (a, b) => a + Math.random() * (b - a);
+  // Smooth pseudo-turbulence: a few layered sines over position and time.
+  function wind(x, y, t) {
+    const n = Math.sin(x * 0.011 + t * 0.7) + Math.sin(y * 0.017 - t * 0.9) * 0.7 + Math.sin((x + y) * 0.006 + t * 0.35) * 1.2;
+    const m = Math.cos(y * 0.013 + t * 0.6) + Math.cos(x * 0.009 - t * 0.45) * 0.8;
+    return [n * 14, m * 9];
+  }
 
-  function makeEmber(anywhere) {
-    const hot = Math.random();
+  function pickLayer() {
+    let r = Math.random();
+    for (let i = 0; i < LAYERS.length; i++) { if ((r -= LAYERS[i].share) <= 0) return i; }
+    return 0;
+  }
+
+  function makeEmber(anywhere, burst) {
+    const li = burst ? 1 + (Math.random() < 0.25 ? 1 : 0) : pickLayer();
+    const L = LAYERS[li];
     return {
-      x: rand(0, w),
-      y: anywhere ? rand(0, h) : h + rand(4, 40),
-      r: hot > 0.92 ? rand(2.2, 3.4) : rand(0.8, 2.1),
-      vy: rand(18, 52),            // px/s upward
-      vx: rand(-6, 6),
-      swayAmp: rand(6, 22),
-      swayFreq: rand(0.4, 1.2),
-      phase: rand(0, Math.PI * 2),
-      flicker: rand(3, 9),
-      life: 0,
-      maxLife: rand(6, 13),        // seconds
-      color: HUES[Math.min(HUES.length - 1, Math.floor(hot * hot * HUES.length))],
-      px: 0, py: 0                 // pointer push offset
+      layer: li, burst: !!burst,
+      x: burst ? rand(w * 0.05, w * 0.6) : rand(-w * 0.25, w),
+      y: anywhere ? rand(0, h) : h + rand(6, 60),
+      vx: rand(20, 45) * L.speed,                 // drift right…
+      vy: -rand(35, 85) * L.speed * (burst ? 1.8 : 1),  // …and up
+      r: rand(L.size[0], L.size[1]),
+      glow: GLOWS[Math.random() < 0.25 ? 0 : Math.random() < 0.6 ? 1 : 2],
+      flicker: rand(6, 16), phase: rand(0, TAU),
+      life: 0, maxLife: burst ? rand(1.5, 3) : rand(5, 11)
     };
   }
 
-  function makeSpark() {
-    const angle = rand(-Math.PI * 0.62, -Math.PI * 0.38); // mostly upward
-    const speed = rand(160, 280);
+  function makeAsh(anywhere) {
     return {
-      x: rand(w * 0.1, w * 0.9), y: h + 6,
-      vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
-      life: 0, maxLife: rand(0.9, 1.6)
+      x: rand(-w * 0.2, w), y: anywhere ? rand(0, h) : h + rand(5, 40),
+      vx: rand(15, 35), vy: -rand(12, 30),
+      size: rand(1.5, 3.5), rot: rand(0, TAU), spin: rand(-3, 3),
+      life: 0, maxLife: rand(7, 14), shade: rand(70, 120) | 0
     };
+  }
+
+  function makeSmoke(anywhere) {
+    const s = rand(h * 0.35, h * 0.7);
+    return {
+      x: anywhere ? rand(-s * 0.3, w) : -s * 0.6, y: rand(h * 0.35, h * 1.05),
+      vx: rand(8, 18), vy: -rand(3, 9), s,
+      life: anywhere ? rand(0, 10) : 0, maxLife: rand(22, 34)
+    };
+  }
+
+  function makeSpark(x, y) {
+    const a = rand(-Math.PI * 0.45, -Math.PI * 0.12);   // up and to the right
+    const v = rand(220, 420);
+    return { x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0, maxLife: rand(0.5, 1.1) };
   }
 
   function resize() {
@@ -63,93 +113,153 @@
     canvas.width = Math.round(w * dpr);
     canvas.height = Math.round(h * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const target = Math.round(Math.min(110, Math.max(40, (w * h) / 9000)));
-    while (embers.length < target) embers.push(makeEmber(true));
-    embers.length = target;
+    const area = (w * h) / 10000;
+    fill(embers, Math.round(Math.min(160, Math.max(60, area * 1.6))), makeEmber);
+    fill(ash, Math.round(Math.min(40, Math.max(14, area * 0.4))), makeAsh);
+    fill(smoke, 5, makeSmoke);
+  }
+  function fill(list, n, make) {
+    while (list.length < n) list.push(make(true));
+    list.length = n;
   }
 
-  function drawGlow(t) {
-    // Slow "breathing" heat haze along the bottom edge.
-    const pulse = 0.55 + 0.45 * Math.sin(t * 0.6);
-    const g = ctx.createRadialGradient(w * 0.5, h + h * 0.1, 0, w * 0.5, h + h * 0.1, h * 0.75);
-    g.addColorStop(0, `rgba(221, 0, 0, ${0.16 + 0.08 * pulse})`);
-    g.addColorStop(0.5, `rgba(160, 20, 20, ${0.06 + 0.03 * pulse})`);
+  function drawFireGlow(t) {
+    // Irregular flicker, like firelight just out of frame.
+    const f = 0.75 + 0.12 * Math.sin(t * 2.3) + 0.08 * Math.sin(t * 5.1 + 1) + 0.05 * Math.sin(t * 11.7);
+    const g = ctx.createRadialGradient(w * 0.35, h * 1.08, 0, w * 0.35, h * 1.08, h * 0.85);
+    g.addColorStop(0, `rgba(255, 70, 10, ${0.30 * f + gust * 0.08})`);
+    g.addColorStop(0.35, `rgba(200, 20, 10, ${0.13 * f})`);
     g.addColorStop(1, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, w, h);
   }
 
   function step(dt, t) {
+    // Gusts: every few seconds the wind picks up and throws a burst.
+    if (!reduceMotion) {
+      nextGust -= dt;
+      if (nextGust <= 0) {
+        nextGust = rand(5, 10);
+        gust = 1;
+        const bx = rand(w * 0.1, w * 0.5);
+        for (let i = 0; i < 14; i++) sparks.push(makeSpark(bx + rand(-40, 40), h + 4));
+        for (let i = 0; i < 18; i++) embers.push(makeEmber(false, true));
+      }
+      gust = Math.max(0, gust - dt * 0.45);
+    }
+    const gustX = 1 + gust * 1.6;
+
     ctx.clearRect(0, 0, w, h);
-    drawGlow(t);
-    ctx.globalCompositeOperation = 'lighter';
 
-    for (let i = 0; i < embers.length; i++) {
-      let e = embers[i];
-      e.life += dt;
-      e.y -= e.vy * dt;
-      e.x += e.vx * dt;
-      if (e.life > e.maxLife || e.y < -20 || e.x < -30 || e.x > w + 30) {
-        e = embers[i] = makeEmber(false);
-      }
+    // Smoke (normal blending so it darkens/tints slightly).
+    for (let i = 0; i < smoke.length; i++) {
+      let s = smoke[i];
+      s.life += dt;
+      s.x += s.vx * gustX * dt; s.y += s.vy * dt;
+      if (s.life > s.maxLife || s.x - s.s > w) s = smoke[i] = makeSmoke(false);
+      const a = Math.min(1, s.life / 5, (s.maxLife - s.life) / 5) * 0.5;
+      ctx.globalAlpha = Math.max(0, a);
+      ctx.drawImage(SMOKE, s.x - s.s, s.y - s.s, s.s * 2, s.s * 2);
+    }
+    ctx.globalAlpha = 1;
 
-      // Pointer pushes embers away; the push eases back over time.
-      if (pointer.active) {
-        const dx = e.x + e.px - pointer.x, dy = e.y + e.py - pointer.y;
-        const d2 = dx * dx + dy * dy;
-        if (d2 < 110 * 110 && d2 > 0.01) {
-          const d = Math.sqrt(d2), f = (1 - d / 110) * 140 * dt;
-          e.px += (dx / d) * f; e.py += (dy / d) * f;
-        }
-      }
-      e.px *= 0.96; e.py *= 0.96;
+    drawFireGlow(t);
 
-      const sway = Math.sin(t * e.swayFreq + e.phase) * e.swayAmp;
-      const x = e.x + sway + e.px, y = e.y + e.py;
-      const fadeIn = Math.min(1, e.life / 1.2);
-      const fadeOut = Math.min(1, (e.maxLife - e.life) / 2.5);
-      const height = Math.min(1, Math.max(0, y / h) + 0.25); // cool as they rise
-      const flick = 0.7 + 0.3 * Math.sin(t * e.flicker + e.phase * 3);
-      const a = Math.max(0, fadeIn * fadeOut * height * flick);
-      const [r, g, b] = e.color;
-
-      const glow = e.r * 5;
-      const grad = ctx.createRadialGradient(x, y, 0, x, y, glow);
-      grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${0.55 * a})`);
-      grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
-      ctx.fillStyle = grad;
-      ctx.beginPath(); ctx.arc(x, y, glow, 0, Math.PI * 2); ctx.fill();
-
-      ctx.fillStyle = `rgba(255, ${Math.min(255, g + 90)}, ${Math.min(255, b + 80)}, ${0.95 * a})`;
-      ctx.beginPath(); ctx.arc(x, y, e.r * 0.6, 0, Math.PI * 2); ctx.fill();
+    // Ash: dark tumbling flecks, drawn before the bright embers.
+    for (let i = 0; i < ash.length; i++) {
+      let a = ash[i];
+      a.life += dt;
+      const [wx, wy] = wind(a.x, a.y, t);
+      a.x += (a.vx * gustX + wx) * dt; a.y += (a.vy + wy * 0.6) * dt;
+      a.rot += a.spin * dt;
+      if (a.life > a.maxLife || a.y < -10 || a.x > w + 10) a = ash[i] = makeAsh(false);
+      const al = Math.min(1, a.life / 1.5, (a.maxLife - a.life) / 2) * 0.55;
+      ctx.save();
+      ctx.translate(a.x, a.y); ctx.rotate(a.rot);
+      ctx.scale(1, Math.abs(Math.cos(a.rot * 1.7)) * 0.8 + 0.2);  // tumbling flake
+      ctx.fillStyle = `rgba(${a.shade}, ${a.shade * 0.85 | 0}, ${a.shade * 0.8 | 0}, ${Math.max(0, al)})`;
+      ctx.fillRect(-a.size / 2, -a.size / 2, a.size, a.size * 0.6);
+      ctx.restore();
     }
 
-    // Occasional fast sparks with a short streak behind them.
-    if (!reduceMotion && Math.random() < dt * 0.9) sparks.push(makeSpark());
+    ctx.globalCompositeOperation = 'lighter';
+
+    // Embers: far layer first so near bokeh sits on top.
+    const pr = 130;
+    for (let li = 0; li < LAYERS.length; li++) {
+      const L = LAYERS[li];
+      for (let i = embers.length - 1; i >= 0; i--) {
+        const e = embers[i];
+        if (e.layer !== li) continue;
+        e.life += dt;
+        const [wx, wy] = wind(e.x, e.y, t);
+        let vx = e.vx * gustX + wx * L.speed, vy = e.vy - gust * 25 + wy * L.speed;
+
+        // Pointer stirs the air: push away plus a bit of its motion.
+        if (pointer.active) {
+          const dx = e.x - pointer.x, dy = e.y - pointer.y, d2 = dx * dx + dy * dy;
+          if (d2 < pr * pr && d2 > 1) {
+            const d = Math.sqrt(d2), f = (1 - d / pr);
+            vx += (dx / d) * f * 160 + pointer.vx * f * 0.5;
+            vy += (dy / d) * f * 160 + pointer.vy * f * 0.5;
+          }
+        }
+
+        e.x += vx * dt; e.y += vy * dt;
+        if (e.life > e.maxLife || e.y < -30 || e.x > w + 40) {
+          if (e.burst) { embers.splice(i, 1); continue; }  // gust extras don't respawn
+          embers[i] = makeEmber(false);
+          continue;
+        }
+
+        const fade = Math.min(1, e.life / 0.8, (e.maxLife - e.life) / 2);
+        const cool = Math.min(1, Math.max(0, e.y / h) * 0.8 + 0.35);   // dim as they rise
+        const flick = 0.65 + 0.35 * Math.sin(t * e.flicker + e.phase) * Math.sin(t * e.flicker * 0.37 + 2);
+        const alpha = Math.max(0, fade * cool * flick * L.alpha);
+        if (alpha < 0.01) continue;
+
+        // Motion streak: stretch the glow along the velocity.
+        const speed = Math.hypot(vx, vy);
+        const stretch = Math.min(3.2, 1 + speed / 120);
+        const size = e.r * 2 * L.blur * 2.2;
+        ctx.save();
+        ctx.translate(e.x, e.y);
+        ctx.rotate(Math.atan2(vy, vx));
+        ctx.globalAlpha = alpha;
+        ctx.drawImage(e.glow, -size * stretch / 2, -size / 2, size * stretch, size);
+        ctx.restore();
+      }
+    }
+
+    // Sparks: thin bright streaks that arc and burn out.
     ctx.lineCap = 'round';
     for (let i = sparks.length - 1; i >= 0; i--) {
       const s = sparks[i];
       s.life += dt;
       if (s.life > s.maxLife) { sparks.splice(i, 1); continue; }
-      s.vy += 60 * dt;              // a touch of gravity curves them
+      s.vx += 40 * dt; s.vy += 90 * dt;
+      s.vx *= 0.985; s.vy *= 0.985;
       s.x += s.vx * dt; s.y += s.vy * dt;
       const a = 1 - s.life / s.maxLife;
-      ctx.strokeStyle = `rgba(255, 170, 90, ${0.8 * a})`;
-      ctx.lineWidth = 1.4;
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = `rgba(255, ${190 + 50 * a | 0}, ${120 + 80 * a | 0}, ${0.9 * a})`;
+      ctx.lineWidth = 1.3;
       ctx.beginPath();
       ctx.moveTo(s.x, s.y);
-      ctx.lineTo(s.x - s.vx * 0.045, s.y - s.vy * 0.045);
+      ctx.lineTo(s.x - s.vx * 0.05, s.y - s.vy * 0.05);
       ctx.stroke();
     }
 
+    ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
+    pointer.vx *= 0.9; pointer.vy *= 0.9;
   }
 
   function loop(now) {
     if (!running) return;
     const dt = Math.min(0.05, (now - last) / 1000 || 0.016);
-    last = now;
-    step(dt, now / 1000);
+    last = now; time += dt;
+    step(dt, time);
     frame = requestAnimationFrame(loop);
   }
 
@@ -169,8 +279,9 @@
 
   brand.addEventListener('pointermove', (ev) => {
     const rect = brand.getBoundingClientRect();
-    pointer.x = ev.clientX - rect.left; pointer.y = ev.clientY - rect.top;
-    pointer.active = true;
+    const x = ev.clientX - rect.left, y = ev.clientY - rect.top;
+    if (pointer.active) { pointer.vx = (x - pointer.x) * 6; pointer.vy = (y - pointer.y) * 6; }
+    pointer.x = x; pointer.y = y; pointer.active = true;
   });
   brand.addEventListener('pointerleave', () => { pointer.active = false; });
   document.addEventListener('visibilitychange', () => { document.hidden ? stop() : start(); });
