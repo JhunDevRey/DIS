@@ -680,6 +680,36 @@
   document.querySelectorAll('[data-open-nav]').forEach(btn =>
     btn.addEventListener('click', () => document.getElementById('mobileNavToggle')?.click()));
 
+  // The full-screen chat is pinned to the screen, so the page can't scroll
+  // the text box above the on-screen keyboard the way a normal page does.
+  // Instead, size the chat to the part of the screen the keyboard leaves
+  // visible (window.visualViewport) — the composer then sits right on top
+  // of the keyboard, like a chat app, and the newest message stays in view.
+  const fsQuery = window.matchMedia('(max-width: 1024px)');
+  const vv = window.visualViewport;
+  function fitToViewport() {
+    if (!vv || !fsQuery.matches) {
+      app.style.top = '';
+      app.style.height = '';
+      return;
+    }
+    const stick = thread ? nearBottom() : false;
+    app.style.top = vv.offsetTop + 'px';
+    app.style.height = vv.height + 'px';
+    if (stick) scrollToBottom();
+  }
+  if (vv) {
+    vv.addEventListener('resize', fitToViewport);
+    vv.addEventListener('scroll', fitToViewport);
+    fsQuery.addEventListener?.('change', fitToViewport);
+    // iOS can leave the page nudged up after the keyboard closes.
+    document.addEventListener('focusout', () => setTimeout(() => {
+      if (fsQuery.matches && !document.activeElement?.matches?.('input, textarea, select')) window.scrollTo(0, 0);
+      fitToViewport();
+    }, 60));
+    fitToViewport();
+  }
+
   // ---------- Start ----------
 
   if (thread) {

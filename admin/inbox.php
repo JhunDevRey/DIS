@@ -31,7 +31,7 @@ if ($openClientId) {
 <meta charset="UTF-8">
 <meta name="csrf-token" content="<?= h(csrfToken()) ?>">
 <script>(function(){var t=localStorage.getItem("theme")||(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t);})();</script>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
 <?php include __DIR__ . '/_pwa_head.php'; ?>
 <title><?= $openClient ? h($openClient['full_name']) . ' · ' : '' ?>Inbox · Duque Immigration Document Portal</title>
 <link rel="icon" type="image/png" href="images/duqueimmigration_logo.png?v=<?= assetVersion('images/duqueimmigration_logo.png') ?>">
