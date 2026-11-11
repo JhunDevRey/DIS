@@ -1547,6 +1547,28 @@ body.auth-page { background: #F7F7F5; }
   color: rgba(255, 255, 255, .85); margin-top: 3px;
 }
 .auth-brand-copy { max-width: 440px; }
+/* Waving Canadian flag above the headline (js/auth-flag.js) — raised up
+   its pole on page load, then flies on the canvas. */
+.auth-flag { position: relative; width: 128px; height: 100px; margin: 0 0 26px; }
+.auth-flag-pole {
+  position: absolute; left: 0; top: 4px; bottom: 0; width: 3px; border-radius: 2px;
+  background: linear-gradient(90deg, #8A8F98, #F2F4F7 45%, #6B7079);
+  box-shadow: 0 0 6px rgba(0, 0, 0, .35);
+}
+.auth-flag-pole::before {
+  content: ''; position: absolute; left: -2.5px; top: -6px; width: 8px; height: 8px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #FFF6D8, #D9A928 60%, #8C6A12);
+}
+.auth-flag-cloth {
+  position: absolute; left: 3px; top: -2px; display: block;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, .35));
+  animation: authFlagRaise 1.6s cubic-bezier(0.22, 1, 0.36, 1) .2s both;
+}
+@keyframes authFlagRaise {
+  from { transform: translateY(40px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) { .auth-flag-cloth { animation: none; } }
 .auth-brand-copy h1 {
   margin: 0 0 14px; font-family: var(--font-display);
   font-size: clamp(26px, 2.6vw, 34px); line-height: 1.15; font-weight: 800; letter-spacing: -.6px;

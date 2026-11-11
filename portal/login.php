@@ -132,5 +132,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </div>
 <script src="js/auth.js?v=<?= assetVersion('js/auth.js') ?>"></script>
 <script src="js/auth-embers.js?v=<?= assetVersion('js/auth-embers.js') ?>"></script>
+<script src="js/auth-flag.js?v=<?= assetVersion('js/auth-flag.js') ?>"></script>
 </body>
 </html>
