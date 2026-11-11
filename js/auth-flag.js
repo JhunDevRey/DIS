@@ -123,19 +123,30 @@
     canvas.width = Math.round(W * dpr);
     canvas.height = Math.round(H * dpr);
 
-    // Flag placement in panel px: big, flying out to the right with the
-    // whole fly end inside the panel.
-    const fw = Math.min(W * 0.8, H * 1.1);
+    // Framing — every value is a fraction of the panel, so it scales with
+    // it. Seen from slightly below: the fly end swings toward the viewer
+    // (negative yaw, so it looks a bit taller than the hoist) and the
+    // edges rise toward the right (tilt).
+    const FRAME = {
+      poleX: 0.09,     // pole, from the panel's left edge (share of width)
+      top: 0.17,       // hoist top / just under the finial (share of height)
+      width: 0.8,      // flag cloth length (share of width) ...
+      maxH: 1.05,      // ... capped at this share of the height on short panels
+      yaw: -0.2,       // radians; negative = fly end toward the viewer
+      tilt: 0.09       // rise of the edges per unit of length, toward the fly
+    };
+    const fw = Math.min(W * FRAME.width, H * FRAME.maxH);
     const fh = fw / 2;
     geo = {
       fw, fh,
-      poleX: W * 0.16,
+      poleX: W * FRAME.poleX,
       poleR: Math.max(3, fw * 0.011),
-      top: Math.max(H * 0.155, 118),   // finial clears the logo row
+      top: Math.max(H * FRAME.top, 118),   // finial clears the logo row
       amp: fw * (reduceMotion ? 0.03 : 0.045),
-      yaw: 0.3,                // radians the fly end turns away from the viewer
+      yaw: FRAME.yaw,
+      tilt: FRAME.tilt,
       focal: Math.max(W, H) * 1.1,
-      cx: W * 0.5, cy: H * 0.45
+      cx: W * 0.5, cy: Math.max(H * FRAME.top, 118) + fh / 2   // perspective centred on the flag
     };
     cols = Math.max(40, Math.min(100, Math.round(fw / 6)));
     px = new Float32Array((cols + 1) * (ROWS + 1));
@@ -210,7 +221,7 @@
   }
 
   function draw(t, ph) {
-    const { fw, fh, poleX, poleR, top, yaw, focal, cx, cy } = geo;
+    const { fw, fh, poleX, poleR, top, yaw, tilt, focal, cx, cy } = geo;
     const hoistX = poleX + poleR * 1.5;    // the cloth leaves the sleeve tube here
     const cosY = Math.cos(yaw), sinY = Math.sin(yaw);
     const du = 1 / cols, dv = 1 / ROWS, stepX = fw * du, stepY = fh * dv;
@@ -236,7 +247,7 @@
         zl[k] = z;
         const X = hoistX + xl * cosY - z * sinY;
         const Z = xl * sinY + z * cosY;
-        const Y = top + v * fh + u * u * droop;
+        const Y = top + v * fh + u * u * droop - xl * tilt;
         const p = focal / (focal + Z);
         px[k] = (cx + (X - cx) * p) * dpr;
         py[k] = (cy + (Y - cy) * p) * dpr;
