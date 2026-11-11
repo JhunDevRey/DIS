@@ -10,8 +10,8 @@
   const copy = document.querySelector('.auth-brand .auth-brand-copy');
   if (!copy || !window.requestAnimationFrame || !window.Path2D) return;
 
-  const FLAG_W = 120, FLAG_H = 60;   // CSS px, official 2:1 ratio
-  const PAD = 8;                     // room for the wave above and below
+  const FLAG_W = 160, FLAG_H = 80;   // CSS px, official 2:1 ratio
+  const PAD = 10;                    // room for the wave above and below
 
   const wrap = document.createElement('div');
   wrap.className = 'auth-flag';
@@ -57,7 +57,7 @@
 
   function draw(t) {
     const W = src.width, H = src.height, pad = PAD * dpr;
-    const amp = (reduceMotion ? 2.2 : 4.2) * dpr;
+    const amp = (reduceMotion ? 3 : 5.6) * dpr;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     for (let x = 0; x < W; x++) {
       const u = x / W;

@@ -1549,18 +1549,18 @@ body.auth-page { background: #F7F7F5; }
 .auth-brand-copy { max-width: 440px; }
 /* Waving Canadian flag above the headline (js/auth-flag.js) — raised up
    its pole on page load, then flies on the canvas. */
-.auth-flag { position: relative; width: 128px; height: 100px; margin: 0 0 26px; }
+.auth-flag { position: relative; width: 168px; height: 128px; margin: 0 0 26px; }
 .auth-flag-pole {
-  position: absolute; left: 0; top: 4px; bottom: 0; width: 3px; border-radius: 2px;
+  position: absolute; left: 0; top: 4px; bottom: 0; width: 4px; border-radius: 2px;
   background: linear-gradient(90deg, #8A8F98, #F2F4F7 45%, #6B7079);
   box-shadow: 0 0 6px rgba(0, 0, 0, .35);
 }
 .auth-flag-pole::before {
-  content: ''; position: absolute; left: -2.5px; top: -6px; width: 8px; height: 8px; border-radius: 50%;
+  content: ''; position: absolute; left: -3px; top: -7px; width: 10px; height: 10px; border-radius: 50%;
   background: radial-gradient(circle at 35% 35%, #FFF6D8, #D9A928 60%, #8C6A12);
 }
 .auth-flag-cloth {
-  position: absolute; left: 3px; top: -2px; display: block;
+  position: absolute; left: 4px; top: -4px; display: block;
   filter: drop-shadow(0 6px 10px rgba(0, 0, 0, .35));
   animation: authFlagRaise 1.6s cubic-bezier(0.22, 1, 0.36, 1) .2s both;
 }
