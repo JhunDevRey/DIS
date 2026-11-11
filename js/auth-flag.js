@@ -31,7 +31,7 @@
   const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const TAU = Math.PI * 2;
   const ROWS = 16;
-  const SLEEVE = 0.035;   // share of the texture width taken by the pole sleeve
+  const SLEEVE = 0.014;   // share of the texture width: the flat strip of the hoist header leaving the sleeve tube
 
   // Flag of Canada, viewBox 0 0 9600 4800.
   const RED = '#D52B1E';
@@ -63,7 +63,7 @@
     const g = src.getContext('2d');
     const sl = Math.round(w * SLEEVE);
 
-    // Sleeve: heavy off-white canvas wrapped round the pole.
+    // Hoist header: heavy off-white canvas, continuing the sleeve tube.
     g.fillStyle = '#E9E5DC';
     g.fillRect(0, 0, sl, h);
 
@@ -130,6 +130,7 @@
     geo = {
       fw, fh,
       poleX: W * 0.16,
+      poleR: Math.max(3, fw * 0.011),
       top: Math.max(H * 0.155, 118),   // finial clears the logo row
       amp: fw * (reduceMotion ? 0.03 : 0.045),
       yaw: 0.3,                // radians the fly end turns away from the viewer
@@ -159,7 +160,7 @@
 
   // Ripple depth of the cloth at (u, v), both 0..1. Positive = away from the viewer.
   function depth(u, v, ph, wind) {
-    const reach = 0.06 + 0.94 * Math.pow(u, 1.15);
+    const reach = 0.04 * u + 0.96 * Math.pow(u, 1.15);   // 0 at the hoist: held still by the sleeve
     return geo.amp * wind * reach * (
       Math.sin(TAU * (1.2 * u - 0.25 * v) - ph * 2.6) +
       0.45 * Math.sin(TAU * (2.2 * u + 0.15 * v) - ph * 3.7 + 1.3) +
@@ -169,7 +170,7 @@
   }
 
   function drawPole() {
-    const x = geo.poleX, r = Math.max(3, geo.fw * 0.011);
+    const x = geo.poleX, r = geo.poleR;
     const top = geo.top - r * 1.2;   // full-staff: the flag's top edge sits just under the finial
     ctx.save();
     ctx.scale(dpr, dpr);
@@ -186,21 +187,28 @@
     fl.addColorStop(1, 'rgba(255,110,40,.35)');
     ctx.fillStyle = fl;
     ctx.fillRect(x - r, H * 0.55, r * 2, H * 0.45);
+    // Collar (the truck) between the pole and the finial.
+    const cg = ctx.createLinearGradient(x - r * 1.5, 0, x + r * 1.5, 0);
+    cg.addColorStop(0, '#2E3036'); cg.addColorStop(0.4, '#D9DDE3'); cg.addColorStop(1, '#25272C');
+    ctx.fillStyle = cg;
+    ctx.fillRect(x - r * 1.5, top - r * 0.9, r * 3, r * 1.1);
     // Gold finial.
     const fr = r * 2.1;
-    const fg = ctx.createRadialGradient(x - fr * 0.35, top - fr * 0.9, fr * 0.1, x, top - fr * 0.6, fr);
+    const fTop = top - r * 0.9;
+    const fg = ctx.createRadialGradient(x - fr * 0.35, fTop - fr * 0.9, fr * 0.1, x, fTop - fr * 0.6, fr);
     fg.addColorStop(0, '#FFF4CF');
     fg.addColorStop(0.45, '#E0B13A');
     fg.addColorStop(1, '#6E5108');
     ctx.fillStyle = fg;
     ctx.beginPath();
-    ctx.arc(x, top - fr * 0.6, fr, 0, TAU);
+    ctx.arc(x, fTop - fr * 0.8, fr, 0, TAU);
     ctx.fill();
     ctx.restore();
   }
 
   function draw(t, ph) {
-    const { fw, fh, poleX, top, yaw, focal, cx, cy } = geo;
+    const { fw, fh, poleX, poleR, top, yaw, focal, cx, cy } = geo;
+    const hoistX = poleX + poleR * 1.25;   // the cloth leaves the sleeve tube here
     const cosY = Math.cos(yaw), sinY = Math.sin(yaw);
     const du = 1 / cols, dv = 1 / ROWS, stepX = fw * du, stepY = fh * dv;
     const wind = windAt(t);
@@ -223,7 +231,7 @@
         zPrev = z;
         const k = j * C + i;
         zl[k] = z;
-        const X = poleX + xl * cosY - z * sinY;
+        const X = hoistX + xl * cosY - z * sinY;
         const Z = xl * sinY + z * cosY;
         const Y = top + v * fh + u * u * droop;
         const p = focal / (focal + Z);
@@ -293,6 +301,41 @@
       }
     }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+    drawSleeve(py[0] / dpr, py[ROWS * C] / dpr, hoistX, flicker);
+  }
+
+  // The hoist sleeve: a canvas tube wrapped round the pole along the flag's
+  // whole short side, with a soft contact shadow where the cloth leaves it.
+  function drawSleeve(y0, y1, hoistX, flicker) {
+    const x = geo.poleX, r = geo.poleR * 1.35;
+    ctx.save();
+    ctx.scale(dpr, dpr);
+    const sh = ctx.createLinearGradient(hoistX, 0, hoistX + r * 3.5, 0);
+    sh.addColorStop(0, 'rgba(0,0,0,.4)');
+    sh.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = sh;
+    ctx.fillRect(hoistX, y0 + 1, r * 3.5, y1 - y0 - 2);
+
+    const g = ctx.createLinearGradient(x - r, 0, x + r, 0);
+    g.addColorStop(0, '#7C786F');
+    g.addColorStop(0.32, '#F4F1EA');
+    g.addColorStop(0.55, '#DAD5CB');
+    g.addColorStop(1, '#5F5B54');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x - r, y0 - r * 0.3, r * 2, y1 - y0 + r * 0.6, r * 0.5);
+    else ctx.rect(x - r, y0 - r * 0.3, r * 2, y1 - y0 + r * 0.6);
+    ctx.fill();
+    // Stitched hems at the tube's ends, and firelight on its lower half.
+    ctx.fillStyle = 'rgba(0,0,0,.25)';
+    ctx.fillRect(x - r, y0 + r * 0.5, r * 2, 1);
+    ctx.fillRect(x - r, y1 - r * 0.5, r * 2, 1);
+    const fl = ctx.createLinearGradient(0, (y0 + y1) / 2, 0, y1);
+    fl.addColorStop(0, 'rgba(255,105,35,0)');
+    fl.addColorStop(1, 'rgba(255,105,35,' + (0.3 * flicker).toFixed(3) + ')');
+    ctx.fillStyle = fl;
+    ctx.fillRect(x - r, (y0 + y1) / 2, r * 2, (y1 - y0) / 2 + r * 0.3);
+    ctx.restore();
   }
 
   function frame(now) {
