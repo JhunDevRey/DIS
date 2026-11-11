@@ -7,7 +7,8 @@
 // fabric weave) is drawn once offscreen. Every frame the cloth is a mesh:
 // each point gets a ripple depth from diagonal travelling waves plus a
 // corner flutter (pinned at the pole, freest at the fly end), driven by a
-// gusty wind that changes their strength and speed. Along each row the
+// strong, steady wind that keeps it at full stretch while its swells vary
+// the waves' strength and speed. Along each row the
 // cloth keeps its length, so deep folds pull the fly end in. The mesh is
 // turned away from the viewer, projected with perspective, and lit per
 // cell: a key light from the upper left (with a soft fabric sheen and the
@@ -122,15 +123,16 @@
     canvas.width = Math.round(W * dpr);
     canvas.height = Math.round(H * dpr);
 
-    // Flag placement in panel px: big, upper right, running off the edge a little.
-    const fw = Math.min(W * 0.95, H * 1.3);
+    // Flag placement in panel px: big, flying out to the right with the
+    // whole fly end inside the panel.
+    const fw = Math.min(W * 0.8, H * 1.1);
     const fh = fw / 2;
     geo = {
       fw, fh,
       poleX: W * 0.16,
-      top: H * 0.13,
-      amp: fw * (reduceMotion ? 0.04 : 0.065),
-      yaw: 0.5,                // radians the fly end turns away from the viewer
+      top: Math.max(H * 0.155, 118),   // finial clears the logo row
+      amp: fw * (reduceMotion ? 0.03 : 0.045),
+      yaw: 0.3,                // radians the fly end turns away from the viewer
       focal: Math.max(W, H) * 1.1,
       cx: W * 0.5, cy: H * 0.45
     };
@@ -148,10 +150,11 @@
     return true;
   }
 
-  // Gusty wind, 0.6..1.1: a few slow incommensurate swells.
+  // A strong, steady wind (0.9..1.1) that keeps the flag fully unfurled,
+  // with a few slow incommensurate swells.
   function windAt(t) {
-    if (reduceMotion) return 0.85;
-    return 0.85 + 0.12 * Math.sin(t * 0.31) + 0.08 * Math.sin(t * 0.83 + 2.1) + 0.05 * Math.sin(t * 1.9 + 0.7);
+    if (reduceMotion) return 1;
+    return 1 + 0.05 * Math.sin(t * 0.31) + 0.03 * Math.sin(t * 0.83 + 2.1) + 0.02 * Math.sin(t * 1.9 + 0.7);
   }
 
   // Ripple depth of the cloth at (u, v), both 0..1. Positive = away from the viewer.
@@ -161,13 +164,13 @@
       Math.sin(TAU * (1.2 * u - 0.25 * v) - ph * 2.6) +
       0.45 * Math.sin(TAU * (2.2 * u + 0.15 * v) - ph * 3.7 + 1.3) +
       0.18 * Math.sin(TAU * (4.0 * u - 0.45 * v) - ph * 6.1) +
-      0.4 * u * u * u * Math.sin(TAU * (1.3 * v + 2.5 * u) - ph * 8.3)   // corner flutter
+      0.3 * u * u * u * Math.sin(TAU * (1.3 * v + 2.5 * u) - ph * 8.3)   // corner flutter
     );
   }
 
   function drawPole() {
     const x = geo.poleX, r = Math.max(3, geo.fw * 0.011);
-    const top = geo.top - r * 3;
+    const top = geo.top - r * 1.2;   // full-staff: the flag's top edge sits just under the finial
     ctx.save();
     ctx.scale(dpr, dpr);
     const g = ctx.createLinearGradient(x - r, 0, x + r, 0);
@@ -201,7 +204,7 @@
     const cosY = Math.cos(yaw), sinY = Math.sin(yaw);
     const du = 1 / cols, dv = 1 / ROWS, stepX = fw * du, stepY = fh * dv;
     const wind = windAt(t);
-    const droop = (1.15 - wind) * 0.12 * fh;
+    const droop = Math.max(0, 1.02 - wind) * 0.1 * fh;   // only a hint of sag in the lulls
     const flicker = 0.85 + 0.1 * Math.sin(t * 2.3) + 0.05 * Math.sin(t * 7.1);
     const C = cols + 1;
 
