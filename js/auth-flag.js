@@ -3,7 +3,7 @@
 // panel (.auth-brand), behind the ember canvas (js/auth-embers.js) so the
 // embers drift in front of it.
 //
-// The flag texture (with a canvas pole sleeve, sewn seams, hems and a fine
+// The flag texture (with a canvas hoist header, sewn seams, hems and a fine
 // fabric weave) is drawn once offscreen. Every frame the cloth is a mesh:
 // each point gets a ripple depth from diagonal travelling waves plus a
 // corner flutter (pinned at the pole, freest at the fly end), driven by a
@@ -31,7 +31,7 @@
   const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const TAU = Math.PI * 2;
   const ROWS = 16;
-  const SLEEVE = 0.014;   // share of the texture width: the flat strip of the hoist header leaving the sleeve tube
+  const SLEEVE = 0.014;   // share of the texture width taken by the hoist header strip
 
   // Flag of Canada, viewBox 0 0 9600 4800.
   const RED = '#D52B1E';
@@ -63,7 +63,7 @@
     const g = src.getContext('2d');
     const sl = Math.round(w * SLEEVE);
 
-    // Hoist header: heavy off-white canvas, continuing the sleeve tube.
+    // Hoist header: heavy off-white canvas strip carrying the grommets.
     g.fillStyle = '#E9E5DC';
     g.fillRect(0, 0, sl, h);
 
@@ -79,7 +79,7 @@
     g.fill(LEAF);
     g.restore();
 
-    // Seams between the panels, hems along the edges, sleeve stitching.
+    // Seams between the panels, hems along the edges, header stitching.
     const line = Math.max(1, Math.round(h / 260));
     g.fillStyle = 'rgba(0,0,0,.16)';
     const fx = (x) => sl + (w - sl) * x / 9600;
@@ -123,30 +123,32 @@
     canvas.width = Math.round(W * dpr);
     canvas.height = Math.round(H * dpr);
 
-    // Framing — every value is a fraction of the panel, so it scales with
-    // it. Seen from slightly below: the fly end swings toward the viewer
-    // (negative yaw, so it looks a bit taller than the hoist) and the
-    // edges rise toward the right (tilt).
+    // Framing, matched to the reference photo — every value is a fraction
+    // of the panel, so it scales with it. The flag is big, seen from below
+    // with a long lens: turned well away from the viewer (yaw), so it looks
+    // about 1.5:1 instead of 2:1, with the fly end about as tall as the
+    // hoist, and both edges climbing steeply toward the fly (tilt).
     const FRAME = {
-      poleX: 0.09,     // pole, from the panel's left edge (share of width)
-      top: 0.17,       // hoist top / just under the finial (share of height)
-      width: 0.8,      // flag cloth length (share of width) ...
-      maxH: 1.05,      // ... capped at this share of the height on short panels
-      yaw: -0.2,       // radians; negative = fly end toward the viewer
-      tilt: 0.09       // rise of the edges per unit of length, toward the fly
+      poleX: 0.035,    // pole, from the panel's left edge (share of width)
+      top: 0.2,        // hoist top, just under the finial (share of height)
+      width: 1.2,      // flag cloth length (share of width) ...
+      maxH: 1.15,      // ... capped at this share of the height on short panels
+      yaw: 0.72,       // radians the fly end turns away from the viewer
+      tilt: 0.15,      // rise of the edges per unit of cloth length, toward the fly
+      lens: 8          // focal length (share of the panel's long side): longer = flatter perspective
     };
     const fw = Math.min(W * FRAME.width, H * FRAME.maxH);
     const fh = fw / 2;
+    const top = Math.max(H * FRAME.top, 118);   // finial clears the logo row
     geo = {
-      fw, fh,
+      fw, fh, top,
       poleX: W * FRAME.poleX,
-      poleR: Math.max(3, fw * 0.011),
-      top: Math.max(H * FRAME.top, 118),   // finial clears the logo row
+      poleR: Math.max(2.5, W * 0.011),
       amp: fw * (reduceMotion ? 0.03 : 0.045),
       yaw: FRAME.yaw,
       tilt: FRAME.tilt,
-      focal: Math.max(W, H) * 1.1,
-      cx: W * 0.5, cy: Math.max(H * FRAME.top, 118) + fh / 2   // perspective centred on the flag
+      focal: Math.max(W, H) * FRAME.lens,
+      cx: W * 0.5, cy: top + fh / 2   // perspective centred on the flag
     };
     cols = Math.max(40, Math.min(100, Math.round(fw / 6)));
     px = new Float32Array((cols + 1) * (ROWS + 1));
@@ -174,7 +176,7 @@
 
   // Ripple depth of the cloth at (u, v), both 0..1. Positive = away from the viewer.
   function depth(u, v, ph, wind) {
-    const reach = 0.04 * u + 0.96 * Math.pow(u, 1.15);   // 0 at the hoist: held still by the sleeve
+    const reach = 0.04 * u + 0.96 * Math.pow(u, 1.15);   // 0 at the hoist: held still by the clips
     return geo.amp * wind * reach * (
       Math.sin(TAU * (1.2 * u - 0.25 * v) - ph * 2.6) +
       0.45 * Math.sin(TAU * (2.2 * u + 0.15 * v) - ph * 3.7 + 1.3) +
@@ -185,14 +187,14 @@
 
   function drawPole() {
     const x = geo.poleX, r = geo.poleR;
-    const top = geo.top - r * 1.2;   // full-staff: the flag's top edge sits just under the finial
+    const top = geo.top - r * 2.2;   // full-staff: the flag's top edge sits just under the finial
     ctx.save();
     ctx.scale(dpr, dpr);
     const g = ctx.createLinearGradient(x - r, 0, x + r, 0);
-    g.addColorStop(0, '#3A3D44');
-    g.addColorStop(0.35, '#E9ECF1');
-    g.addColorStop(0.55, '#B9BEC7');
-    g.addColorStop(1, '#2A2C31');
+    g.addColorStop(0, '#6F747C');
+    g.addColorStop(0.35, '#FFFFFF');
+    g.addColorStop(0.6, '#D9DDE3');
+    g.addColorStop(1, '#5A5E66');
     ctx.fillStyle = g;
     ctx.fillRect(x - r, top, r * 2, H - top);
     // Warm firelight on the lower pole.
@@ -201,28 +203,28 @@
     fl.addColorStop(1, 'rgba(255,110,40,.35)');
     ctx.fillStyle = fl;
     ctx.fillRect(x - r, H * 0.55, r * 2, H * 0.45);
-    // Collar (the truck) between the pole and the finial.
-    const cg = ctx.createLinearGradient(x - r * 1.5, 0, x + r * 1.5, 0);
-    cg.addColorStop(0, '#2E3036'); cg.addColorStop(0.4, '#D9DDE3'); cg.addColorStop(1, '#25272C');
+    // Truck: a gold band, then a small silver dome finial.
+    const cg = ctx.createLinearGradient(x - r * 1.3, 0, x + r * 1.3, 0);
+    cg.addColorStop(0, '#6E5108'); cg.addColorStop(0.4, '#F3D27A'); cg.addColorStop(1, '#5A4206');
     ctx.fillStyle = cg;
-    ctx.fillRect(x - r * 1.5, top - r * 0.9, r * 3, r * 1.1);
-    // Gold finial.
-    const fr = r * 2.1;
-    const fTop = top - r * 0.9;
-    const fg = ctx.createRadialGradient(x - fr * 0.35, fTop - fr * 0.9, fr * 0.1, x, fTop - fr * 0.6, fr);
-    fg.addColorStop(0, '#FFF4CF');
-    fg.addColorStop(0.45, '#E0B13A');
-    fg.addColorStop(1, '#6E5108');
+    ctx.fillRect(x - r * 1.3, top - r * 1.1, r * 2.6, r * 1.1);
+    const fr = r * 1.45;
+    const fy = top - r * 1.1 - fr * 0.7;
+    const fg = ctx.createRadialGradient(x - fr * 0.4, fy - fr * 0.4, fr * 0.1, x, fy, fr);
+    fg.addColorStop(0, '#FFFFFF');
+    fg.addColorStop(0.5, '#C9CED6');
+    fg.addColorStop(1, '#4E525A');
     ctx.fillStyle = fg;
     ctx.beginPath();
-    ctx.arc(x, fTop - fr * 0.8, fr, 0, TAU);
+    ctx.arc(x, fy, fr, 0, TAU);
     ctx.fill();
+    ctx.fillRect(x - r * 0.25, fy - fr * 1.6, r * 0.5, fr * 0.8);   // little spire
     ctx.restore();
   }
 
   function draw(t, ph) {
     const { fw, fh, poleX, poleR, top, yaw, tilt, focal, cx, cy } = geo;
-    const hoistX = poleX + poleR * 1.5;    // the cloth leaves the sleeve tube here
+    const hoistX = poleX + poleR * 2.6;    // hoist edge, clipped to the halyard beside the pole
     const cosY = Math.cos(yaw), sinY = Math.sin(yaw);
     const du = 1 / cols, dv = 1 / ROWS, stepX = fw * du, stepY = fh * dv;
     const wind = windAt(t);
@@ -269,7 +271,7 @@
         if (back) n = [-n[0], -n[1], -n[2]];
         const diff = Math.max(0, n[0] * KEY[0] + n[1] * KEY[1] + n[2] * KEY[2]);
         const spec = Math.pow(Math.max(0, n[0] * HALF[0] + n[1] * HALF[1] + n[2] * HALF[2]), 18) * 0.35;
-        let val = (diff / base - 1) * 1.1 + spec - (back ? 0.12 : 0);
+        let val = (diff - base) * 1.8 + spec - (back ? 0.12 : 0);
         const o = (j * cols + i) * 4;
         const c = val > 0 ? 255 : 0;
         sd[o] = sd[o + 1] = sd[o + 2] = c;
@@ -295,7 +297,7 @@
     litCtx.drawImage(fireMap, 0, 0, cols, ROWS, 0, 0, lit.width, lit.height);
 
     // The cloth is dimmed so the brand copy on top stays readable; the
-    // pole and the sleeve holding the hoist are drawn brighter so the
+    // pole and the clips holding the hoist are drawn brighter so the
     // attachment is clear. The cloth goes to its own layer first so the
     // overlapping cells don't double up when it is faded.
     clothCtx.setTransform(1, 0, 0, 1, 0, 0);
@@ -324,41 +326,40 @@
     ctx.globalAlpha = 0.42;
     ctx.drawImage(cloth, 0, 0);
     ctx.globalAlpha = 0.85;
-    drawSleeve(py[0] / dpr, py[ROWS * C] / dpr, hoistX, flicker);
+    drawFittings(py[0] / dpr, py[ROWS * C] / dpr, hoistX);
     ctx.globalAlpha = 1;
   }
 
-  // The hoist sleeve: a canvas tube wrapped round the pole along the flag's
-  // whole short side, with a soft contact shadow where the cloth leaves it.
-  function drawSleeve(y0, y1, hoistX, flicker) {
-    const x = geo.poleX, r = geo.poleR * 1.7;
+  // How the hoist is held, as in the reference: a rope halyard running down
+  // beside the pole, and a snap hook on it clipped through a brass grommet
+  // at the hoist's top and bottom corners.
+  function drawFittings(y0, y1, hoistX) {
+    const r = geo.poleR, ropeX = geo.poleX + r * 1.45;
     ctx.save();
     ctx.scale(dpr, dpr);
-    const sh = ctx.createLinearGradient(hoistX, 0, hoistX + r * 3.5, 0);
-    sh.addColorStop(0, 'rgba(0,0,0,.3)');
-    sh.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = sh;
-    ctx.fillRect(hoistX, y0 + 1, r * 3.5, y1 - y0 - 2);
-
-    const g = ctx.createLinearGradient(x - r, 0, x + r, 0);
-    g.addColorStop(0, '#8F8A80');
-    g.addColorStop(0.3, '#FFFDF8');
-    g.addColorStop(0.6, '#E6E1D7');
-    g.addColorStop(1, '#6E6A62');
-    ctx.fillStyle = g;
+    ctx.lineCap = 'round';
+    // Halyard.
+    ctx.strokeStyle = 'rgba(225,228,232,.9)';
+    ctx.lineWidth = Math.max(1, r * 0.35);
     ctx.beginPath();
-    if (ctx.roundRect) ctx.roundRect(x - r, y0 - r * 0.3, r * 2, y1 - y0 + r * 0.6, r * 0.5);
-    else ctx.rect(x - r, y0 - r * 0.3, r * 2, y1 - y0 + r * 0.6);
-    ctx.fill();
-    // Stitched hems at the tube's ends, and firelight on its lower half.
-    ctx.fillStyle = 'rgba(0,0,0,.25)';
-    ctx.fillRect(x - r, y0 + r * 0.5, r * 2, 1);
-    ctx.fillRect(x - r, y1 - r * 0.5, r * 2, 1);
-    const fl = ctx.createLinearGradient(0, (y0 + y1) / 2, 0, y1);
-    fl.addColorStop(0, 'rgba(255,105,35,0)');
-    fl.addColorStop(1, 'rgba(255,105,35,' + (0.3 * flicker).toFixed(3) + ')');
-    ctx.fillStyle = fl;
-    ctx.fillRect(x - r, (y0 + y1) / 2, r * 2, (y1 - y0) / 2 + r * 0.3);
+    ctx.moveTo(geo.poleX + r * 0.9, geo.top - r * 2.2);
+    ctx.lineTo(ropeX, y0);
+    ctx.lineTo(ropeX, H);
+    ctx.stroke();
+    // Snap hooks and grommets.
+    [y0 + r * 1.1, y1 - r * 1.1].forEach((y) => {
+      const gx = hoistX + r * 0.9;
+      ctx.strokeStyle = '#B9BEC7';
+      ctx.lineWidth = Math.max(1.2, r * 0.4);
+      ctx.beginPath();
+      ctx.ellipse((ropeX + gx) / 2, y, (gx - ropeX) / 2 + r * 0.3, r * 0.45, 0, 0, TAU);
+      ctx.stroke();
+      ctx.strokeStyle = '#D9B44A';
+      ctx.lineWidth = Math.max(1.2, r * 0.35);
+      ctx.beginPath();
+      ctx.arc(gx, y, r * 0.5, 0, TAU);
+      ctx.stroke();
+    });
     ctx.restore();
   }
 
