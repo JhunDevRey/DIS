@@ -219,6 +219,15 @@
     ctx.arc(x, fy, fr, 0, TAU);
     ctx.fill();
     ctx.fillRect(x - r * 0.25, fy - fr * 1.6, r * 0.5, fr * 0.8);   // little spire
+    // Below the flag the pole dissolves into the background.
+    const f0 = geo.top + geo.fh * 0.7, f1 = geo.top + geo.fh * 1.5;
+    const fade = ctx.createLinearGradient(0, f0, 0, f1);
+    fade.addColorStop(0, 'rgba(0,0,0,0)');
+    fade.addColorStop(1, 'rgba(0,0,0,1)');
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = fade;
+    ctx.fillRect(x - r * 2, f0, r * 4, H - f0);
+    ctx.globalCompositeOperation = 'source-over';
     ctx.restore();
   }
 
@@ -321,11 +330,11 @@
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.globalAlpha = 0.7;
+    ctx.globalAlpha = 0.3;    // the pole is kept faint, just enough to hold the flag
     drawPole();
     ctx.globalAlpha = 0.42;
     ctx.drawImage(cloth, 0, 0);
-    ctx.globalAlpha = 0.85;
+    ctx.globalAlpha = 0.45;
     drawFittings(py[0] / dpr, py[ROWS * C] / dpr, hoistX);
     ctx.globalAlpha = 1;
   }
@@ -344,7 +353,7 @@
     ctx.beginPath();
     ctx.moveTo(geo.poleX + r * 0.9, geo.top - r * 2.2);
     ctx.lineTo(ropeX, y0);
-    ctx.lineTo(ropeX, H);
+    ctx.lineTo(ropeX, y1 + r);
     ctx.stroke();
     // Snap hooks and grommets.
     [y0 + r * 1.1, y1 - r * 1.1].forEach((y) => {
