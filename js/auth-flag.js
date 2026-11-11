@@ -45,7 +45,7 @@
 
   let dpr = 1, W = 0, H = 0, src = null, raf = 0, running = false;
   let geo = null, cols = 0, px = null, py = null, zl = null;
-  let lit = null, litCtx = null;
+  let lit = null, litCtx = null, cloth = null, clothCtx = null;
   let shadeMap = null, shadeCtx = null, shadeData = null;
   let fireMap = null, fireCtx = null, fireData = null;
   let last = 0, clock = 0, phase = 0;
@@ -145,6 +145,9 @@
     [fireMap, fireCtx, fireData] = smallCanvas(cols, ROWS);
 
     buildTexture(Math.round(fw * dpr), Math.round(fh * dpr));
+    cloth = document.createElement('canvas');
+    cloth.width = canvas.width; cloth.height = canvas.height;
+    clothCtx = cloth.getContext('2d');
     lit = document.createElement('canvas');
     lit.width = src.width; lit.height = src.height;
     litCtx = lit.getContext('2d');
@@ -208,7 +211,7 @@
 
   function draw(t, ph) {
     const { fw, fh, poleX, poleR, top, yaw, focal, cx, cy } = geo;
-    const hoistX = poleX + poleR * 1.25;   // the cloth leaves the sleeve tube here
+    const hoistX = poleX + poleR * 1.5;    // the cloth leaves the sleeve tube here
     const cosY = Math.cos(yaw), sinY = Math.sin(yaw);
     const du = 1 / cols, dv = 1 / ROWS, stepX = fw * du, stepY = fh * dv;
     const wind = windAt(t);
@@ -280,10 +283,12 @@
     litCtx.globalCompositeOperation = 'lighter';
     litCtx.drawImage(fireMap, 0, 0, cols, ROWS, 0, 0, lit.width, lit.height);
 
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    drawPole();
-
+    // The cloth is dimmed so the brand copy on top stays readable; the
+    // pole and the sleeve holding the hoist are drawn brighter so the
+    // attachment is clear. The cloth goes to its own layer first so the
+    // overlapping cells don't double up when it is faded.
+    clothCtx.setTransform(1, 0, 0, 1, 0, 0);
+    clothCtx.clearRect(0, 0, cloth.width, cloth.height);
     // Each cell is mapped onto the parallelogram spanned by its top-left,
     // top-right and bottom-left mesh points, so edges follow the folds
     // smoothly; cells overlap by about a pixel to hide seams.
@@ -292,35 +297,43 @@
       for (let i = 0; i < cols; i++) {
         const a = j * C + i, b = a + C;
         const x0 = px[a], y0 = py[a];
-        ctx.setTransform(
+        clothCtx.setTransform(
           (px[a + 1] - x0) / sw, (py[a + 1] - y0) / sw,
           (px[b] - x0) / sh, (py[b] - y0) / sh,
           x0, y0
         );
-        ctx.drawImage(lit, i * sw, j * sh, sw, sh, 0, 0, sw + ov, sh + ov);
+        clothCtx.drawImage(lit, i * sw, j * sh, sw, sh, 0, 0, sw + ov, sh + ov);
       }
     }
+
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.globalAlpha = 0.7;
+    drawPole();
+    ctx.globalAlpha = 0.42;
+    ctx.drawImage(cloth, 0, 0);
+    ctx.globalAlpha = 0.85;
     drawSleeve(py[0] / dpr, py[ROWS * C] / dpr, hoistX, flicker);
+    ctx.globalAlpha = 1;
   }
 
   // The hoist sleeve: a canvas tube wrapped round the pole along the flag's
   // whole short side, with a soft contact shadow where the cloth leaves it.
   function drawSleeve(y0, y1, hoistX, flicker) {
-    const x = geo.poleX, r = geo.poleR * 1.35;
+    const x = geo.poleX, r = geo.poleR * 1.7;
     ctx.save();
     ctx.scale(dpr, dpr);
     const sh = ctx.createLinearGradient(hoistX, 0, hoistX + r * 3.5, 0);
-    sh.addColorStop(0, 'rgba(0,0,0,.4)');
+    sh.addColorStop(0, 'rgba(0,0,0,.3)');
     sh.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = sh;
     ctx.fillRect(hoistX, y0 + 1, r * 3.5, y1 - y0 - 2);
 
     const g = ctx.createLinearGradient(x - r, 0, x + r, 0);
-    g.addColorStop(0, '#7C786F');
-    g.addColorStop(0.32, '#F4F1EA');
-    g.addColorStop(0.55, '#DAD5CB');
-    g.addColorStop(1, '#5F5B54');
+    g.addColorStop(0, '#8F8A80');
+    g.addColorStop(0.3, '#FFFDF8');
+    g.addColorStop(0.6, '#E6E1D7');
+    g.addColorStop(1, '#6E6A62');
     ctx.fillStyle = g;
     ctx.beginPath();
     if (ctx.roundRect) ctx.roundRect(x - r, y0 - r * 0.3, r * 2, y1 - y0 + r * 0.6, r * 0.5);
