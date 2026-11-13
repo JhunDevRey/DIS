@@ -540,6 +540,8 @@
   const filterProcessor = document.getElementById('msgFilterProcessor');
   const filterUnread = document.getElementById('msgFilterUnread');
   const FILTERS_KEY = 'duqueInboxFilters';
+  const channelTabs = document.getElementById('msgChannelTabs');
+  let channel = 'all';
 
   let conversations = [];
   let clientDir = [];
@@ -557,6 +559,7 @@
       filterClass.value = saved.cls || '';
       filterProcessor.value = saved.proc || '';
       filterUnread.checked = !!saved.unread;
+      if (channelTabs && saved.ch && channelTabs.querySelector(`[data-channel="${saved.ch}"]`)) channel = saved.ch;
       if (filterClass.selectedIndex < 0) filterClass.value = '';
       if (filterProcessor.selectedIndex < 0) filterProcessor.value = '';
     } catch (e) { /* storage blocked — start unfiltered */ }
@@ -565,7 +568,7 @@
   function saveFilters() {
     try {
       sessionStorage.setItem(FILTERS_KEY, JSON.stringify({
-        q: convSearch.value, cls: filterClass.value, proc: filterProcessor.value, unread: filterUnread.checked,
+        q: convSearch.value, cls: filterClass.value, proc: filterProcessor.value, unread: filterUnread.checked, ch: channel,
       }));
     } catch (e) { /* not critical */ }
   }
@@ -615,8 +618,35 @@
       </a>`;
   }
 
+  const onChannel = (conv, ch) => ch === 'all' || (conv.channels || ['portal']).includes(ch);
+
+  // Tab state + per-tab unread conversation counts.
+  function renderChannelTabs() {
+    if (!channelTabs) return;
+    channelTabs.querySelectorAll('[data-channel]').forEach(btn => {
+      const ch = btn.dataset.channel;
+      btn.classList.toggle('on', ch === channel);
+      btn.setAttribute('aria-selected', ch === channel ? 'true' : 'false');
+      btn.classList.toggle('off', btn.dataset.connected === '0');
+      const n = conversations.filter(c => c.unread_count && String(c.client_id) !== clientId && onChannel(c, ch)).length;
+      const count = btn.querySelector('[data-channel-count]');
+      if (count) count.textContent = n || '';
+    });
+  }
+
   function renderConvList() {
     if (!convList) return;
+    renderChannelTabs();
+    const tab = channelTabs && channelTabs.querySelector(`[data-channel="${channel}"]`);
+    if (tab && tab.dataset.connected === '0') {
+      if (convCount) convCount.hidden = true;
+      convList.innerHTML = `<div class="conv-empty conv-not-connected">
+        <i class="${esc(tab.querySelector('i').className)}"></i>
+        <strong>${esc(tab.dataset.label)} isn't connected yet</strong>
+        Once it is, ${esc(tab.dataset.label)} chats will show up here alongside portal messages.
+      </div>`;
+      return;
+    }
     const words = convSearch.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
     const searching = words.length || filterClass.value || filterProcessor.value;
     const byId = new Map(clientDir.map(c => [c.client_id, c]));
@@ -624,10 +654,13 @@
 
     // Conversations, merged with their client details (a deactivated client
     // isn't in the directory, so fall back to the name on the conversation).
-    let rows = conversations.map(conv => ({ client: byId.get(conv.client_id) || { client_id: conv.client_id, full_name: conv.full_name }, conv }));
+    let rows = conversations.filter(conv => onChannel(conv, channel))
+      .map(conv => ({ client: byId.get(conv.client_id) || { client_id: conv.client_id, full_name: conv.full_name }, conv }));
     if (searching) {
       rows = rows.filter(r => matches(r.client, words));
-      if (!filterUnread.checked) {
+      // New conversations start in the portal, so clients without a thread
+      // are only offered on the All and Portal tabs.
+      if (!filterUnread.checked && (channel === 'all' || channel === 'portal')) {
         rows = rows.concat(clientDir.filter(c => !convIds.has(c.client_id) && matches(c, words)).map(c => ({ client: c, conv: null })));
       }
     }
@@ -661,6 +694,16 @@
         badge.hidden = data.unread_total === 0;
       }
     } catch (e) { /* next poll retries */ }
+  }
+
+  if (channelTabs) {
+    channelTabs.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-channel]');
+      if (!btn) return;
+      channel = btn.dataset.channel;
+      saveFilters();
+      renderConvList();
+    });
   }
 
   if (convSearch) {

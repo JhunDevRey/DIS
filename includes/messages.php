@@ -80,7 +80,25 @@ function staffConversationsForJson(): array
         'preview'      => ($c['last_sender_type'] === 'admin' ? 'You: ' : '') . mb_strimwidth($c['last_body'] !== '' ? $c['last_body'] : '📎 Attachment', 0, 90, '…'),
         'last_at'      => $c['last_at'],
         'unread_count' => (int)$c['unread_count'],
+        // Channels this thread has messages on, for the Inbox tabs. Portal
+        // is the only one live so far; the WhatsApp channel (branch
+        // `whatsapp`) fills this from messages.channel.
+        'channels'     => ['portal'],
     ], staffConversationList());
+}
+
+/**
+ * Inbox channel tabs, in display order. 'connected' => false shows the tab
+ * with a "not connected yet" note instead of conversations.
+ */
+function messageChannels(): array
+{
+    return [
+        'portal'    => ['label' => 'Portal',    'icon' => 'fa-solid fa-globe',               'connected' => true],
+        'whatsapp'  => ['label' => 'WhatsApp',  'icon' => 'fa-brands fa-whatsapp',          'connected' => false],
+        'messenger' => ['label' => 'Messenger', 'icon' => 'fa-brands fa-facebook-messenger', 'connected' => false],
+        'instagram' => ['label' => 'Instagram', 'icon' => 'fa-brands fa-instagram',         'connected' => false],
+    ];
 }
 
 /**

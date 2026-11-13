@@ -62,6 +62,14 @@ if ($openClientId) {
           <button type="button" class="msg-fs-icon msg-fs-menu" data-open-nav aria-label="Open menu" title="Menu"><i class="fa-solid fa-bars"></i></button>
           <span class="msg-fs-title">Inbox</span>
         </div>
+        <div class="conv-channels" id="msgChannelTabs" role="tablist" aria-label="Channel">
+          <button type="button" class="on" data-channel="all" role="tab">All <b data-channel-count="all"></b></button>
+          <?php foreach (messageChannels() as $key => $ch): ?>
+            <button type="button" data-channel="<?= h($key) ?>" data-connected="<?= $ch['connected'] ? '1' : '0' ?>" data-label="<?= h($ch['label']) ?>" role="tab" title="<?= h($ch['label']) ?><?= $ch['connected'] ? '' : ' (not connected yet)' ?>">
+              <i class="<?= h($ch['icon']) ?>"></i><span class="conv-ch-label"><?= h($ch['label']) ?></span> <b data-channel-count="<?= h($key) ?>"></b>
+            </button>
+          <?php endforeach; ?>
+        </div>
         <div class="conv-tools">
           <input type="search" id="msgConvSearch" placeholder="Search name, case type, #client no.…" aria-label="Search clients" autocomplete="off">
           <div class="conv-filters">

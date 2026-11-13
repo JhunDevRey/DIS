@@ -2674,3 +2674,29 @@ button.msg-edited:hover { color: var(--ink); text-decoration: underline; }
   .fd-search kbd { display: none; }
   .fd-search input { padding-right: 16px; }
 }
+
+/* ---------- Inbox channel tabs (All / Portal / WhatsApp / Messenger / Instagram) ---------- */
+.conv-channels { display: flex; gap: 4px; padding: 10px 12px 0; overflow-x: auto; scrollbar-width: none; }
+.conv-channels::-webkit-scrollbar { display: none; }
+.conv-channels button {
+  flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px;
+  font: inherit; font-size: 12.5px; font-weight: 600; padding: 5px 11px; border-radius: 999px; cursor: pointer;
+  background: var(--surface-alt); color: var(--text-muted); border: 1px solid var(--line); white-space: nowrap;
+}
+.conv-channels button:hover { color: var(--ink); border-color: var(--line-strong, var(--line)); }
+.conv-channels button.on { background: var(--ink-solid); color: #fff; border-color: transparent; }
+.conv-channels button.off:not(.on) { opacity: .6; }
+.conv-channels button b { color: var(--gold); }
+.conv-channels button b:empty { display: none; }
+.conv-channels button.on b { color: #fff; }
+.conv-channels .fa-whatsapp { color: #25D366; }
+.conv-channels .fa-facebook-messenger { color: #0866FF; }
+.conv-channels .fa-instagram { color: #E1306C; }
+.conv-channels button.on i { color: #fff; }
+/* The conversation list is narrow, so channel tabs are icon-only (title
+   names each one) and only the selected tab spells out its name. */
+.conv-channels button:not(.on) .conv-ch-label { display: none; }
+.conv-channels button:not(.on):has(b:empty) { padding: 5px 9px; }
+.conv-not-connected { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 36px 20px; line-height: 1.5; }
+.conv-not-connected i { font-size: 26px; margin-bottom: 4px; opacity: .8; }
+.conv-not-connected strong { color: var(--ink); font-size: 13.5px; }
