@@ -3,6 +3,7 @@ require_once __DIR__ . '/../includes/admin_auth.php';
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/messages.php';
+require_once __DIR__ . '/../includes/notion.php';
 requireAdmin();
 $activeNav = 'frontdesk';
 
@@ -20,7 +21,6 @@ $staffSenders = getDb()->query('SELECT id, full_name FROM processors WHERE is_ac
 // what's coming, each says where its data will come from.
 $comingWindows = [
     ['Scheduling', 'fa-regular fa-calendar', 'var(--accepted)', 'Calendly', "Today's appointments and new bookings."],
-    ['Notion · Inquiries', 'fa-solid fa-n', 'var(--ink-solid)', 'Notion', 'New website inquiries waiting for a reply.'],
     ['Contracts', 'fa-solid fa-file-signature', 'var(--revision)', 'Documenso', 'Contracts with the client, waiting for JD, or signed but unpaid.'],
     ['PQ Forms', 'fa-solid fa-list-check', 'var(--class-family)', 'Cognito', 'PQ forms sent and how far each person got.'],
     ['Social Media Posting', 'fa-solid fa-bullhorn', 'var(--class-visit)', 'Meta', 'Scheduled and recent Facebook / Instagram posts.'],
@@ -86,6 +86,34 @@ $comingWindows = [
           <a href="inbox.php">Open Inbox →</a>
           <a href="inbox.php" class="btn btn-ghost btn-sm"><i class="fa-regular fa-paper-plane"></i> New message</a>
         </footer>
+      </section>
+
+      <section class="fd-win" id="fdInquiries" data-enabled="<?= notionEnabled() ? '1' : '0' ?>">
+        <header>
+          <span class="fd-wico" style="--c:var(--ink-solid)"><i class="fa-solid fa-n"></i></span>
+          <h2>Notion · Inquiries</h2>
+          <span class="fd-count" id="fdInqCount"></span>
+          <span class="fd-src<?= notionEnabled() ? ' live' : '' ?>"><?= notionEnabled() ? 'Live' : 'Notion' ?></span>
+        </header>
+        <?php if (notionEnabled()): ?>
+          <div class="fd-msg-tools">
+            <div class="conv-channels" id="fdInqTabs" role="tablist" aria-label="Show">
+              <button type="button" class="on" data-inq="today" role="tab">Today <b data-inq-count="today"></b></button>
+              <button type="button" data-inq="week" role="tab">7 days <b data-inq-count="week"></b></button>
+            </div>
+            <label class="fd-unread-toggle"><input type="checkbox" id="fdInqWebsite"> Website only</label>
+          </div>
+          <ul class="fd-list" id="fdInqList"><li class="fd-empty">Loading inquiries…</li></ul>
+          <footer>
+            <a href="<?= h(notionInquiriesUrl()) ?>" target="_blank" rel="noopener">Open in Notion →</a>
+            <button type="button" class="btn btn-ghost btn-sm" id="fdInqRefresh"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+          </footer>
+        <?php else: ?>
+          <div class="fd-soon-body">
+            <i class="fa-solid fa-plug"></i>
+            <div><strong>Not connected yet</strong><span>New inquiries from the website and staff, straight from Notion.</span></div>
+          </div>
+        <?php endif; ?>
       </section>
 
       <?php foreach ($comingWindows as [$title, $icon, $color, $source, $what]): ?>

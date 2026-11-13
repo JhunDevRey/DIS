@@ -129,6 +129,13 @@ define('PORTAL_APP_URL', 'https://portal.duqueimmigration.ca');
 // built separately — it is not currently persisted to this app's storage.
 define('ADOBE_PDF_EMBED_CLIENT_ID', '');
 
+// ---- Notion (Front Desk "Notion · Inquiries" window, read-only) ----
+// Leave NOTION_TOKEN empty to keep the window switched off. Create an
+// internal integration at notion.so/profile/integrations (read content
+// only), copy its secret here, then in Notion open the 📬 Inquiries
+// database → ••• → Connections → add the integration.
+define('NOTION_TOKEN', '');
+
 // ---- WhatsApp (via 360dialog, Coexistence with the office WhatsApp Business app) ----
 // Leave WA_API_KEY empty to keep WhatsApp switched off — the Inbox then
 // works exactly as before. See docs/WHATSAPP_SETUP.md.

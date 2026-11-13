@@ -260,6 +260,119 @@
   setInterval(() => { if (!document.hidden) refresh(); }, LIST_POLL_MS);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
 
+  // ---- Notion · Inquiries window ----
+  // Read-only list of recent inquiries from the Notion 📬 Inquiries database
+  // (via api/frontdesk_inquiries.php, cached ~60s on the server). Clicking a
+  // row opens the inquiry in Notion; email/phone are one tap away.
+  const inqWin = document.getElementById('fdInquiries');
+  if (inqWin && inqWin.dataset.enabled === '1') {
+    const INQ_KEY = 'duqueFrontDeskInq';
+    const INQ_POLL_MS = 120000;
+    const INQ_ROWS = 5;
+    const inqList = document.getElementById('fdInqList');
+    const inqCount = document.getElementById('fdInqCount');
+    const inqTabs = document.getElementById('fdInqTabs');
+    const inqWebsite = document.getElementById('fdInqWebsite');
+    let inqRange = 'today';
+    let inqAll = false;
+    let inquiries = null;
+    try {
+      const saved = JSON.parse(localStorage.getItem(INQ_KEY) || '{}');
+      if (saved.range === 'week') inqRange = 'week';
+      inqWebsite.checked = !!saved.website;
+    } catch (e) {}
+    const saveInq = () => { try { localStorage.setItem(INQ_KEY, JSON.stringify({ range: inqRange, website: inqWebsite.checked })); } catch (e) {} };
+
+    const isToday = (iso) => new Date(iso).toDateString() === new Date().toDateString();
+    const inqWhen = (iso) => {
+      const d = new Date(iso);
+      return isToday(iso) ? d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+        : d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+    };
+
+    function inqHtml(q) {
+      const tags = [
+        q.inquiring_as && `<span class="fd-inq-tag ${q.inquiring_as === 'Canadian Employer' ? 'emp' : 'app'}">${esc(q.inquiring_as)}</span>`,
+        q.service && `<span class="fd-inq-tag">${esc(q.service)}</span>`,
+        ...(q.case_types || []).slice(0, 3).map(c => `<span class="fd-inq-tag">${esc(c)}</span>`),
+        q.from_website ? '<span class="fd-inq-tag web">Website</span>' : (q.heard_via && `<span class="fd-inq-tag">${esc(q.heard_via)}</span>`),
+        q.country && `<span class="fd-inq-tag">${esc(q.country)}</span>`,
+      ].filter(Boolean).join('');
+      const contact = [
+        q.phone && `<span class="fd-inq-link" role="link" tabindex="0" data-href="tel:${esc(q.phone)}"><i class="fa-solid fa-phone"></i> ${esc(q.phone)}</span>`,
+        q.email && `<span class="fd-inq-link" role="link" tabindex="0" data-href="mailto:${esc(q.email)}"><i class="fa-regular fa-envelope"></i> ${esc(q.email)}</span>`,
+      ].filter(Boolean).join('');
+      return `<li><a class="fd-inq" href="${esc(q.url)}" target="_blank" rel="noopener">
+        <span class="fd-inq-top"><span class="fd-name">${esc(q.name)}</span><span class="fd-time">${esc(inqWhen(q.created_at))}</span></span>
+        ${tags ? `<span class="fd-inq-tags">${tags}</span>` : ''}
+        ${q.message ? `<span class="fd-inq-msg">${esc(q.message)}</span>` : ''}
+        ${contact ? `<span class="fd-inq-contact">${contact}</span>` : ''}
+      </a></li>`;
+    }
+
+    function renderInquiries() {
+      inqTabs.querySelectorAll('[data-inq]').forEach(b => b.classList.toggle('on', b.dataset.inq === inqRange));
+      if (!inquiries) return;
+      const base = inquiries.filter(q => !inqWebsite.checked || q.from_website);
+      const today = base.filter(q => isToday(q.created_at));
+      inqTabs.querySelector('[data-inq-count="today"]').textContent = today.length || '';
+      inqTabs.querySelector('[data-inq-count="week"]').textContent = base.length || '';
+      const todayAll = inquiries.filter(q => isToday(q.created_at)).length;
+      inqCount.textContent = todayAll ? `${todayAll} new today` : 'None today yet';
+      const rows = inqRange === 'today' ? today : base;
+      if (!rows.length) {
+        inqList.innerHTML = `<li class="fd-empty">${inqRange === 'today' ? 'No new inquiries today yet.' : 'No inquiries in the last 7 days.'}</li>`;
+        return;
+      }
+      const shown = inqAll ? rows : rows.slice(0, INQ_ROWS);
+      inqList.innerHTML = shown.map(inqHtml).join('') +
+        (rows.length > shown.length ? `<li><button type="button" class="fd-inq-more" data-inq-more>Show ${rows.length - shown.length} more</button></li>` : '');
+    }
+
+    async function loadInquiries(fresh = false) {
+      try {
+        const res = await fetch('api/frontdesk_inquiries.php' + (fresh ? '?fresh=1' : ''), { headers: { Accept: 'application/json' } });
+        const out = await res.json();
+        if (!out.success) {
+          if (!inquiries) inqList.innerHTML = `<li class="fd-empty fd-inq-error">${esc(out.message || 'Could not load inquiries.')}</li>`;
+          if (fresh) showToast(out.message || 'Could not load inquiries.', true);
+          return;
+        }
+        inquiries = out.inquiries || [];
+        renderInquiries();
+      } catch (e) {
+        if (!inquiries) inqList.innerHTML = '<li class="fd-empty fd-inq-error">Could not load inquiries. Check your connection.</li>';
+      }
+    }
+
+    inqTabs.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-inq]');
+      if (!b) return;
+      inqRange = b.dataset.inq;
+      inqAll = false;
+      saveInq();
+      renderInquiries();
+    });
+    inqWebsite.addEventListener('change', () => { inqAll = false; saveInq(); renderInquiries(); });
+    inqList.addEventListener('click', (e) => {
+      if (e.target.closest('[data-inq-more]')) { inqAll = true; renderInquiries(); return; }
+      // Phone / email (spans, since links can't nest in the row link) call
+      // or email instead of opening Notion.
+      const contact = e.target.closest('[data-href]');
+      if (contact) { e.preventDefault(); location.href = contact.dataset.href; }
+    });
+    const refreshBtn = document.getElementById('fdInqRefresh');
+    refreshBtn.addEventListener('click', async () => {
+      refreshBtn.disabled = true;
+      await loadInquiries(true);
+      refreshBtn.disabled = false;
+    });
+
+    renderInquiries();
+    loadInquiries();
+    setInterval(() => { if (!document.hidden) loadInquiries(); }, INQ_POLL_MS);
+  }
+
   // ---- Client quick-search ----
   const input = document.getElementById('fdSearchInput');
   const results = document.getElementById('fdSearchResults');
