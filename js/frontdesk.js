@@ -10,7 +10,8 @@
   const MAX_RESULTS = 8;
 
   let data = JSON.parse(document.getElementById('fdData').textContent);
-  let filter = 'all';
+  let channel = 'all';
+  const STATE_KEY = 'duqueFrontDeskMsg';
 
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const initial = (name) => (String(name || '?').trim()[0] || '?').toUpperCase();
@@ -39,7 +40,19 @@
   // ---- Messaging window ----
   const list = document.getElementById('fdMsgList');
   const countEl = document.getElementById('fdMsgCount');
-  const unreadTab = document.getElementById('fdUnreadTab');
+  const tabs = document.getElementById('fdChannelTabs');
+  const unreadOnly = document.getElementById('fdUnreadOnly');
+  const onChannel = (conv, ch) => ch === 'all' || (conv.channels || ['portal']).includes(ch);
+
+  // Remember the tab + Unread toggle on this device.
+  try {
+    const saved = JSON.parse(localStorage.getItem(STATE_KEY) || '{}');
+    if (saved.ch && tabs.querySelector(`[data-channel="${saved.ch}"]`)) channel = saved.ch;
+    unreadOnly.checked = !!saved.unread;
+  } catch (e) { /* storage blocked — defaults */ }
+  const saveState = () => {
+    try { localStorage.setItem(STATE_KEY, JSON.stringify({ ch: channel, unread: unreadOnly.checked })); } catch (e) {}
+  };
 
   function clientById(id) {
     return data.clients.find(c => c.client_id === id) || null;
@@ -48,11 +61,30 @@
   function renderMessages() {
     const unread = data.conversations.filter(c => c.unread_count > 0);
     countEl.textContent = unread.length ? `${unread.length} unread` : 'All caught up';
-    unreadTab.textContent = unread.length || '';
 
-    const rows = (filter === 'unread' ? unread : data.conversations).slice(0, MAX_ROWS);
+    tabs.querySelectorAll('[data-channel]').forEach(btn => {
+      const ch = btn.dataset.channel;
+      btn.classList.toggle('on', ch === channel);
+      btn.setAttribute('aria-selected', ch === channel ? 'true' : 'false');
+      btn.classList.toggle('off', btn.dataset.connected === '0');
+      btn.querySelector('[data-channel-count]').textContent = unread.filter(c => onChannel(c, ch)).length || '';
+    });
+
+    const tab = tabs.querySelector(`[data-channel="${channel}"]`);
+    if (tab && tab.dataset.connected === '0') {
+      list.innerHTML = `<li class="fd-empty fd-not-connected">
+        <i class="${esc(tab.querySelector('i').className)}"></i>
+        <strong>${esc(tab.dataset.label)} isn't connected yet</strong>
+        <span>Once it is, ${esc(tab.dataset.label)} chats will show up here.</span>
+      </li>`;
+      return;
+    }
+
+    const rows = data.conversations
+      .filter(c => onChannel(c, channel) && (!unreadOnly.checked || c.unread_count > 0))
+      .slice(0, MAX_ROWS);
     if (!rows.length) {
-      list.innerHTML = `<li class="fd-empty">${filter === 'unread'
+      list.innerHTML = `<li class="fd-empty">${unreadOnly.checked
         ? '<i class="fa-solid fa-circle-check"></i> No unread messages.'
         : 'No conversations yet.'}</li>`;
       return;
@@ -71,11 +103,14 @@
     }).join('');
   }
 
-  document.querySelectorAll('[data-fd-filter]').forEach(btn => btn.addEventListener('click', () => {
-    filter = btn.dataset.fdFilter;
-    document.querySelectorAll('[data-fd-filter]').forEach(b => b.classList.toggle('on', b === btn));
+  tabs.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-channel]');
+    if (!btn) return;
+    channel = btn.dataset.channel;
+    saveState();
     renderMessages();
-  }));
+  });
+  unreadOnly.addEventListener('change', () => { saveState(); renderMessages(); });
 
   async function refresh() {
     try {

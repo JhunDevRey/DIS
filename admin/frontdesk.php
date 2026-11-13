@@ -68,9 +68,16 @@ $comingWindows = [
           <span class="fd-count" id="fdMsgCount"></span>
           <span class="fd-src live">Live</span>
         </header>
-        <div class="fd-tabs" role="tablist">
-          <button type="button" class="on" data-fd-filter="all" role="tab">All</button>
-          <button type="button" data-fd-filter="unread" role="tab">Unread <b id="fdUnreadTab"></b></button>
+        <div class="fd-msg-tools">
+          <div class="conv-channels" id="fdChannelTabs" role="tablist" aria-label="Channel">
+            <button type="button" class="on" data-channel="all" role="tab">All <b data-channel-count="all"></b></button>
+            <?php foreach (messageChannels() as $key => $ch): ?>
+              <button type="button" data-channel="<?= h($key) ?>" data-connected="<?= $ch['connected'] ? '1' : '0' ?>" data-label="<?= h($ch['label']) ?>" role="tab" title="<?= h($ch['label']) ?><?= $ch['connected'] ? '' : ' (not connected yet)' ?>">
+                <i class="<?= h($ch['icon']) ?>"></i><span class="conv-ch-label"><?= h($ch['label']) ?></span> <b data-channel-count="<?= h($key) ?>"></b>
+              </button>
+            <?php endforeach; ?>
+          </div>
+          <label class="fd-unread-toggle"><input type="checkbox" id="fdUnreadOnly"> Unread</label>
         </div>
         <ul class="fd-list" id="fdMsgList"></ul>
         <footer>
