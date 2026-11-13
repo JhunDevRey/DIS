@@ -25,7 +25,7 @@ require_once __DIR__ . '/../includes/admin_remember.php';
 adminRememberTryLogin();
 
 if (!empty($_SESSION['admin_id'])) {
-    header('Location: ' . ($redirect ?: 'clients.php'));
+    header('Location: ' . ($redirect ?: 'frontdesk.php'));
     exit;
 }
 
@@ -51,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!empty($_POST['remember'])) {
                 adminRememberIssue((int)$admin['id']);
             }
-            header('Location: ' . ($redirect ?: 'clients.php'));
+            header('Location: ' . ($redirect ?: 'frontdesk.php'));
             exit;
         }
         recordFailedLogin('admin');

@@ -3,7 +3,7 @@
   "short_name": "Duque Staff",
   "description": "Duque Immigration staff portal: clients, documents and the shared inbox.",
   "id": "./",
-  "start_url": "clients.php?source=app",
+  "start_url": "frontdesk.php?source=app",
   "scope": "./",
   "display": "standalone",
   "background_color": "#FFFFFF",
@@ -31,7 +31,7 @@
   "shortcuts": [
     {
       "name": "Clients",
-      "url": "clients.php?source=app",
+      "url": "frontdesk.php?source=app",
       "icons": [
         {
           "src": "images/app-icon-round-192.png",

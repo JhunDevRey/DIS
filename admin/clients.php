@@ -367,6 +367,11 @@ sort($clientNoOptions, SORT_NATURAL);
 <script src="js/admin.js?v=<?= assetVersion('js/admin.js') ?>"></script>
 <script>
 document.getElementById('btnNewClient').addEventListener('click', () => openModal('modalNewClient'));
+// Front Desk's "Add client" links here with ?new=1.
+if (new URLSearchParams(location.search).get('new') === '1') {
+  openModal('modalNewClient');
+  history.replaceState(null, '', 'clients.php');
+}
 
 const clientNoInput = document.getElementById('clientNoInput');
 const clientNoToggle = document.getElementById('clientNoToggle');

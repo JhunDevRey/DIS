@@ -1,5 +1,5 @@
 <?php
-// $activeNav should be set by the including page: 'clients' | 'inbox' | 'processors' | 'profile'
+// $activeNav should be set by the including page: 'frontdesk' | 'clients' | 'inbox' | 'processors' | 'profile'
 $activeNav = $activeNav ?? '';
 
 // Inbox badge = conversations with unread client messages. Wrapped so a
@@ -35,6 +35,7 @@ $navUserInitials = strtoupper(substr($navUserParts[0], 0, 1) . (count($navUserPa
   </div>
   <div class="sidebar-drawer">
     <nav>
+      <a href="frontdesk.php" title="Front Desk" class="<?= $activeNav === 'frontdesk' ? 'active' : '' ?>"><i class="fa-solid fa-bell-concierge"></i><span class="nav-label">Front Desk</span></a>
       <a href="clients.php" title="Clients" class="<?= $activeNav === 'clients' && $navClass === '' ? 'active' : '' ?>" data-nav-clients><i class="fa-solid fa-users"></i><span class="nav-label">Clients</span></a>
       <a href="inbox.php" title="Inbox" class="<?= $activeNav === 'inbox' ? 'active' : '' ?>">
         <i class="fa-solid fa-inbox"></i><span class="nav-label">Inbox</span>
