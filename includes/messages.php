@@ -66,7 +66,10 @@ function staffConversationList(): array
         last.id AS last_message_id, last.body AS last_body,
         last.sender_type AS last_sender_type, last.channel AS last_channel, last.created_at AS last_at,
         (SELECT COUNT(*) FROM messages u
-          WHERE u.client_id = c.id AND u.sender_type = 'client' AND u.id > c.staff_messages_seen_id AND u.is_history = 0) AS unread_count
+          WHERE u.client_id = c.id AND u.sender_type = 'client' AND u.id > c.staff_messages_seen_id AND u.is_history = 0) AS unread_count,
+        (SELECT GROUP_CONCAT(DISTINCT ch.channel) FROM messages ch WHERE ch.client_id = c.id) AS channels,
+        (SELECT rc.channel FROM messages rc WHERE rc.client_id = c.id AND rc.sender_type = 'client'
+          ORDER BY rc.created_at DESC, rc.id DESC LIMIT 1) AS reply_channel
       FROM clients c
       JOIN messages last ON last.id = (SELECT id FROM messages WHERE client_id = c.id ORDER BY created_at DESC, id DESC LIMIT 1)
       LEFT JOIN processors pr ON pr.id = c.processor_id
@@ -87,10 +90,11 @@ function staffConversationsForJson(): array
         'last_at'      => $c['last_at'],
         'channel'      => $c['last_channel'],
         'unread_count' => (int)$c['unread_count'],
-        // Channels this thread has messages on, for the Inbox tabs. Portal
-        // is the only one live so far; the WhatsApp channel (branch
-        // `whatsapp`) fills this from messages.channel.
-        'channels'     => ['portal'],
+        // Channels this thread has messages on, for the Inbox tabs.
+        'channels'     => array_values(array_filter(explode(',', (string)$c['channels']))) ?: ['portal'],
+        // Where a reply goes by default: the channel the client last wrote
+        // on (same rule as the Inbox composer, waPreferredChannel()).
+        'reply_channel' => $c['reply_channel'] === 'whatsapp' ? 'whatsapp' : 'portal',
     ], staffConversationList());
 }
 
@@ -102,7 +106,7 @@ function messageChannels(): array
 {
     return [
         'portal'    => ['label' => 'Portal',    'icon' => 'fa-solid fa-globe',               'connected' => true],
-        'whatsapp'  => ['label' => 'WhatsApp',  'icon' => 'fa-brands fa-whatsapp',          'connected' => false],
+        'whatsapp'  => ['label' => 'WhatsApp',  'icon' => 'fa-brands fa-whatsapp',          'connected' => defined('WA_API_KEY') && WA_API_KEY !== ''],
         'messenger' => ['label' => 'Messenger', 'icon' => 'fa-brands fa-facebook-messenger', 'connected' => false],
         'instagram' => ['label' => 'Instagram', 'icon' => 'fa-brands fa-instagram',         'connected' => false],
     ];

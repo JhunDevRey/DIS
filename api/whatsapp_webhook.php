@@ -1,15 +1,15 @@
 <?php
 /**
  * api/whatsapp_webhook.php
- * The URL Meta calls for WhatsApp events (incoming messages, delivery
- * receipts, office-phone echoes, history import). No login here — every
- * POST is instead checked against Meta's signature (WA_APP_SECRET), and
- * anything unsigned or mis-signed is rejected before it's even parsed.
+ * The URL 360dialog calls for WhatsApp events (incoming messages, delivery
+ * receipts, office-phone echoes, history import) — same JSON as Meta's
+ * Cloud API webhooks. No login here: every POST must carry the secret
+ * X-DIS-Webhook-Token header (WA_WEBHOOK_TOKEN, registered with 360dialog
+ * by cron/wa_set_webhook.php); anything else is rejected before parsing.
  *
- *   GET  hub.mode=subscribe&hub.verify_token=…&hub.challenge=…  -> Meta's one-time URL check
- *   POST (signed JSON)                                           -> see waProcessWebhook()
+ *   POST (JSON + X-DIS-Webhook-Token)  -> see waProcessWebhook()
  *
- * Meta wants a 200 within a few seconds and retries otherwise, so the
+ * 360dialog wants a 200 within 5 seconds and retries otherwise, so the
  * response is sent first and the work (media downloads etc.) happens
  * after. Retries are harmless anyway: wa_message_id is unique.
  */
@@ -23,30 +23,19 @@ if (!waEnabled()) {
     exit;
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    $verify = defined('WA_VERIFY_TOKEN') ? WA_VERIFY_TOKEN : '';
-    if (($_GET['hub_mode'] ?? '') === 'subscribe' && $verify !== ''
-        && hash_equals($verify, (string)($_GET['hub_verify_token'] ?? ''))) {
-        header('Content-Type: text/plain');
-        echo (string)($_GET['hub_challenge'] ?? '');
-        exit;
-    }
-    http_response_code(403);
-    exit;
-}
-
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     exit;
 }
 
-$raw = file_get_contents('php://input');
-$secret = defined('WA_APP_SECRET') ? WA_APP_SECRET : '';
-$signature = $_SERVER['HTTP_X_HUB_SIGNATURE_256'] ?? '';
-if ($secret === '' || !hash_equals('sha256=' . hash_hmac('sha256', $raw, $secret), $signature)) {
+$token = defined('WA_WEBHOOK_TOKEN') ? (string)WA_WEBHOOK_TOKEN : '';
+$given = (string)($_SERVER['HTTP_X_DIS_WEBHOOK_TOKEN'] ?? '');
+if (strlen($token) < 32 || !hash_equals($token, $given)) {
     http_response_code(401);
     exit;
 }
+
+$raw = file_get_contents('php://input');
 
 $payload = json_decode($raw, true);
 if (!is_array($payload)) {
@@ -58,7 +47,7 @@ $db = getDb();
 $db->prepare('INSERT INTO whatsapp_webhook_log (payload) VALUES (?)')->execute([$raw]);
 $logId = (int)$db->lastInsertId();
 
-// Answer Meta now; keep working after the connection closes.
+// Answer 360dialog now; keep working after the connection closes.
 ignore_user_abort(true);
 set_time_limit(300);
 http_response_code(200);

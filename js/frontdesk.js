@@ -138,19 +138,40 @@
     replyFor = clientId;
     row.classList.add('replying');
     const first = String(conv.full_name).trim().split(/\s+/)[0];
+    // WhatsApp on: reply on the channel the client last wrote on (staff
+    // can switch). The server falls back to the portal when it can't send
+    // on WhatsApp, and says so in the toast.
+    const waOn = list.dataset.wa === '1';
+    const via = waOn && conv.reply_channel === 'whatsapp' ? 'whatsapp' : 'portal';
+    const viaHtml = waOn ? `<label class="fd-reply-via"><select aria-label="Send via">
+          <option value="portal"${via === 'portal' ? ' selected' : ''}>Portal</option>
+          <option value="whatsapp"${via === 'whatsapp' ? ' selected' : ''}>WhatsApp</option>
+        </select></label>` : '';
     const box = document.createElement('form');
     box.className = 'fd-reply';
     box.innerHTML = `
       <textarea rows="2" maxlength="${MESSAGE_MAX_LENGTH}" placeholder="Reply to ${esc(first)}…" aria-label="Reply to ${esc(conv.full_name)}"></textarea>
       <div class="fd-reply-bar">
         <label class="fd-reply-as"><i class="fa-solid fa-user-pen"></i><select aria-label="Sending as">${senderOptions()}</select></label>
-        <button type="button" class="btn btn-ghost btn-sm" data-cancel>Cancel</button>
-        <button type="submit" class="btn btn-gold btn-sm"><i class="fa-solid fa-paper-plane"></i> Send</button>
+        ${viaHtml}
+        <span class="fd-reply-actions">
+          <button type="button" class="btn btn-ghost btn-sm" data-cancel>Cancel</button>
+          <button type="submit" class="btn btn-gold btn-sm"><i class="fa-solid fa-paper-plane"></i> Send</button>
+        </span>
       </div>
-      <div class="fd-reply-note"><span class="fd-reply-hint">Ctrl + Enter to send · </span>Goes to their portal Messages; they get an email notice to log in.</div>`;
+      <div class="fd-reply-note"><span class="fd-reply-hint">Ctrl + Enter to send · </span><span data-via-note></span></div>`;
     row.appendChild(box);
     const ta = box.querySelector('textarea');
-    const sel = box.querySelector('select');
+    const sel = box.querySelector('.fd-reply-as select');
+    const viaSel = box.querySelector('.fd-reply-via select');
+    const note = box.querySelector('[data-via-note]');
+    const setNote = () => {
+      note.textContent = viaSel && viaSel.value === 'whatsapp'
+        ? 'Goes to their WhatsApp (within 24h of their last WhatsApp; otherwise portal + a WhatsApp notice).'
+        : 'Goes to their portal Messages; they get an email notice to log in.';
+    };
+    setNote();
+    if (viaSel) viaSel.addEventListener('change', setNote);
     ta.value = replyDraft;
     const grow = () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 180) + 'px'; };
     grow();
@@ -175,8 +196,10 @@
     fd.append('action', 'send');
     fd.append('client_id', conv.client_id);
     fd.append('body', text);
-    const sel = box.querySelector('select');
+    const sel = box.querySelector('.fd-reply-as select');
     if (sel.value) fd.append('sender_id', sel.value);
+    const viaSel = box.querySelector('.fd-reply-via select');
+    if (viaSel) fd.append('channel', viaSel.value);
     try {
       const res = await fetch('api/admin_messages.php', { method: 'POST', body: fd });
       const out = await res.json();
@@ -191,7 +214,8 @@
         await fetch('api/admin_messages.php', { method: 'POST', body: seen }).catch(() => {});
       }
       closeReply();
-      showToast(`Sent to ${conv.full_name}.`);
+      // WhatsApp sends explain what happened (sent / fell back to portal).
+      showToast(viaSel && out.message && out.message !== 'Message sent.' ? out.message : `Sent to ${conv.full_name}.`);
       refresh();
     } catch (err) {
       showToast('Could not send — check your connection and try again.', true);

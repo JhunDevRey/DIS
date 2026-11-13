@@ -2780,10 +2780,12 @@ button.msg-edited:hover { color: var(--ink); text-decoration: underline; }
   background: var(--surface-alt); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 9px 11px; outline: none;
 }
 .fd-reply textarea:focus { border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-tint); }
-.fd-reply-bar { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
-.fd-reply-as { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); min-width: 0; flex: 1 1 0; }
+.fd-reply-bar { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.fd-reply-as { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); min-width: 120px; flex: 1 1 0; }
 .fd-reply-as select { flex: 1 1 auto; width: 0; }
-.fd-reply-bar .btn { flex-shrink: 0; }
+/* Cancel + Send stay together; they drop to their own line (right-aligned)
+   when the Portal / WhatsApp pick takes the room. */
+.fd-reply-actions { display: flex; gap: 8px; margin-left: auto; flex-shrink: 0; }
 .fd-reply-as select {
   min-width: 0; max-width: 100%; font: inherit; font-size: 12px; color: var(--text);
   background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px;
@@ -2793,4 +2795,11 @@ button.msg-edited:hover { color: var(--ink); text-decoration: underline; }
   .fd-reply { padding-left: 16px; }
   .fd-reply-hint { display: none; }
   .fd-reply textarea { font-size: 16px; } /* no iOS zoom-on-focus */
+}
+
+/* Front Desk quick reply: Portal / WhatsApp pick (only when WhatsApp is on) */
+.fd-reply-via { flex-shrink: 0; }
+.fd-reply-via select {
+  font: inherit; font-size: 12px; color: var(--text);
+  background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px;
 }

@@ -2,8 +2,10 @@
 /**
  * includes/whatsapp.php
  * WhatsApp channel for Messages, via Meta's WhatsApp Business Platform
- * (Cloud API, ideally in Coexistence mode so the office phone keeps
- * working). WhatsApp messages live in the same per-client thread as
+ * (Cloud API in Coexistence mode, so the office phone keeps working),
+ * reached through 360dialog: same request/webhook format as Meta's Cloud
+ * API, but a different host and a D360-API-KEY header instead of a Meta
+ * token — so no Meta developer app is needed. WhatsApp messages live in the same per-client thread as
  * portal messages (messages.channel = 'whatsapp') — see
  * sql/migration_whatsapp.sql.
  *
@@ -20,19 +22,21 @@ require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 require_once __DIR__ . '/messages.php';
 
-/** WhatsApp is on only once the Meta settings are filled in config.php. */
+/** WhatsApp is on only once the 360dialog API key is filled in config.php. */
 function waEnabled(): bool
 {
-    return defined('WA_PHONE_NUMBER_ID') && WA_PHONE_NUMBER_ID !== ''
-        && defined('WA_ACCESS_TOKEN') && WA_ACCESS_TOKEN !== '';
+    return defined('WA_API_KEY') && WA_API_KEY !== '';
 }
 
-function waGraphUrl(string $path): string
+function waApiBase(): string
 {
-    $version = defined('WA_GRAPH_VERSION') && WA_GRAPH_VERSION ? WA_GRAPH_VERSION : 'v23.0';
-    // WA_GRAPH_BASE exists only so tests can point at a local fake API.
-    $base = defined('WA_GRAPH_BASE') && WA_GRAPH_BASE ? rtrim(WA_GRAPH_BASE, '/') : 'https://graph.facebook.com';
-    return $base . '/' . $version . '/' . ltrim($path, '/');
+    // WA_API_BASE exists only so tests can point at a local fake API.
+    return defined('WA_API_BASE') && WA_API_BASE ? rtrim(WA_API_BASE, '/') : 'https://waba-v2.360dialog.io';
+}
+
+function waApiUrl(string $path): string
+{
+    return waApiBase() . '/' . ltrim($path, '/');
 }
 
 // ---------- Phone numbers ----------
@@ -142,16 +146,17 @@ function waPreferredChannel(int $clientId): string
     return $stmt->fetchColumn() === 'whatsapp' ? 'whatsapp' : 'portal';
 }
 
-// ---------- Graph API calls ----------
+// ---------- 360dialog (Cloud API) calls ----------
 
 /**
- * One Graph API request. Returns the decoded JSON on success; throws
- * RuntimeException with Meta's own error text (and code) on failure.
+ * One API request. Returns the decoded JSON on success; throws
+ * RuntimeException with Meta's own error text (and code) on failure —
+ * 360dialog passes Meta's error objects through unchanged.
  */
 function waApi(string $method, string $path, ?array $json = null, ?array $multipart = null): array
 {
-    $ch = curl_init(waGraphUrl($path));
-    $headers = ['Authorization: Bearer ' . WA_ACCESS_TOKEN];
+    $ch = curl_init(waApiUrl($path));
+    $headers = ['D360-API-KEY: ' . WA_API_KEY];
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_CUSTOMREQUEST  => $method,
@@ -184,7 +189,7 @@ function waApi(string $method, string $path, ?array $json = null, ?array $multip
 
 function waSend(string $to, array $payload): string
 {
-    $data = waApi('POST', WA_PHONE_NUMBER_ID . '/messages', array_merge([
+    $data = waApi('POST', 'messages', array_merge([
         'messaging_product' => 'whatsapp',
         'recipient_type'    => 'individual',
         'to'                => $to,
@@ -203,7 +208,7 @@ function waSendText(string $to, string $body): string
 function waSendFile(string $to, string $path, string $originalName): string
 {
     $mime = mimeTypeForExtension($originalName);
-    $upload = waApi('POST', WA_PHONE_NUMBER_ID . '/media', null, [
+    $upload = waApi('POST', 'media', null, [
         'messaging_product' => 'whatsapp',
         'type'              => $mime,
         'file'              => new CURLFile($path, $mime, $originalName),
@@ -243,11 +248,17 @@ function waDownloadMedia(string $mediaId, string $waMessageId, ?string $filename
         $stored = 'wa_' . substr(sha1($waMessageId), 0, 16) . '_' . time() . '_' . sanitizeFilename($original);
         $path = MESSAGE_UPLOAD_DIR . '/' . $stored;
 
+        // Meta hands back a lookaside.fbsbx.com link; through 360dialog the
+        // same path + query is fetched from their host with the API key.
+        $parts = parse_url((string)($info['url'] ?? ''));
+        if (empty($parts['path'])) return null;
+        $url = waApiBase() . $parts['path'] . (isset($parts['query']) ? '?' . $parts['query'] : '');
+
         $fh = fopen($path, 'wb');
-        $ch = curl_init($info['url']);
+        $ch = curl_init($url);
         curl_setopt_array($ch, [
             CURLOPT_FILE           => $fh,
-            CURLOPT_HTTPHEADER     => ['Authorization: Bearer ' . WA_ACCESS_TOKEN],
+            CURLOPT_HTTPHEADER     => ['D360-API-KEY: ' . WA_API_KEY],
             CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_TIMEOUT        => 120,
             CURLOPT_FAILONERROR    => true,
@@ -440,11 +451,6 @@ function waProcessWebhook(array $payload): void
         foreach ($entry['changes'] ?? [] as $change) {
             $field = $change['field'] ?? '';
             $value = $change['value'] ?? [];
-
-            // Only the office number configured here — ignore any other
-            // number that might share the Meta app.
-            $phoneId = (string)($value['metadata']['phone_number_id'] ?? '');
-            if ($phoneId !== '' && $phoneId !== WA_PHONE_NUMBER_ID) continue;
 
             if ($field === 'messages') {
                 $names = [];

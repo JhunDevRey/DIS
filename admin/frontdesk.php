@@ -81,7 +81,7 @@ $comingWindows = [
           </div>
           <label class="fd-unread-toggle"><input type="checkbox" id="fdUnreadOnly"> Unread</label>
         </div>
-        <ul class="fd-list" id="fdMsgList"></ul>
+        <ul class="fd-list" id="fdMsgList" data-wa="<?= messageChannels()['whatsapp']['connected'] ? '1' : '0' ?>"></ul>
         <footer>
           <a href="inbox.php">Open Inbox →</a>
           <a href="inbox.php" class="btn btn-ghost btn-sm"><i class="fa-regular fa-paper-plane"></i> New message</a>

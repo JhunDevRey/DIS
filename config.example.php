@@ -129,23 +129,19 @@ define('PORTAL_APP_URL', 'https://portal.duqueimmigration.ca');
 // built separately — it is not currently persisted to this app's storage.
 define('ADOBE_PDF_EMBED_CLIENT_ID', '');
 
-// ---- WhatsApp (Meta WhatsApp Business Platform / Cloud API) ----
-// Leave WA_PHONE_NUMBER_ID empty to keep WhatsApp switched off — the
-// Inbox then works exactly as before. Values come from the Meta app
-// (WhatsApp > API Setup, and App settings > Basic for the app secret).
-//   WA_ACCESS_TOKEN   a permanent System User token, never the 24h test token
-//   WA_APP_SECRET     signs every webhook call; unsigned calls are rejected
-//   WA_VERIFY_TOKEN   any long random string — typed into Meta's webhook
-//                     setup too, so Meta can prove the webhook URL is ours
+// ---- WhatsApp (via 360dialog, Coexistence with the office WhatsApp Business app) ----
+// Leave WA_API_KEY empty to keep WhatsApp switched off — the Inbox then
+// works exactly as before. See docs/WHATSAPP_SETUP.md.
+//   WA_API_KEY          the 360dialog API key for the office number (Hub -> API keys)
+//   WA_BUSINESS_NUMBER  the office number, digits only, e.g. 12045551234
+//   WA_WEBHOOK_TOKEN    32+ random characters; 360dialog sends it with every
+//                       webhook call (cron/wa_set_webhook.php registers it)
 //   WA_NOTICE_TEMPLATE  approved template sent instead of the message
-//                     when the client hasn't written on WhatsApp in 24h
-//                     (body with one variable: {{1}} = client first name)
-define('WA_PHONE_NUMBER_ID', '');
-define('WA_BUSINESS_NUMBER', '');      // the office number, digits only, e.g. 12045551234
-define('WA_ACCESS_TOKEN', '');
-define('WA_APP_SECRET', '');
-define('WA_VERIFY_TOKEN', '');
-define('WA_GRAPH_VERSION', 'v23.0');
+//                       when the 24h reply window has closed
+//                       (body with one variable: {{1}} = client first name)
+define('WA_API_KEY', '');
+define('WA_BUSINESS_NUMBER', '');
+define('WA_WEBHOOK_TOKEN', '');
 define('WA_NOTICE_TEMPLATE', '');      // e.g. portal_message_notice
 define('WA_NOTICE_TEMPLATE_LANG', 'en');
 
