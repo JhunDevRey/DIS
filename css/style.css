@@ -2699,3 +2699,35 @@ button.msg-edited:hover { color: var(--ink); text-decoration: underline; }
 .conv-not-connected { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 36px 20px; line-height: 1.5; }
 .conv-not-connected i { font-size: 26px; margin-bottom: 4px; opacity: .8; }
 .conv-not-connected strong { color: var(--ink); font-size: 13.5px; }
+
+/* ---------- Front Desk quick reply ---------- */
+.fd-row { position: relative; }
+.fd-row > .fd-item { padding-right: 52px; }
+.fd-reply-btn {
+  position: absolute; right: 12px; top: 10px; width: 30px; height: 30px; border-radius: 50%;
+  border: 1px solid var(--line); background: var(--card); color: var(--text-muted); cursor: pointer;
+  display: flex; align-items: center; justify-content: center; font-size: 12px;
+  transition: all var(--ease);
+}
+.fd-reply-btn:hover, .fd-row.replying .fd-reply-btn { color: #fff; background: var(--gold-fill, var(--gold)); border-color: transparent; }
+.fd-reply { padding: 0 16px 12px 60px; }
+.fd-reply textarea {
+  width: 100%; box-sizing: border-box; resize: none; min-height: 58px;
+  font: inherit; font-size: 13.5px; line-height: 1.5; color: var(--text);
+  background: var(--surface-alt); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 9px 11px; outline: none;
+}
+.fd-reply textarea:focus { border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-tint); }
+.fd-reply-bar { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.fd-reply-as { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); min-width: 0; flex: 1 1 0; }
+.fd-reply-as select { flex: 1 1 auto; width: 0; }
+.fd-reply-bar .btn { flex-shrink: 0; }
+.fd-reply-as select {
+  min-width: 0; max-width: 100%; font: inherit; font-size: 12px; color: var(--text);
+  background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px;
+}
+.fd-reply-note { font-size: 11.5px; color: var(--text-muted); margin-top: 6px; }
+@media (max-width: 768px) {
+  .fd-reply { padding-left: 16px; }
+  .fd-reply-hint { display: none; }
+  .fd-reply textarea { font-size: 16px; } /* no iOS zoom-on-focus */
+}

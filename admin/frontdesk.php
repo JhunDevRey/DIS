@@ -13,6 +13,8 @@ $frontDeskData = [
     'clients'       => staffClientDirectory(),
     'unread_total'  => staffUnreadConversationCount(),
 ];
+// "Sending as" names for quick replies (same list as the Inbox composer).
+$staffSenders = getDb()->query('SELECT id, full_name FROM processors WHERE is_active = 1 ORDER BY full_name ASC')->fetchAll();
 
 // Windows whose integrations aren't built yet — shown so staff know
 // what's coming, each says where its data will come from.
@@ -104,6 +106,7 @@ $comingWindows = [
 </div>
 <div id="toast"></div>
 <script id="fdData" type="application/json"><?= json_encode($frontDeskData, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
+<script id="fdSenders" type="application/json"><?= json_encode(array_map(fn($s) => ['id' => (int)$s['id'], 'name' => $s['full_name']], $staffSenders), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
 <script src="js/ui-kit.js?v=<?= assetVersion('js/ui-kit.js') ?>"></script>
 <script src="js/frontdesk.js?v=<?= assetVersion('js/frontdesk.js') ?>"></script>
 </body>

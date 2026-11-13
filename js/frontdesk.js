@@ -12,6 +12,13 @@
   let data = JSON.parse(document.getElementById('fdData').textContent);
   let channel = 'all';
   const STATE_KEY = 'duqueFrontDeskMsg';
+  const SEND_AS_KEY = 'duqueMsgSendAs'; // shared with the Inbox composer
+  const MESSAGE_MAX_LENGTH = 5000;
+  const senders = JSON.parse(document.getElementById('fdSenders').textContent || '[]');
+  // Quick reply: the conversation whose reply box is open, and its draft
+  // (kept so a tab switch or list refresh doesn't lose what was typed).
+  let replyFor = 0;
+  let replyDraft = '';
 
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const initial = (name) => (String(name || '?').trim()[0] || '?').toUpperCase();
@@ -91,7 +98,7 @@
     }
     list.innerHTML = rows.map(conv => {
       const isUnread = conv.unread_count > 0;
-      return `<li><a class="fd-item${isUnread ? ' unread' : ''}" href="inbox.php?client_id=${conv.client_id}">
+      return `<li class="fd-row" data-client-id="${conv.client_id}"><a class="fd-item${isUnread ? ' unread' : ''}" href="inbox.php?client_id=${conv.client_id}">
         <span class="fd-dot"${isUnread ? '' : ' hidden'}></span>
         <span class="avatar">${esc(initial(conv.full_name))}</span>
         <span class="fd-main">
@@ -99,9 +106,106 @@
           <span class="fd-sub">${esc(conv.preview)}</span>
         </span>
         <span class="fd-time">${esc(timeAgo(conv.last_at))}</span>
-      </a></li>`;
+      </a><button type="button" class="fd-reply-btn" data-reply="${conv.client_id}" title="Quick reply to ${esc(conv.full_name)}" aria-label="Quick reply to ${esc(conv.full_name)}"><i class="fa-solid fa-reply"></i></button></li>`;
     }).join('');
+    if (replyFor) {
+      if (list.querySelector(`.fd-row[data-client-id="${replyFor}"]`)) openReply(replyFor, false);
+      else { replyFor = 0; replyDraft = ''; }
+    }
   }
+
+  // ---- Quick reply ----
+  function senderOptions() {
+    let saved = '';
+    try { saved = localStorage.getItem(SEND_AS_KEY) || ''; } catch (e) {}
+    return `<option value="">Duque Immigration (team)</option>` + senders.map(s =>
+      `<option value="${s.id}"${String(s.id) === saved ? ' selected' : ''}>${esc(s.name)}</option>`).join('');
+  }
+
+  function closeReply() {
+    replyFor = 0;
+    replyDraft = '';
+    list.querySelectorAll('.fd-reply').forEach(el => el.remove());
+    list.querySelectorAll('.fd-row.replying').forEach(el => el.classList.remove('replying'));
+  }
+
+  function openReply(clientId, focus = true) {
+    list.querySelectorAll('.fd-reply').forEach(el => el.remove());
+    list.querySelectorAll('.fd-row.replying').forEach(el => el.classList.remove('replying'));
+    const row = list.querySelector(`.fd-row[data-client-id="${clientId}"]`);
+    const conv = data.conversations.find(c => c.client_id === clientId);
+    if (!row || !conv) return;
+    replyFor = clientId;
+    row.classList.add('replying');
+    const first = String(conv.full_name).trim().split(/\s+/)[0];
+    const box = document.createElement('form');
+    box.className = 'fd-reply';
+    box.innerHTML = `
+      <textarea rows="2" maxlength="${MESSAGE_MAX_LENGTH}" placeholder="Reply to ${esc(first)}…" aria-label="Reply to ${esc(conv.full_name)}"></textarea>
+      <div class="fd-reply-bar">
+        <label class="fd-reply-as"><i class="fa-solid fa-user-pen"></i><select aria-label="Sending as">${senderOptions()}</select></label>
+        <button type="button" class="btn btn-ghost btn-sm" data-cancel>Cancel</button>
+        <button type="submit" class="btn btn-gold btn-sm"><i class="fa-solid fa-paper-plane"></i> Send</button>
+      </div>
+      <div class="fd-reply-note"><span class="fd-reply-hint">Ctrl + Enter to send · </span>Goes to their portal Messages; they get an email notice to log in.</div>`;
+    row.appendChild(box);
+    const ta = box.querySelector('textarea');
+    const sel = box.querySelector('select');
+    ta.value = replyDraft;
+    const grow = () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 180) + 'px'; };
+    grow();
+    ta.addEventListener('input', () => { replyDraft = ta.value; grow(); });
+    ta.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); box.requestSubmit(); }
+      else if (e.key === 'Escape') { e.preventDefault(); closeReply(); }
+    });
+    sel.addEventListener('change', () => { try { localStorage.setItem(SEND_AS_KEY, sel.value); } catch (e) {} });
+    box.querySelector('[data-cancel]').addEventListener('click', closeReply);
+    box.addEventListener('submit', (e) => { e.preventDefault(); sendReply(box, conv); });
+    if (focus) { ta.focus(); box.scrollIntoView({ block: 'nearest' }); }
+  }
+
+  async function sendReply(box, conv) {
+    const ta = box.querySelector('textarea');
+    const text = ta.value.trim();
+    if (!text) { ta.focus(); return; }
+    const btn = box.querySelector('[type=submit]');
+    btn.disabled = true;
+    const fd = new FormData();
+    fd.append('action', 'send');
+    fd.append('client_id', conv.client_id);
+    fd.append('body', text);
+    const sel = box.querySelector('select');
+    if (sel.value) fd.append('sender_id', sel.value);
+    try {
+      const res = await fetch('api/admin_messages.php', { method: 'POST', body: fd });
+      const out = await res.json();
+      if (!out.success) { showToast(out.message || 'Could not send the message.', true); btn.disabled = false; return; }
+      // Replying answers everything before it, so the conversation is read.
+      const sent = out.messages && out.messages[out.messages.length - 1];
+      if (sent && conv.unread_count) {
+        const seen = new FormData();
+        seen.append('action', 'seen');
+        seen.append('client_id', conv.client_id);
+        seen.append('up_to_id', sent.id);
+        await fetch('api/admin_messages.php', { method: 'POST', body: seen }).catch(() => {});
+      }
+      closeReply();
+      showToast(`Sent to ${conv.full_name}.`);
+      refresh();
+    } catch (err) {
+      showToast('Could not send — check your connection and try again.', true);
+      btn.disabled = false;
+    }
+  }
+
+  list.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-reply]');
+    if (!btn) return;
+    const id = Number(btn.dataset.reply);
+    if (replyFor === id) closeReply();
+    else { replyDraft = ''; openReply(id); }
+  });
 
   tabs.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-channel]');
@@ -118,7 +222,8 @@
       const fresh = await res.json();
       if (!fresh.success) return;
       data = fresh;
-      renderMessages();
+      const typing = replyFor && list.contains(document.activeElement) && document.activeElement.closest('.fd-reply');
+      if (!typing) renderMessages();
       const badge = document.getElementById('navInboxBadge');
       if (badge) {
         badge.textContent = fresh.unread_total;
