@@ -405,9 +405,11 @@ function validateMessageAttachments(array $files): ?string
 /**
  * Saves a message (and its already-validated attachments) in one
  * transaction. Returns the new message id. Throws on failure — callers
- * catch and respond with JSON.
+ * catch and respond with JSON. $markSeen = false leaves the sender's read
+ * marker alone (Front Desk replies, which mustn't mark unread portal
+ * messages as read for the Processing Inbox).
  */
-function createMessage(int $clientId, string $senderType, string $senderName, string $body, array $files, int $replyToId = 0): int
+function createMessage(int $clientId, string $senderType, string $senderName, string $body, array $files, int $replyToId = 0, bool $markSeen = true): int
 {
     $db = getDb();
     // A reply can only quote a message from this same conversation;
@@ -441,9 +443,11 @@ function createMessage(int $clientId, string $senderType, string $senderName, st
         }
 
         // Sending a message means you've seen the conversation up to it.
-        $seenColumn = $senderType === 'admin' ? 'staff_messages_seen_id' : 'client_messages_seen_id';
-        $db->prepare("UPDATE clients SET {$seenColumn} = GREATEST({$seenColumn}, ?) WHERE id = ?")
-           ->execute([$messageId, $clientId]);
+        if ($markSeen) {
+            $seenColumn = $senderType === 'admin' ? 'staff_messages_seen_id' : 'client_messages_seen_id';
+            $db->prepare("UPDATE clients SET {$seenColumn} = GREATEST({$seenColumn}, ?) WHERE id = ?")
+               ->execute([$messageId, $clientId]);
+        }
 
         $db->commit();
         return $messageId;

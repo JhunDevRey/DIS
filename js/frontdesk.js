@@ -198,6 +198,7 @@
     const sel = box.querySelector('.fd-reply-as select');
     if (sel.value) fd.append('sender_id', sel.value);
     fd.append('channel', 'whatsapp');
+    fd.append('from', 'frontdesk');
     try {
       const res = await fetch('api/admin_messages.php', { method: 'POST', body: fd });
       const out = await res.json();
