@@ -2,11 +2,13 @@
 /**
  * api/admin_messages.php
  * Staff side of Messages.
- *   GET  ?list=1                       -> conversation list + unread total (inbox sidebar refresh)
- *   GET  ?list=1&scope=frontdesk       -> same, social channels only (Front Desk Messaging window)
+ * Every call takes scope=portal (Processing Inbox, the default) or
+ * scope=social (Front Desk chats: WhatsApp, Messenger, Instagram, TikTok);
+ * lists, threads and read markers only ever cover that scope.
+ *   GET  ?list=1                       -> conversation list + unread total (sidebar badge refresh)
  *   GET  ?client_id=N&after_id=M       -> messages in one conversation newer than M (polling)
- *   POST action=send, client_id, body, attachments[], reply_to_id?, channel=portal|whatsapp -> send a message
- *        (from=frontdesk: don't mark the thread read; the Front Desk decides that itself)
+ *   POST action=send, client_id, body, attachments[], reply_to_id? -> send a message
+ *        (portal scope: in the portal; social scope: on WhatsApp)
  *   POST action=seen, client_id, up_to_id             -> mark conversation read
  *   POST action=edit, client_id, message_id, body     -> edit a staff message (within 2h)
  *   GET  ?client_id=N&history=ID                      -> earlier versions of an edited message
@@ -22,15 +24,17 @@ require_once __DIR__ . '/../includes/whatsapp.php';
 requireAdmin();
 
 $db = getDb();
+$scope = messageScope($_GET['scope'] ?? $_POST['scope'] ?? null);
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     if (!empty($_GET['list'])) {
-        $frontDesk = ($_GET['scope'] ?? '') === 'frontdesk';
+        // Unmatched WhatsApp numbers wait in the Front Desk chats.
+        $waUnmatched = $scope === 'social' && waEnabled() ? waUnmatchedCount() : 0;
         jsonResponse(true, '', [
-            'conversations' => $frontDesk ? frontDeskConversationsForJson() : staffConversationsForJson(),
+            'conversations' => staffConversationsForJson($scope),
             'clients'       => staffClientDirectory(),
-            'unread_total'  => staffUnreadConversationCount() + (waEnabled() ? waUnmatchedCount() : 0),
-            'wa_unmatched'  => waEnabled() ? waUnmatchedCount() : 0,
+            'unread_total'  => staffUnreadConversationCount($scope) + $waUnmatched,
+            'wa_unmatched'  => $waUnmatched,
         ]);
     }
 
@@ -51,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $statuses = array_map(fn($r) => ['id' => (int)$r['id'], 'wa_status' => $r['wa_status'], 'wa_error' => $r['wa_error']], $stmt->fetchAll());
     }
     jsonResponse(true, '', [
-        'messages'    => messagesForJson(fetchMessages($clientId, $afterId), 'admin'),
+        'messages'    => messagesForJson(fetchMessages($clientId, $afterId, $scope), 'admin'),
         'edits'       => recentMessageEdits($clientId, 'admin'),
         'wa_statuses' => $statuses,
     ]);
@@ -79,7 +83,7 @@ if (!$client) {
 }
 
 if ($action === 'seen') {
-    markMessagesSeen($clientId, 'admin', (int)($_POST['up_to_id'] ?? 0));
+    markMessagesSeen($clientId, 'admin', (int)($_POST['up_to_id'] ?? 0), $scope);
     jsonResponse(true);
 }
 
@@ -158,18 +162,18 @@ $alreadyNotified = (int)$stmt->fetchColumn() > 0;
 $senderName = inboxActorName($db);
 
 try {
-    $messageId = createMessage($clientId, 'admin', $senderName, $body, $files, (int)($_POST['reply_to_id'] ?? 0),
-        ($_POST['from'] ?? '') !== 'frontdesk');
+    $messageId = createMessage($clientId, 'admin', $senderName, $body, $files, (int)($_POST['reply_to_id'] ?? 0), $scope);
 } catch (Throwable $e) {
     error_log('admin_messages send failed: ' . $e->getMessage());
     jsonResponse(false, 'Could not send the message. Please try again.');
 }
 
-// WhatsApp: the message is saved first (so it's never lost), then sent.
-// If it can't go on WhatsApp it stays a portal message — see waDeliverStaffMessage().
+// Front Desk chats send on WhatsApp: the message is saved first (so it's
+// never lost), then sent. If it can't go on WhatsApp it stays a portal
+// message (and moves to the Processing Inbox) — see waDeliverStaffMessage().
 $note = 'Message sent.';
 $channel = 'portal';
-if (($_POST['channel'] ?? '') === 'whatsapp' && waEnabled()) {
+if ($scope === 'social' && waEnabled()) {
     $stmt = $db->prepare('SELECT original_name, stored_name FROM message_files WHERE message_id = ? ORDER BY id ASC');
     $stmt->execute([$messageId]);
     $note = waDeliverStaffMessage($messageId, $client, $body, $stmt->fetchAll());
@@ -183,4 +187,4 @@ if ($channel === 'portal' && !$alreadyNotified) {
     notifyClientNewMessage($client, $senderName);
 }
 
-jsonResponse(true, $note, ['messages' => messagesForJson(fetchMessages($clientId, $messageId - 1), 'admin')]);
+jsonResponse(true, $note, ['messages' => messagesForJson(fetchMessages($clientId, $messageId - 1, $scope), 'admin')]);

@@ -60,7 +60,7 @@ function requireOwner(): void
         jsonResponse(false, 'Only an owner can do that.');
     }
     echo '<!DOCTYPE html><meta charset="utf-8"><title>Owners only</title><body style="font-family:sans-serif;padding:40px">'
-       . '<h1>Owners only</h1><p>Only an owner account can open this page.</p><p><a href="frontdesk.php">Back to Front Desk</a></p>';
+       . '<h1>Owners only</h1><p>Only an owner account can open this page.</p><p><a href="clients.php">Back to Clients</a></p>';
     exit;
 }
 

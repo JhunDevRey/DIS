@@ -68,7 +68,7 @@ $client = $stmt->fetch();
 // Same 15-minute burst throttle as the staff side, for the processor email.
 $stmt = $db->prepare("
   SELECT COUNT(*) FROM messages
-  WHERE client_id = ? AND sender_type = 'client' AND id > ? AND created_at > NOW() - INTERVAL 15 MINUTE
+  WHERE client_id = ? AND sender_type = 'client' AND channel = 'portal' AND id > ? AND created_at > NOW() - INTERVAL 15 MINUTE
 ");
 $stmt->execute([$clientId, (int)$client['staff_messages_seen_id']]);
 $alreadyNotified = (int)$stmt->fetchColumn() > 0;

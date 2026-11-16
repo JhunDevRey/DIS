@@ -2,16 +2,22 @@
 // $activeNav should be set by the including page: 'frontdesk' | 'clients' | 'inbox' | 'processors' | 'staff' | 'activity' | 'profile'
 $activeNav = $activeNav ?? '';
 
-// Inbox badge = conversations with unread client messages. Wrapped so a
-// missing messages table (code deployed before the migration ran) can
-// never break every admin page — the badge just doesn't show.
-// Unmatched WhatsApp numbers count too: they need someone to link them.
+// Badges = conversations with unread client messages: portal ones on the
+// Processing Inbox, social ones (plus unmatched WhatsApp numbers waiting
+// to be linked) on the Front Desk. Wrapped so a missing table or column
+// (code deployed before a migration ran) can never break every admin
+// page — the badge just doesn't show.
 require_once __DIR__ . '/../includes/messages.php';
 require_once __DIR__ . '/../includes/whatsapp.php';
 try {
-    $navInboxUnread = staffUnreadConversationCount() + (waEnabled() ? waUnmatchedCount() : 0);
+    $navInboxUnread = staffUnreadConversationCount('portal');
 } catch (Throwable $e) {
     $navInboxUnread = 0;
+}
+try {
+    $navFrontDeskUnread = staffUnreadConversationCount('social') + (waEnabled() ? waUnmatchedCount() : 0);
+} catch (Throwable $e) {
+    $navFrontDeskUnread = 0;
 }
 
 // Class shortcuts (ClickUp "Spaces"-style) open the Clients list already
@@ -45,7 +51,7 @@ $navUserInitials = strtoupper(substr($navUserParts[0], 0, 1) . (count($navUserPa
       </a>
       <a href="processors.php" title="Processors" class="<?= $activeNav === 'processors' ? 'active' : '' ?>"><i class="fa-solid fa-user-tie"></i><span class="nav-label">Processors</span></a>
       <?php if ($navIsOwner): ?>
-      <a href="staff.php" title="Staff accounts" class="<?= $activeNav === 'staff' ? 'active' : '' ?>"><i class="fa-solid fa-users-gear"></i><span class="nav-label">Staff accounts</span></a>
+      <a href="staff.php" title="Accounts" class="<?= $activeNav === 'staff' ? 'active' : '' ?>"><i class="fa-solid fa-users-gear"></i><span class="nav-label">Accounts</span></a>
       <a href="activity.php" title="Activity" class="<?= $activeNav === 'activity' ? 'active' : '' ?>"><i class="fa-solid fa-clock-rotate-left"></i><span class="nav-label">Activity</span></a>
       <?php endif; ?>
       <a href="profile.php" title="My Profile" class="<?= $activeNav === 'profile' ? 'active' : '' ?>"><i class="fa-solid fa-id-badge"></i><span class="nav-label">My Profile</span></a>
@@ -64,7 +70,10 @@ $navUserInitials = strtoupper(substr($navUserParts[0], 0, 1) . (count($navUserPa
     <!-- Front desk work (social chats, bookings, contracts, PQ) sits apart
          from the processing pages above so processors aren't sent there. -->
     <nav class="nav-frontdesk" aria-label="Front desk">
-      <a href="frontdesk.php" title="Front Desk" class="<?= $activeNav === 'frontdesk' ? 'active' : '' ?>"><i class="fa-solid fa-bell-concierge"></i><span class="nav-label">Front Desk</span></a>
+      <a href="frontdesk.php" title="Front Desk" class="<?= $activeNav === 'frontdesk' ? 'active' : '' ?>">
+        <i class="fa-solid fa-bell-concierge"></i><span class="nav-label">Front Desk</span>
+        <span class="nav-badge" id="navFrontDeskBadge" title="Chats with unread messages"<?= $navFrontDeskUnread ? '' : ' hidden' ?>><?= $navFrontDeskUnread ?></span>
+      </a>
     </nav>
     <button type="button" class="nav-install" id="navInstallApp" title="Install the app on this device" hidden>
       <i class="fa-solid fa-download"></i><span class="nav-label">Install app</span>

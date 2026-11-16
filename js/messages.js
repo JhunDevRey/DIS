@@ -6,6 +6,10 @@
 //   data-endpoint       api/admin_messages.php | api/client_messages.php
 //   data-file-endpoint  api/admin_message_file.php | api/client_message_file.php
 //   data-client-id      (admin only) the open conversation's client id
+//   data-scope          (admin only) 'portal' = Processing Inbox, 'social' =
+//                       Front Desk chats; sent with every request
+//   data-page           (admin only) inbox.php | chats.php, for conversation links
+//   data-badge          (admin only) id of the sidebar badge this inbox updates
 //
 // New messages are picked up by polling every POLL_MS while the tab is
 // visible (and immediately when it becomes visible again) — no
@@ -19,9 +23,9 @@
 // phone) and hit the reply arrow; the sent message carries a quote of the
 // original, and clicking the quote jumps back to it.
 //
-// WhatsApp (when configured): messages carry channel = 'whatsapp'; staff
-// pick Portal / WhatsApp per message in #msgChannel, and see delivery
-// ticks (wa_status) that refresh with each poll.
+// WhatsApp (when configured): messages carry channel = 'whatsapp'. Staff
+// reply on it from the Front Desk chats (#msgChannel shows the 24-hour
+// window) and see delivery ticks (wa_status) that refresh with each poll.
 
 (function () {
   const app = document.getElementById('msgApp');
@@ -34,6 +38,9 @@
   const endpoint = app.dataset.endpoint;
   const fileEndpoint = app.dataset.fileEndpoint;
   const clientId = app.dataset.clientId || '';
+  const scope = app.dataset.scope || '';
+  const page = app.dataset.page || 'inbox.php';
+  const withScope = (fd) => { if (scope) fd.append('scope', scope); return fd; };
 
   const thread = document.getElementById('msgThread');
   const form = document.getElementById('msgForm');
@@ -406,6 +413,7 @@
   function threadUrl() {
     const params = new URLSearchParams({ after_id: lastId });
     if (clientId) params.set('client_id', clientId);
+    if (scope) params.set('scope', scope);
     return endpoint + '?' + params.toString();
   }
 
@@ -437,6 +445,7 @@
     fd.append('action', 'seen');
     fd.append('up_to_id', lastId);
     if (clientId) fd.append('client_id', clientId);
+    withScope(fd);
     try {
       await fetch(endpoint, { method: 'POST', body: fd });
     } catch (e) { /* not critical */ }
@@ -552,7 +561,7 @@
       if (clientId) fd.append('client_id', clientId);
       if (sendAs?.value) fd.append('sender_id', sendAs.value);
       if (replyTo) fd.append('reply_to_id', replyTo.id);
-      if (channelBox) fd.append('channel', pickedChannel());
+      withScope(fd);
       pendingFiles.forEach(f => fd.append('attachments[]', f));
 
       sendBtn.disabled = true;
@@ -666,7 +675,7 @@
                   c.ref && `<span class="conv-meta-item">#${esc(c.ref)}</span>`,
                   c.processor && `<span class="conv-meta-item">${esc(c.processor)}</span>`].filter(Boolean).join('');
     return `
-      <a class="conv-item${active ? ' active' : ''}${unread ? ' unread' : ''}${conv ? '' : ' no-thread'}" href="inbox.php?client_id=${c.client_id}"
+      <a class="conv-item${active ? ' active' : ''}${unread ? ' unread' : ''}${conv ? '' : ' no-thread'}" href="${page}?client_id=${c.client_id}"
          data-client-id="${c.client_id}">
         <div class="conv-top">
           <span class="conv-name">${esc(c.full_name)}</span>
@@ -721,8 +730,9 @@
     if (searching) {
       rows = rows.filter(r => matches(r.client, words));
       // New conversations start in the portal, so clients without a thread
-      // are only offered on the All and Portal tabs.
-      if (!filterUnread.checked && (channel === 'all' || channel === 'portal')) {
+      // are only offered in the Processing Inbox (the Front Desk chats only
+      // list people who already wrote on a social channel).
+      if (!filterUnread.checked && scope !== 'social') {
         rows = rows.concat(clientDir.filter(c => !convIds.has(c.client_id) && matches(c, words)).map(c => ({ client: c, conv: null })));
       }
     }
@@ -744,13 +754,13 @@
   async function refreshList() {
     if (!convList) return;
     try {
-      const res = await fetch(endpoint + '?list=1', { headers: { Accept: 'application/json' } });
+      const res = await fetch(endpoint + '?list=1' + (scope ? '&scope=' + encodeURIComponent(scope) : ''), { headers: { Accept: 'application/json' } });
       const data = await res.json();
       if (!data.success) return;
       conversations = data.conversations;
       clientDir = data.clients;
       renderConvList();
-      const badge = document.getElementById('navInboxBadge');
+      const badge = document.getElementById(app.dataset.badge || 'navInboxBadge');
       if (badge) {
         badge.textContent = data.unread_total;
         badge.hidden = data.unread_total === 0;

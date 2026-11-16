@@ -12,7 +12,7 @@ require_once __DIR__ . '/../includes/staff_security.php';
 adminRememberTryLogin();
 
 if (!empty($_SESSION['admin_id'])) {
-    header('Location: ' . ($redirect ?: 'frontdesk.php'));
+    header('Location: ' . ($redirect ?: 'clients.php'));
     exit;
 }
 
@@ -54,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif (($how = adminCheckSecondFactor($admin, (string)($_POST['code'] ?? ''))) !== null) {
             rateLimitClear($codeKey);
             $remember = !empty($pending['remember']);
-            $goTo = $pending['redirect'] ?: 'frontdesk.php';
+            $goTo = $pending['redirect'] ?: 'clients.php';
             adminFinishSignIn($admin, $remember, $how === 'recovery' ? 'with a recovery code' : 'with app code');
             if ($how === 'recovery' && adminRecoveryCodesLeft($admin) <= 3) {
                 $goTo = 'profile.php?recovery_low=1';
@@ -91,7 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     exit;
                 }
                 adminFinishSignIn($admin, $remember, 'password only');
-                header('Location: ' . ($redirect ?: 'frontdesk.php'));
+                header('Location: ' . ($redirect ?: 'clients.php'));
                 exit;
             }
             recordFailedLogin('admin', $username);

@@ -76,7 +76,7 @@ $recoveryLeft = $twoFaOn ? adminRecoveryCodesLeft($admin) : 0;
           <div class="field">
             <label>Username</label>
             <input type="text" value="<?= h($admin['username']) ?>" disabled style="background:var(--surface-alt);color:var(--text-muted);">
-            <p class="help-text">An owner can change usernames on the Staff accounts page.</p>
+            <p class="help-text">An owner can change usernames on the Accounts page.</p>
           </div>
           <p class="error-text" id="profileError" style="display:none;"></p>
           <p style="color:var(--accepted);font-size:13px;display:none;" id="profileSuccess">Saved.</p>
@@ -279,7 +279,7 @@ document.getElementById('formPassword').addEventListener('submit', async (e) => 
     if (data.success) {
       showToast(data.message || 'Password updated.');
       form.reset();
-      <?php if ($mustChangePw): ?>setTimeout(() => { location.href = 'frontdesk.php'; }, 900); return;<?php endif; ?>
+      <?php if ($mustChangePw): ?>setTimeout(() => { location.href = 'clients.php'; }, 900); return;<?php endif; ?>
       if (/signed out/.test(data.message || '')) {
         document.getElementById('otherDevicesText').textContent = 'Not signed in on any other device.';
         document.getElementById('btnForgetDevices').disabled = true;

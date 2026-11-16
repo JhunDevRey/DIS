@@ -1,5 +1,5 @@
 // js/frontdesk.js — staff Front Desk (admin/frontdesk.php).
-// Greeting, the client quick-search, and the live windows. The Messaging
+// Greeting and the live windows. The Messaging
 // window shows social channels only (WhatsApp, Messenger, Instagram,
 // TikTok); portal messages stay in the Processing Inbox.
 (function () {
@@ -7,7 +7,6 @@
 
   const LIST_POLL_MS = 20000;
   const MAX_ROWS = 6;
-  const MAX_RESULTS = 8;
 
   let data = JSON.parse(document.getElementById('fdData').textContent);
   let channel = 'all';
@@ -108,7 +107,7 @@
     }
     list.innerHTML = rows.map(conv => {
       const isUnread = conv.unread_count > 0;
-      return `<li class="fd-row" data-client-id="${conv.client_id}"><a class="fd-item${isUnread ? ' unread' : ''}" href="inbox.php?client_id=${conv.client_id}">
+      return `<li class="fd-row" data-client-id="${conv.client_id}"><a class="fd-item${isUnread ? ' unread' : ''}" href="chats.php?client_id=${conv.client_id}">
         <span class="fd-dot"${isUnread ? '' : ' hidden'}></span>
         <span class="avatar">${esc(initial(conv.full_name))}</span>
         <span class="fd-main">
@@ -197,23 +196,13 @@
     fd.append('body', text);
     const sel = box.querySelector('.fd-reply-as select');
     if (sel.value) fd.append('sender_id', sel.value);
-    fd.append('channel', 'whatsapp');
-    fd.append('from', 'frontdesk');
+    fd.append('scope', 'social');
     try {
       const res = await fetch('api/admin_messages.php', { method: 'POST', body: fd });
       const out = await res.json();
       if (!out.success) { showToast(out.message || 'Could not send the message.', true); btn.disabled = false; return; }
-      // Replying answers the chat, so it's read — unless portal messages
-      // are also waiting: the read marker covers the whole thread, and
-      // those belong to the Processing Inbox.
-      const sent = out.messages && out.messages[out.messages.length - 1];
-      if (sent && conv.unread_count && !conv.unread_portal) {
-        const seen = new FormData();
-        seen.append('action', 'seen');
-        seen.append('client_id', conv.client_id);
-        seen.append('up_to_id', sent.id);
-        await fetch('api/admin_messages.php', { method: 'POST', body: seen }).catch(() => {});
-      }
+      // Sending marks the chat read (the Front Desk's own marker only;
+      // portal messages stay unread for the Processing Inbox).
       closeReply();
       // WhatsApp sends explain what happened (sent / fell back to portal).
       showToast(out.message && out.message !== 'Message sent.' ? out.message : `Sent to ${conv.full_name}.`);
@@ -243,13 +232,13 @@
 
   async function refresh() {
     try {
-      const res = await fetch('api/admin_messages.php?list=1&scope=frontdesk', { headers: { Accept: 'application/json' } });
+      const res = await fetch('api/admin_messages.php?list=1&scope=social', { headers: { Accept: 'application/json' } });
       const fresh = await res.json();
       if (!fresh.success) return;
       data = fresh;
       const typing = replyFor && list.contains(document.activeElement) && document.activeElement.closest('.fd-reply');
       if (!typing) renderMessages();
-      const badge = document.getElementById('navInboxBadge');
+      const badge = document.getElementById('navFrontDeskBadge');
       if (badge) {
         badge.textContent = fresh.unread_total;
         badge.hidden = fresh.unread_total === 0;
@@ -565,65 +554,4 @@
     setInterval(() => { if (!document.hidden) loadContracts(); }, CON_POLL_MS);
   }
 
-  // ---- Client quick-search ----
-  const input = document.getElementById('fdSearchInput');
-  const results = document.getElementById('fdSearchResults');
-  let active = 0;
-
-  function matches(q) {
-    const words = q.toLowerCase().split(/\s+/).filter(Boolean);
-    if (!words.length) return [];
-    return data.clients.filter(c => {
-      const hay = [c.full_name, c.email, c.case_type, c.class, c.ref, c.processor].join(' ').toLowerCase();
-      return words.every(w => hay.includes(w));
-    }).slice(0, MAX_RESULTS);
-  }
-
-  function renderResults() {
-    const found = matches(input.value);
-    if (!input.value.trim()) { results.hidden = true; return; }
-    active = Math.min(active, Math.max(0, found.length - 1));
-    results.innerHTML = found.length ? found.map((c, i) => `
-      <div class="fd-result${i === active ? ' active' : ''}">
-        <a class="fd-result-main" href="client.php?id=${c.client_id}">
-          <span class="avatar">${esc(initial(c.full_name))}</span>
-          <span class="fd-main">
-            <span class="fd-name">${esc(c.full_name)} ${classTag(c)}</span>
-            <span class="fd-sub">${esc([c.ref && '#' + c.ref, c.email, c.processor].filter(Boolean).join(' · '))}</span>
-          </span>
-        </a>
-        <a class="fd-result-msg" href="inbox.php?client_id=${c.client_id}" title="Message ${esc(c.full_name)}" aria-label="Message ${esc(c.full_name)}"><i class="fa-regular fa-comment"></i></a>
-      </div>`).join('')
-      : '<div class="fd-result-none">No clients match.</div>';
-    results.hidden = false;
-  }
-
-  input.addEventListener('input', () => { active = 0; renderResults(); });
-  input.addEventListener('focus', renderResults);
-  input.addEventListener('keydown', (e) => {
-    const rows = results.querySelectorAll('.fd-result');
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-      if (!rows.length) return;
-      e.preventDefault();
-      active = (active + (e.key === 'ArrowDown' ? 1 : rows.length - 1)) % rows.length;
-      renderResults();
-    } else if (e.key === 'Enter') {
-      const link = rows[active] && rows[active].querySelector('.fd-result-main');
-      if (link) { e.preventDefault(); location.href = link.href; }
-    } else if (e.key === 'Escape') {
-      results.hidden = true;
-      input.blur();
-    }
-  });
-  document.addEventListener('click', (e) => {
-    if (!document.getElementById('fdSearch').contains(e.target)) results.hidden = true;
-  });
-  // "/" jumps to the search box from anywhere on the page.
-  document.addEventListener('keydown', (e) => {
-    if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
-    const tag = (document.activeElement && document.activeElement.tagName) || '';
-    if (/^(INPUT|TEXTAREA|SELECT)$/.test(tag) || document.activeElement.isContentEditable) return;
-    e.preventDefault();
-    input.focus();
-  });
 })();

@@ -10,11 +10,11 @@ $activeNav = 'frontdesk';
 
 // Social channels only (WhatsApp, Messenger, Instagram, TikTok) — portal
 // messages belong to the Processing Inbox. The Messaging window re-polls
-// api/admin_messages.php?list=1&scope=frontdesk to stay current.
+// api/admin_messages.php?list=1&scope=social to stay current; rows open
+// the conversation in admin/chats.php.
 $frontDeskData = [
-    'conversations' => frontDeskConversationsForJson(),
+    'conversations' => staffConversationsForJson('social'),
     'clients'       => staffClientDirectory(),
-    'unread_total'  => staffUnreadConversationCount(),
 ];
 $fdChannels = frontDeskChannels();
 // "Sending as" names for quick replies (same list as the Inbox composer).
@@ -49,17 +49,7 @@ $comingWindows = [
       <p><span id="fdDate"></span>Everything the front desk needs, in one place.</p>
     </div>
 
-    <div class="fd-search" id="fdSearch">
-      <i class="fa-solid fa-magnifying-glass"></i>
-      <input type="search" id="fdSearchInput" placeholder="Find a client — name, email, client no. or case type" autocomplete="off" aria-label="Find a client">
-      <kbd>/</kbd>
-      <div class="fd-search-results" id="fdSearchResults" hidden></div>
-    </div>
 
-    <div class="fd-actions">
-      <a href="clients.php?new=1" class="btn btn-gold"><i class="fa-solid fa-user-plus"></i> Add client</a>
-      <a href="clients.php" class="btn btn-ghost"><i class="fa-solid fa-users"></i> All clients</a>
-    </div>
 
     <div class="fd-grid">
       <section class="fd-win">
@@ -82,6 +72,7 @@ $comingWindows = [
         </div>
         <ul class="fd-list" id="fdMsgList" data-wa="<?= $fdChannels['whatsapp']['connected'] ? '1' : '0' ?>" data-any-connected="<?= array_filter(array_column($fdChannels, 'connected')) ? '1' : '0' ?>"></ul>
         <footer>
+          <a href="chats.php">Open chats →</a>
           <span class="fd-foot-note">WhatsApp · Messenger · Instagram · TikTok</span>
         </footer>
       </section>

@@ -11,7 +11,14 @@
  * clients.staff_messages_seen_id for staff.
  *
  * WhatsApp (includes/whatsapp.php) is a second channel in the same thread:
- * messages.channel = 'whatsapp'. Imported past chats (is_history = 1)
+ * messages.channel = 'whatsapp'.
+ *
+ * Staff see the thread in two places ("scopes"): the Processing Inbox
+ * (admin/inbox.php, scope 'portal': portal messages only) and the Front
+ * Desk chats (admin/chats.php, scope 'social': WhatsApp, Messenger,
+ * Instagram, TikTok). Each keeps its own read marker -
+ * clients.staff_messages_seen_id and clients.staff_social_seen_id
+ * (sql/migration_social_inbox.sql) - so reading one never marks the other. Imported past chats (is_history = 1)
  * never count as unread, and staff WhatsApp replies don't badge the
  * client's portal — they already got them on their phone.
  */
@@ -40,48 +47,73 @@ function clientUnreadMessageCount(int $clientId): int
     return (int)$stmt->fetchColumn();
 }
 
-/**
- * Number of CONVERSATIONS with at least one unread client message (what
- * the admin sidebar badge shows) — counted per client rather than per
- * message, so one chatty client doesn't inflate it.
- */
-function staffUnreadConversationCount(): int
+/** 'social' for the Front Desk chats, anything else is the Processing Inbox. */
+function messageScope(?string $scope): string
 {
+    return $scope === 'social' ? 'social' : 'portal';
+}
+
+/** SQL condition picking one scope's messages (fixed strings, never user input). */
+function messageScopeSql(string $scope, string $alias): string
+{
+    return messageScope($scope) === 'social' ? "{$alias}.channel <> 'portal'" : "{$alias}.channel = 'portal'";
+}
+
+/** The clients column holding staff's read marker for a scope. */
+function staffSeenColumn(string $scope): string
+{
+    return messageScope($scope) === 'social' ? 'staff_social_seen_id' : 'staff_messages_seen_id';
+}
+
+/**
+ * Number of CONVERSATIONS with at least one unread client message in a
+ * scope (what the sidebar badges show) — counted per client rather than
+ * per message, so one chatty client doesn't inflate it.
+ */
+function staffUnreadConversationCount(string $scope = 'portal'): int
+{
+    $seen = staffSeenColumn($scope);
     return (int)getDb()->query("
       SELECT COUNT(DISTINCT m.client_id) FROM messages m
       JOIN clients c ON c.id = m.client_id
-      WHERE m.sender_type = 'client' AND m.id > c.staff_messages_seen_id AND m.is_history = 0
+      WHERE m.sender_type = 'client' AND m.id > c.{$seen} AND m.is_history = 0
+        AND " . messageScopeSql($scope, 'm') . "
     ")->fetchColumn();
 }
 
 /**
- * Inbox list for staff: every client that has at least one message, most
- * recent activity first, with the latest message preview and unread count.
+ * Inbox list for staff, one scope: every client with at least one message
+ * in it, most recent activity first, with that scope's latest message as
+ * the preview and its unread count.
  */
-function staffConversationList(): array
+function staffConversationList(string $scope = 'portal'): array
 {
+    $seen = staffSeenColumn($scope);
+    $in = fn(string $alias) => messageScopeSql($scope, $alias);
     return getDb()->query("
       SELECT c.id AS client_id, c.full_name, c.case_type, c.reference_number,
         pr.full_name AS processor_name,
         last.id AS last_message_id, last.body AS last_body,
         last.sender_type AS last_sender_type, last.channel AS last_channel, last.created_at AS last_at,
         (SELECT COUNT(*) FROM messages u
-          WHERE u.client_id = c.id AND u.sender_type = 'client' AND u.id > c.staff_messages_seen_id AND u.is_history = 0) AS unread_count,
-        (SELECT GROUP_CONCAT(DISTINCT ch.channel) FROM messages ch WHERE ch.client_id = c.id) AS channels,
-        (SELECT rc.channel FROM messages rc WHERE rc.client_id = c.id AND rc.sender_type = 'client'
+          WHERE u.client_id = c.id AND u.sender_type = 'client' AND u.id > c.{$seen} AND u.is_history = 0
+            AND {$in('u')}) AS unread_count,
+        (SELECT GROUP_CONCAT(DISTINCT ch.channel) FROM messages ch WHERE ch.client_id = c.id AND {$in('ch')}) AS channels,
+        (SELECT rc.channel FROM messages rc WHERE rc.client_id = c.id AND rc.sender_type = 'client' AND {$in('rc')}
           ORDER BY rc.created_at DESC, rc.id DESC LIMIT 1) AS reply_channel
       FROM clients c
-      JOIN messages last ON last.id = (SELECT id FROM messages WHERE client_id = c.id ORDER BY created_at DESC, id DESC LIMIT 1)
+      JOIN messages last ON last.id = (SELECT lm.id FROM messages lm WHERE lm.client_id = c.id AND {$in('lm')}
+        ORDER BY lm.created_at DESC, lm.id DESC LIMIT 1)
       LEFT JOIN processors pr ON pr.id = c.processor_id
       ORDER BY last.created_at DESC, last.id DESC
     ")->fetchAll();
 }
 
 /**
- * staffConversationList() shaped for the inbox JS (shared by admin/inbox.php
- * and api/admin_messages.php so both render the same thing).
+ * staffConversationList() shaped for the inbox JS (shared by the inbox
+ * pages, the Front Desk and api/admin_messages.php so all render the same).
  */
-function staffConversationsForJson(): array
+function staffConversationsForJson(string $scope = 'portal'): array
 {
     return array_map(fn($c) => [
         'client_id'    => (int)$c['client_id'],
@@ -90,12 +122,11 @@ function staffConversationsForJson(): array
         'last_at'      => $c['last_at'],
         'channel'      => $c['last_channel'],
         'unread_count' => (int)$c['unread_count'],
-        // Channels this thread has messages on, for the Inbox tabs.
-        'channels'     => array_values(array_filter(explode(',', (string)$c['channels']))) ?: ['portal'],
-        // Where a reply goes by default: the channel the client last wrote
-        // on (same rule as the Inbox composer, waPreferredChannel()).
-        'reply_channel' => $c['reply_channel'] === 'whatsapp' ? 'whatsapp' : 'portal',
-    ], staffConversationList());
+        // Channels this thread has messages on, for the channel tabs.
+        'channels'     => array_values(array_filter(explode(',', (string)$c['channels']))),
+        // Where a reply goes by default: the channel the client last wrote on.
+        'reply_channel' => (string)($c['reply_channel'] ?: $c['last_channel']),
+    ], staffConversationList($scope));
 }
 
 /**
@@ -111,49 +142,6 @@ function messageChannels(): array
         'instagram' => ['label' => 'Instagram', 'icon' => 'fa-brands fa-instagram',         'connected' => false],
         'tiktok'    => ['label' => 'TikTok',    'icon' => 'fa-brands fa-tiktok',            'connected' => false],
     ];
-}
-
-/**
- * Front Desk Messaging window: social channels only (everything except the
- * portal, which belongs to the Processing Inbox). Each client with at least
- * one non-portal message, newest first; preview, unread count and channels
- * come from those messages only. 'unread_portal' lets the window avoid
- * marking a thread read while portal messages still wait for processing.
- */
-function frontDeskConversationsForJson(): array
-{
-    $rows = getDb()->query("
-      SELECT c.id AS client_id, c.full_name,
-        last.body AS last_body, last.sender_type AS last_sender_type,
-        last.channel AS last_channel, last.created_at AS last_at,
-        (SELECT COUNT(*) FROM messages u
-          WHERE u.client_id = c.id AND u.sender_type = 'client' AND u.id > c.staff_messages_seen_id
-            AND u.is_history = 0 AND u.channel <> 'portal') AS unread_count,
-        (SELECT COUNT(*) FROM messages u
-          WHERE u.client_id = c.id AND u.sender_type = 'client' AND u.id > c.staff_messages_seen_id
-            AND u.is_history = 0 AND u.channel = 'portal') AS unread_portal,
-        (SELECT GROUP_CONCAT(DISTINCT ch.channel) FROM messages ch
-          WHERE ch.client_id = c.id AND ch.channel <> 'portal') AS channels,
-        (SELECT rc.channel FROM messages rc
-          WHERE rc.client_id = c.id AND rc.sender_type = 'client' AND rc.channel <> 'portal'
-          ORDER BY rc.created_at DESC, rc.id DESC LIMIT 1) AS reply_channel
-      FROM clients c
-      JOIN messages last ON last.id = (SELECT id FROM messages
-        WHERE client_id = c.id AND channel <> 'portal' ORDER BY created_at DESC, id DESC LIMIT 1)
-      ORDER BY last.created_at DESC, last.id DESC
-    ")->fetchAll();
-
-    return array_map(fn($c) => [
-        'client_id'     => (int)$c['client_id'],
-        'full_name'     => $c['full_name'],
-        'preview'       => ($c['last_sender_type'] === 'admin' ? 'You: ' : '') . mb_strimwidth($c['last_body'] !== '' ? $c['last_body'] : '📎 Attachment', 0, 90, '…'),
-        'last_at'       => $c['last_at'],
-        'channel'       => $c['last_channel'],
-        'unread_count'  => (int)$c['unread_count'],
-        'unread_portal' => (int)$c['unread_portal'],
-        'channels'      => array_values(array_filter(explode(',', (string)$c['channels']))),
-        'reply_channel' => (string)($c['reply_channel'] ?: $c['last_channel']),
-    ], $rows);
 }
 
 /** messageChannels() minus the portal — the Front Desk Messaging tabs. */
@@ -200,10 +188,12 @@ function staffClientDirectory(): array
  * The full thread is ordered by time sent, not id, so WhatsApp chats
  * linked or imported later still land in the right place.
  */
-function fetchMessages(int $clientId, int $afterId = 0): array
+function fetchMessages(int $clientId, int $afterId = 0, ?string $scope = null): array
 {
     $db = getDb();
-    $stmt = $db->prepare('SELECT * FROM messages WHERE client_id = ? AND id > ? ORDER BY ' . ($afterId > 0 ? 'id ASC' : 'created_at ASC, id ASC'));
+    // $scope limits staff views to one inbox; null = the whole thread (client portal).
+    $only = $scope === null ? '' : ' AND ' . messageScopeSql($scope, 'm');
+    $stmt = $db->prepare('SELECT m.* FROM messages m WHERE m.client_id = ? AND m.id > ?' . $only . ' ORDER BY ' . ($afterId > 0 ? 'm.id ASC' : 'm.created_at ASC, m.id ASC'));
     $stmt->execute([$clientId, $afterId]);
     $messages = $stmt->fetchAll();
     if (!$messages) {
@@ -405,11 +395,10 @@ function validateMessageAttachments(array $files): ?string
 /**
  * Saves a message (and its already-validated attachments) in one
  * transaction. Returns the new message id. Throws on failure — callers
- * catch and respond with JSON. $markSeen = false leaves the sender's read
- * marker alone (Front Desk replies, which mustn't mark unread portal
- * messages as read for the Processing Inbox).
+ * catch and respond with JSON. For staff, $scope says which inbox sent it,
+ * and only that inbox's read marker moves.
  */
-function createMessage(int $clientId, string $senderType, string $senderName, string $body, array $files, int $replyToId = 0, bool $markSeen = true): int
+function createMessage(int $clientId, string $senderType, string $senderName, string $body, array $files, int $replyToId = 0, string $scope = 'portal'): int
 {
     $db = getDb();
     // A reply can only quote a message from this same conversation;
@@ -443,11 +432,9 @@ function createMessage(int $clientId, string $senderType, string $senderName, st
         }
 
         // Sending a message means you've seen the conversation up to it.
-        if ($markSeen) {
-            $seenColumn = $senderType === 'admin' ? 'staff_messages_seen_id' : 'client_messages_seen_id';
-            $db->prepare("UPDATE clients SET {$seenColumn} = GREATEST({$seenColumn}, ?) WHERE id = ?")
-               ->execute([$messageId, $clientId]);
-        }
+        $seenColumn = $senderType === 'admin' ? staffSeenColumn($scope) : 'client_messages_seen_id';
+        $db->prepare("UPDATE clients SET {$seenColumn} = GREATEST({$seenColumn}, ?) WHERE id = ?")
+           ->execute([$messageId, $clientId]);
 
         $db->commit();
         return $messageId;
@@ -461,13 +448,14 @@ function createMessage(int $clientId, string $senderType, string $senderName, st
 }
 
 /**
- * Marks a conversation read up to $upToId for one side. GREATEST() keeps
- * it from ever moving backwards (e.g. an older tab reporting late).
- * $side is 'admin' or 'client' — mapped to a fixed column, never user input.
+ * Marks a conversation read up to $upToId for one side (and, for staff,
+ * one scope). GREATEST() keeps it from ever moving backwards (e.g. an
+ * older tab reporting late). $side is 'admin' or 'client' — mapped to a
+ * fixed column, never user input.
  */
-function markMessagesSeen(int $clientId, string $side, int $upToId): void
+function markMessagesSeen(int $clientId, string $side, int $upToId, string $scope = 'portal'): void
 {
-    $column = $side === 'admin' ? 'staff_messages_seen_id' : 'client_messages_seen_id';
+    $column = $side === 'admin' ? staffSeenColumn($scope) : 'client_messages_seen_id';
     getDb()->prepare("UPDATE clients SET {$column} = GREATEST({$column}, ?) WHERE id = ?")
            ->execute([$upToId, $clientId]);
 }

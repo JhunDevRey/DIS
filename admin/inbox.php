@@ -5,7 +5,15 @@ require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/messages.php';
 require_once __DIR__ . '/../includes/whatsapp.php';
 requireAdmin();
-$activeNav = 'inbox';
+
+// One page, two inboxes: the Processing Inbox (portal messages) and, via
+// admin/chats.php, the Front Desk chats (WhatsApp, Messenger, Instagram,
+// TikTok). Each only ever shows and marks read its own messages.
+$inboxScope = messageScope($inboxScope ?? 'portal');
+$isSocial = $inboxScope === 'social';
+$inboxPage = $isSocial ? 'chats.php' : 'inbox.php';
+$inboxTitle = $isSocial ? 'Chats' : 'Processing Inbox';
+$activeNav = $isSocial ? 'frontdesk' : 'inbox';
 
 $db = getDb();
 $clientDirectory = staffClientDirectory();
@@ -26,8 +34,8 @@ if ($openClientId) {
     $openClient = $stmt->fetch() ?: null;
 }
 
-// WhatsApp (only once configured — see includes/whatsapp.php).
-$waOn = waEnabled();
+// WhatsApp (only once configured — see includes/whatsapp.php), Front Desk chats only.
+$waOn = $isSocial && waEnabled();
 $waView = $waOn && !$openClient && ($_GET['view'] ?? '') === 'whatsapp';
 $waUnmatched = $waView ? waUnmatchedList() : [];
 $waUnmatchedCount = $waOn ? waUnmatchedCount() : 0;
@@ -43,7 +51,7 @@ $waDefault = $waOn && $openClient && $waNumber ? waPreferredChannel((int)$openCl
 <script>(function(){var t=localStorage.getItem("theme")||(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t);})();</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
 <?php include __DIR__ . '/_pwa_head.php'; ?>
-<title><?= $openClient ? h($openClient['full_name']) . ' · ' : '' ?>Processing Inbox · Duque Immigration Document Portal</title>
+<title><?= $openClient ? h($openClient['full_name']) . ' · ' : '' ?><?= h($inboxTitle) ?> · Duque Immigration Document Portal</title>
 <link rel="icon" type="image/png" href="images/duqueimmigration_logo.png?v=<?= assetVersion('images/duqueimmigration_logo.png') ?>">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer">
 <link rel="stylesheet" href="css/style.css?v=<?= cssVersion() ?>">
@@ -55,8 +63,12 @@ $waDefault = $waOn && $openClient && $waNumber ? waPreferredChannel((int)$openCl
   <main class="main">
     <div class="main-header">
       <div>
-        <h1>Processing Inbox</h1>
-        <p>Messages between your team and clients<?= $waOn ? ', from the portal and WhatsApp' : '' ?>. Clients see these in the Messages tab of their portal.</p>
+        <h1><?= h($inboxTitle) ?></h1>
+        <?php if ($isSocial): ?>
+          <p>Front desk chats on WhatsApp, Messenger, Instagram and TikTok. Portal messages are in the Processing Inbox.</p>
+        <?php else: ?>
+          <p>Portal messages between your team and clients. Clients see these in the Messages tab of their portal.</p>
+        <?php endif; ?>
       </div>
     </div>
 
@@ -64,22 +76,27 @@ $waDefault = $waOn && $openClient && $waNumber ? waPreferredChannel((int)$openCl
          data-viewer="admin"
          data-endpoint="api/admin_messages.php"
          data-file-endpoint="api/admin_message_file.php"
+         data-scope="<?= h($inboxScope) ?>"
+         data-page="<?= h($inboxPage) ?>"
+         data-badge="<?= $isSocial ? 'navFrontDeskBadge' : 'navInboxBadge' ?>"
          data-client-id="<?= $openClient ? (int)$openClient['id'] : '' ?>">
 
       <div class="card conv-panel">
         <?php // Full-screen (phones/tablets) title bar — hidden on desktop. ?>
         <div class="msg-fs-bar">
           <button type="button" class="msg-fs-icon msg-fs-menu" data-open-nav aria-label="Open menu" title="Menu"><i class="fa-solid fa-bars"></i></button>
-          <span class="msg-fs-title">Processing Inbox</span>
+          <span class="msg-fs-title"><?= h($inboxTitle) ?></span>
         </div>
+        <?php if ($isSocial): ?>
         <div class="conv-channels" id="msgChannelTabs" role="tablist" aria-label="Channel">
           <button type="button" class="on" data-channel="all" role="tab">All <b data-channel-count="all"></b></button>
-          <?php foreach (messageChannels() as $key => $ch): ?>
+          <?php foreach (frontDeskChannels() as $key => $ch): ?>
             <button type="button" data-channel="<?= h($key) ?>" data-connected="<?= $ch['connected'] ? '1' : '0' ?>" data-label="<?= h($ch['label']) ?>" role="tab" title="<?= h($ch['label']) ?><?= $ch['connected'] ? '' : ' (not connected yet)' ?>">
               <i class="<?= h($ch['icon']) ?>"></i><span class="conv-ch-label"><?= h($ch['label']) ?></span> <b data-channel-count="<?= h($key) ?>"></b>
             </button>
           <?php endforeach; ?>
         </div>
+        <?php endif; ?>
         <div class="conv-tools">
           <input type="search" id="msgConvSearch" placeholder="Search name, case type, #client no.…" aria-label="Search clients" autocomplete="off">
           <div class="conv-filters">
@@ -101,7 +118,7 @@ $waDefault = $waOn && $openClient && $waNumber ? waPreferredChannel((int)$openCl
           <label class="conv-unread-toggle"><input type="checkbox" id="msgFilterUnread"> Unread only</label>
         </div>
         <?php if ($waOn): ?>
-          <a class="wa-unmatched-link<?= $waView ? ' active' : '' ?>" href="inbox.php?view=whatsapp" id="waUnmatchedLink"<?= $waUnmatchedCount || $waView ? '' : ' hidden' ?>>
+          <a class="wa-unmatched-link<?= $waView ? ' active' : '' ?>" href="chats.php?view=whatsapp" id="waUnmatchedLink"<?= $waUnmatchedCount || $waView ? '' : ' hidden' ?>>
             <i class="fa-brands fa-whatsapp"></i>
             <span>Unmatched WhatsApp numbers</span>
             <span class="conv-unread" id="waUnmatchedCount"<?= $waUnmatchedCount ? '' : ' hidden' ?>><?= $waUnmatchedCount ?></span>
@@ -111,7 +128,7 @@ $waDefault = $waOn && $openClient && $waNumber ? waPreferredChannel((int)$openCl
         <div class="conv-list" id="msgConvList"></div>
         <?php // Initial data for instant search; api/admin_messages.php?list=1 refreshes it. ?>
         <script type="application/json" id="msgInboxData"><?= json_encode([
-            'conversations' => staffConversationsForJson(),
+            'conversations' => staffConversationsForJson($inboxScope),
             'clients'       => $clientDirectory,
         ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
       </div>
@@ -168,11 +185,11 @@ $waDefault = $waOn && $openClient && $waNumber ? waPreferredChannel((int)$openCl
         <?php elseif (!$openClient): ?>
           <div class="msg-select-prompt">
             <div class="icon">💬</div>
-            Pick a conversation on the left, or search for any client to start a new one.
+            <?= $isSocial ? 'Pick a chat on the left.' : 'Pick a conversation on the left, or search for any client to start a new one.' ?>
           </div>
         <?php else: ?>
           <div class="msg-panel-head">
-            <a class="msg-fs-icon msg-fs-back" href="inbox.php" aria-label="All conversations" title="All conversations"><i class="fa-solid fa-arrow-left"></i></a>
+            <a class="msg-fs-icon msg-fs-back" href="<?= h($inboxPage) ?>" aria-label="All conversations" title="All conversations"><i class="fa-solid fa-arrow-left"></i></a>
             <div class="msg-panel-title">
               <h2><?= h($openClient['full_name']) ?></h2>
               <div class="msg-panel-sub">
@@ -183,7 +200,7 @@ $waDefault = $waOn && $openClient && $waNumber ? waPreferredChannel((int)$openCl
               </div>
             </div>
             <div class="msg-panel-actions">
-              <a class="btn btn-ghost btn-sm msg-all-btn" href="inbox.php"><i class="fa-solid fa-arrow-left"></i> All</a>
+              <a class="btn btn-ghost btn-sm msg-all-btn" href="<?= h($inboxPage) ?>"><i class="fa-solid fa-arrow-left"></i> All</a>
               <a class="btn btn-ghost btn-sm" href="client.php?id=<?= (int)$openClient['id'] ?>" title="Client file"><i class="fa-solid fa-folder-open"></i><span class="msg-btn-label"> Client file</span></a>
             </div>
           </div>
@@ -191,10 +208,19 @@ $waDefault = $waOn && $openClient && $waNumber ? waPreferredChannel((int)$openCl
           <div class="msg-thread" id="msgThread" aria-live="polite">
             <div class="msg-empty" id="msgEmpty">
               <div class="icon">✉️</div>
-              No messages with <?= h($openClient['full_name']) ?> yet. They'll get an email letting them know when you send the first one.
+              <?php if ($isSocial): ?>
+                No WhatsApp, Messenger, Instagram or TikTok messages with <?= h($openClient['full_name']) ?> yet.
+              <?php else: ?>
+                No messages with <?= h($openClient['full_name']) ?> yet. They'll get an email letting them know when you send the first one.
+              <?php endif; ?>
             </div>
           </div>
 
+          <?php if ($isSocial && !$waOn): ?>
+          <div class="msg-composer msg-composer-off">
+            <i class="fa-solid fa-plug"></i> Replies go out on WhatsApp once it's connected. Messenger, Instagram and TikTok replies aren't connected yet.
+          </div>
+          <?php else: ?>
           <form class="msg-composer" id="msgForm">
             <div class="msg-sendas">
               <label for="msgSendAs"><i class="fa-solid fa-user-pen"></i> Sending as</label>
@@ -210,9 +236,8 @@ $waDefault = $waOn && $openClient && $waNumber ? waPreferredChannel((int)$openCl
                    data-window-ends="<?= h($waWindowEnds ?? '') ?>"
                    data-has-template="<?= defined('WA_NOTICE_TEMPLATE') && WA_NOTICE_TEMPLATE !== '' ? '1' : '0' ?>">
                 <span class="msg-channel-label">Send via</span>
-                <label class="msg-channel-opt"><input type="radio" name="msgChannelPick" value="portal"<?= $waDefault === 'portal' ? ' checked' : '' ?>> <i class="fa-solid fa-globe"></i> Portal</label>
                 <label class="msg-channel-opt<?= $waNumber ? '' : ' disabled' ?>" title="<?= $waNumber ? h(waFormatNumber($waNumber)) : 'No WhatsApp number on file. It is saved automatically when this client messages on WhatsApp and you link their number, or when their phone is saved with a country code (+…).' ?>">
-                  <input type="radio" name="msgChannelPick" value="whatsapp"<?= $waDefault === 'whatsapp' ? ' checked' : '' ?><?= $waNumber ? '' : ' disabled' ?>> <i class="fa-brands fa-whatsapp"></i> WhatsApp
+                  <input type="radio" name="msgChannelPick" value="whatsapp" checked<?= $waNumber ? '' : ' disabled' ?>> <i class="fa-brands fa-whatsapp"></i> WhatsApp
                 </label>
                 <span class="msg-channel-note" id="msgChannelNote"></span>
               </div>
@@ -226,8 +251,11 @@ $waDefault = $waOn && $openClient && $waNumber ? waPreferredChannel((int)$openCl
               <textarea id="msgBody" rows="1" maxlength="<?= MESSAGE_MAX_LENGTH ?>" placeholder="Write a message to <?= h(explode(' ', $openClient['full_name'])[0]) ?>…" aria-label="Message"></textarea>
               <button type="submit" class="btn btn-gold" id="msgSendBtn"><i class="fa-solid fa-paper-plane"></i> Send</button>
             </div>
-            <div class="msg-hint">Ctrl + Enter to send · The client is emailed a notice (never the message itself) to log in and read it.</div>
+            <div class="msg-hint">Ctrl + Enter to send · <?= $isSocial
+              ? 'Goes to their WhatsApp. If it can\'t, it\'s sent in the portal instead and moves to the Processing Inbox.'
+              : 'The client is emailed a notice (never the message itself) to log in and read it.' ?></div>
           </form>
+          <?php endif; ?>
         <?php endif; ?>
       </div>
     </div>

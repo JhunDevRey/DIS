@@ -418,7 +418,7 @@ function waFileMessage(array $m, string $customer, string $direction, ?string $p
     }
 
     if ($direction === 'in') {
-        $stmt = $db->prepare('SELECT full_name, processor_id, staff_messages_seen_id FROM clients WHERE id = ?');
+        $stmt = $db->prepare('SELECT full_name, processor_id, staff_social_seen_id FROM clients WHERE id = ?');
         $stmt->execute([$clientId]);
         $client = $stmt->fetch();
         $name = $client['full_name'] ?? ($profileName ?: 'Client');
@@ -435,9 +435,9 @@ function waNotifyProcessor(int $clientId, array $client, string $name, string $b
     if (empty($client['processor_id']) || !function_exists('notifyProcessorRealtime')) return;
     $stmt = getDb()->prepare("
       SELECT COUNT(*) FROM messages
-      WHERE client_id = ? AND sender_type = 'client' AND id > ? AND created_at > NOW() - INTERVAL 15 MINUTE
+      WHERE client_id = ? AND sender_type = 'client' AND channel <> 'portal' AND id > ? AND created_at > NOW() - INTERVAL 15 MINUTE
     ");
-    $stmt->execute([$clientId, (int)$client['staff_messages_seen_id']]);
+    $stmt->execute([$clientId, (int)$client['staff_social_seen_id']]);
     if ((int)$stmt->fetchColumn() > 1) return; // the one just stored counts as 1
     $preview = $body !== '' ? mb_strimwidth($body, 0, 300, '…') : '(sent ' . $fileCount . ' attachment' . ($fileCount === 1 ? '' : 's') . ')';
     notifyProcessorRealtime((int)$client['processor_id'], $clientId, $name, 'message', $name . ' sent a WhatsApp message: "' . $preview . '"');
