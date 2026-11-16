@@ -572,6 +572,7 @@
     let pqStage = 'waiting';
     let pqAll = false;
     let pqEntries = null;
+    let pqPartialTries = 0;
     try {
       const saved = JSON.parse(localStorage.getItem(PQ_KEY) || '{}');
       if (PQ_STAGES.includes(saved.stage)) pqStage = saved.stage;
@@ -587,6 +588,7 @@
         p.stage === 'waiting' && pqDays(p.created_at) >= PQ_CHASE_DAYS && '<span class="fd-inq-tag follow">Follow up</span>',
         p.stage === 'waiting' && `<span class="fd-inq-tag">${esc(p.status)}</span>`,
         p.stage === 'submitted' && '<span class="fd-inq-tag app">Submitted</span>',
+        p.form && `<span class="fd-inq-tag web">${esc(p.form)}</span>`,
         p.number != null && `<span class="fd-inq-tag">#${esc(p.number)}</span>`,
       ].filter(Boolean).join('');
       const contact = [
@@ -634,6 +636,9 @@
         }
         pqEntries = out.entries || [];
         renderPq();
+        // First load of a big backlog is finished over a few quick refreshes.
+        if (out.partial && pqPartialTries < 30) { pqPartialTries++; setTimeout(() => loadPq(), Math.max(3, out.wait || 3) * 1000); }
+        else if (!out.partial) pqPartialTries = 0;
       } catch (e) {
         if (!pqEntries) pqList.innerHTML = '<li class="fd-empty fd-inq-error">Could not load PQ forms. Check your connection.</li>';
       }
