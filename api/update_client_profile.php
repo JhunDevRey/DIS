@@ -3,6 +3,7 @@ require_once __DIR__ . '/../includes/client_auth.php';
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/mailer.php';
+require_once __DIR__ . '/../includes/client_passwords.php';
 requireClient();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -35,23 +36,29 @@ if ($action === 'update_contact_info') {
 }
 
 if ($action === 'update_password') {
-    $current = $_POST['current_password'] ?? '';
-    $new     = $_POST['new_password'] ?? '';
+    $current = (string)($_POST['current_password'] ?? '');
+    $new     = (string)($_POST['new_password'] ?? '');
 
-    if (strlen($new) < 6) {
-        jsonResponse(false, 'New password must be at least 6 characters.');
-    }
+    // Guessing the current password here is throttled like signing in.
+    enforceActionLimit('pwchange:client:' . $clientId, 10, 15, 'Too many attempts. Please wait 15 minutes and try again.');
 
-    $stmt = $db->prepare('SELECT password_hash FROM clients WHERE id = ?');
+    $stmt = $db->prepare('SELECT email, password_hash FROM clients WHERE id = ?');
     $stmt->execute([$clientId]);
     $row = $stmt->fetch();
 
     if (!$row || !password_verify($current, $row['password_hash'])) {
         jsonResponse(false, 'Current password is incorrect.');
     }
+    $problem = clientPasswordProblem($new, (string)$row['email']);
+    if ($problem !== null) {
+        jsonResponse(false, $problem);
+    }
+    if (password_verify($new, $row['password_hash'])) {
+        jsonResponse(false, 'Please choose a password different from the current one.');
+    }
 
-    $db->prepare('UPDATE clients SET password_hash = ?, plain_password = ? WHERE id = ?')
-       ->execute([password_hash($new, PASSWORD_DEFAULT), $new, $clientId]);
+    // Stored only as a hash; this also ends a "must choose your own" state.
+    setClientPassword($clientId, $new, false);
 
     // Other remembered devices must sign in with the new password; this one stays.
     $signedOut = clientRememberForgetAll($clientId, true);

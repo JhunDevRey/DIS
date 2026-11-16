@@ -552,8 +552,8 @@ function notifyClientWelcome(array $client, string $plainPassword): bool
         . "Once your documents are in, we'll prepare your application forms and post them to your "
         . "portal for you to look over — checking things like name spelling and dates — before "
         . "anything is submitted.\n\n"
-        . "For your security, we recommend changing your password after your first login "
-        . "(My Profile → Change password, once you're logged in).\n\n"
+        . "For your security, the first time you sign in you'll be asked to choose your own "
+        . "password. This temporary one then stops working.\n\n"
         . "If you have any questions, just reply to this email or leave a comment on your portal.\n\n"
         . "— Duque Immigration";
 
@@ -599,7 +599,7 @@ function notifyClientWelcome(array $client, string $plainPassword): bool
             $credentialsBlock,
             '<div style="font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:.4px;color:#6B6B70;margin:0 0 8px;">Here\'s what happens next</div>',
             $nextStepsBlock,
-            'For your security, we recommend changing your password after your first login (My Profile → Change password, once you\'re logged in).',
+            'For your security, the first time you sign in you\'ll be asked to choose your own password. This temporary one then stops working.',
             'If you have any questions, just reply to this email or leave a comment on your portal.',
         ],
         'Log in to your portal',
@@ -628,12 +628,8 @@ function notifyCcWelcome(string $ccEmail, array $client, string $addedBy): bool
     $portalLogin = rtrim(PORTAL_APP_URL, '/') . '/login.php';
 
     // The applicant's current password (stored for staff to hand out).
-    $password = '';
-    try {
-        $stmt = getDb()->prepare('SELECT plain_password FROM clients WHERE email = ? LIMIT 1');
-        $stmt->execute([$loginEmail]);
-        $password = (string)$stmt->fetchColumn();
-    } catch (Throwable $e) { /* fall back to "ask the applicant" */ }
+    // Passwords are stored only as hashes, so this email can't (and
+    // shouldn't) contain one: the contact asks the applicant for it.
 
     $subject = "You've been added to " . $name . "'s case — Duque Immigration";
     $intro = $addedBy === 'client'
@@ -641,20 +637,20 @@ function notifyCcWelcome(string $ccEmail, array $client, string $addedBy): bool
         : 'Duque Immigration has added you as an additional contact on ' . $name . "'s immigration case.";
     $what = "You'll receive a copy of the email updates we send " . $firstName . ", and you can sign in to "
         . $firstName . "'s client portal with " . $firstName . "'s login to see documents, upload files and message the case team.";
-    $private = 'This is ' . $firstName . "'s own login — please keep it private and don't share it with anyone else.";
+    $private = 'This is ' . $firstName . "'s own login — please keep it private and don't share it with anyone else. For your security we never send passwords by email.";
 
     $textBody = "Hello,\n\n"
         . $intro . "\n\n"
         . $what . "\n\n"
         . "Portal: " . $portalLogin . "\n"
         . "Email: " . $loginEmail . "\n"
-        . ($password !== '' ? "Password: " . $password . "\n" : "Password: please ask " . $firstName . "\n")
+        . "Password: please ask " . $firstName . " (it is never sent by email)\n"
         . "\n" . $private . "\n\n"
         . "If you weren't expecting this, just reply to this email and we'll remove you.\n\n"
         . "— Duque Immigration";
 
     $safeEmail = htmlspecialchars($loginEmail, ENT_QUOTES, 'UTF-8');
-    $safePassword = $password !== '' ? htmlspecialchars($password, ENT_QUOTES, 'UTF-8') : 'Please ask ' . htmlspecialchars($firstName, ENT_QUOTES, 'UTF-8');
+    $safePassword = 'Please ask ' . htmlspecialchars($firstName, ENT_QUOTES, 'UTF-8') . ' (never sent by email)';
     $credentials = '
         <table role="presentation" cellpadding="0" cellspacing="0" width="100%"
                style="background-color:#F6F6F7;border:1px solid #E4E4E7;border-radius:8px;margin:4px 0 16px;">

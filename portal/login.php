@@ -126,7 +126,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </label>
         <button type="submit" class="auth-submit" id="authSubmit">Sign in <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button>
       </form>
-    <p class="auth-help">Forgot your password or don't have login details? Email us at <a href="mailto:info@duqueimmigration.ca">info@duqueimmigration.ca</a> and we'll help you get in.</p>
+    <p class="auth-help"><a href="forgot_password.php">Forgot your password?</a> We'll email you a link to choose a new one. No login details yet? Email <a href="mailto:info@duqueimmigration.ca">info@duqueimmigration.ca</a>.</p>
     </div>
   </main>
 </div>

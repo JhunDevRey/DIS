@@ -1,7 +1,16 @@
 <?php
+/**
+ * api/admin_reset_client_password.php
+ * Staff set a temporary password for a client (e.g. to read it out on the
+ * phone). It is stored only as a hash and the client must choose their
+ * own at the next sign-in. Usually "Send reset link" is the better option
+ * (api/admin_send_client_reset.php): staff never know the password.
+ */
 require_once __DIR__ . '/../includes/admin_auth.php';
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/functions.php';
+require_once __DIR__ . '/../includes/client_passwords.php';
+require_once __DIR__ . '/../includes/client_remember.php';
 requireAdmin();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -9,29 +18,23 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $clientId = (int)($_POST['client_id'] ?? 0);
-$newPassword = $_POST['new_password'] ?? '';
+$newPassword = (string)($_POST['new_password'] ?? '');
 
-if ($clientId <= 0) {
-    jsonResponse(false, 'Client not found.');
-}
-if (strlen($newPassword) < 6) {
-    jsonResponse(false, 'Password must be at least 6 characters.');
-}
-
-$db = getDb();
-$stmt = $db->prepare('SELECT id FROM clients WHERE id = ?');
+$stmt = getDb()->prepare('SELECT id, email FROM clients WHERE id = ?');
 $stmt->execute([$clientId]);
-if (!$stmt->fetch()) {
+$client = $stmt->fetch();
+if (!$client) {
     jsonResponse(false, 'Client not found.');
 }
+$problem = clientPasswordProblem($newPassword, (string)$client['email']);
+if ($problem !== null) {
+    jsonResponse(false, $problem);
+}
 
-$db->prepare('UPDATE clients SET password_hash = ?, plain_password = ? WHERE id = ?')
-   ->execute([password_hash($newPassword, PASSWORD_DEFAULT), $newPassword, $clientId]);
-
-auditLog('client.password_set', $clientId);
+setClientPassword($clientId, $newPassword, true);
+auditLog('client.password_set', $clientId, 'temporary password');
 
 // A new password signs the client out of every remembered device.
-require_once __DIR__ . '/../includes/client_remember.php';
 clientRememberForgetAll($clientId);
 
-jsonResponse(true, 'Password updated.', ['plain_password' => $newPassword]);
+jsonResponse(true, 'Temporary password saved. The client will be asked to choose their own when they sign in.');

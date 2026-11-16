@@ -11,6 +11,7 @@ $stmt->execute([$_SESSION['client_id']]);
 $client = $stmt->fetch();
 $thisDeviceRemembered = clientRememberThisDevice((int)$_SESSION['client_id']);
 $otherDevices = clientRememberOtherDeviceCount((int)$_SESSION['client_id']);
+$mustChange = clientMustChangePassword();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -38,6 +39,12 @@ $otherDevices = clientRememberOtherDeviceCount((int)$_SESSION['client_id']);
     </div>
 
     <div style="max-width:480px;">
+      <?php if ($mustChange): ?>
+      <div class="card card-pad" id="mustChangeNotice" role="alert" style="border:1px solid var(--gold);">
+        <h3 style="font-family:var(--font-display);font-size:16px;margin:0 0 6px;color:var(--ink);"><i class="fa-solid fa-key" style="color:var(--gold);"></i> Please choose your own password</h3>
+        <p style="margin:0;font-size:13.5px;color:var(--text);">You signed in with a temporary password from our team. Choose a new one below to continue to your portal. Only you will know it.</p>
+      </div>
+      <?php endif; ?>
       <div class="card card-pad">
         <div style="display:flex;align-items:center;gap:14px;margin-bottom:22px;">
           <div class="avatar" style="width:52px;height:52px;font-size:18px;"><?= h(strtoupper(substr($client['full_name'], 0, 1))) ?></div>
@@ -64,7 +71,7 @@ $otherDevices = clientRememberOtherDeviceCount((int)$_SESSION['client_id']);
           <div class="field">
             <label>Additional emails <span style="font-weight:400;text-transform:none;">(CC)</span></label>
             <input type="text" name="cc_emails" data-email-chips value="<?= h($client['cc_emails']) ?>" placeholder="e.g. spouse@example.com">
-            <p class="help-text">Type or paste an email and press Enter — you can add as many as you need. Anyone listed here is CC'd on every email we send you <strong>and is emailed your portal login (email and password)</strong>, so they can sign in to your portal as you. Only add people you trust with your file, like a spouse or your agent.</p>
+            <p class="help-text">Type or paste an email and press Enter — you can add as many as you need. Anyone listed here is CC'd on every email we send you <strong>and can sign in to your portal as you</strong> (we email them your login email; you give them the password yourself, since we never send passwords by email). Only add people you trust with your file, like a spouse or your agent.</p>
           </div>
           <div class="field-row">
             <div class="field">
@@ -83,19 +90,19 @@ $otherDevices = clientRememberOtherDeviceCount((int)$_SESSION['client_id']);
       </div>
 
       <div class="card card-pad">
-        <h3 style="font-family:var(--font-display);font-size:16px;margin:0 0 16px;color:var(--ink);">Change password</h3>
+        <h3 style="font-family:var(--font-display);font-size:16px;margin:0 0 16px;color:var(--ink);"><?= $mustChange ? 'Choose your password' : 'Change password' ?></h3>
         <form id="formPassword">
           <div class="field">
-            <label>Current password</label>
-            <input type="password" name="current_password" required>
+            <label><?= $mustChange ? 'Temporary password (from our email)' : 'Current password' ?></label>
+            <input type="password" name="current_password" required autocomplete="current-password">
           </div>
           <div class="field">
             <label>New password</label>
-            <input type="password" name="new_password" required minlength="6">
+            <input type="password" name="new_password" required minlength="8" autocomplete="new-password">
           </div>
           <div class="field">
             <label>Confirm new password</label>
-            <input type="password" name="confirm_password" required minlength="6">
+            <input type="password" name="confirm_password" required minlength="8" autocomplete="new-password">
           </div>
           <p class="error-text" id="passwordError" style="display:none;"></p>
           <button type="submit" class="btn btn-primary">Update password</button>
@@ -166,6 +173,11 @@ document.getElementById('formPassword').addEventListener('submit', async (e) => 
     if (data.success) {
       showToast(data.message || 'Password updated.');
       form.reset();
+      // First-time password chosen: carry on into the portal.
+      if (document.getElementById('mustChangeNotice')) {
+        setTimeout(() => { location.href = 'documents.php'; }, 900);
+        return;
+      }
       if (/other devices/.test(data.message || '')) {
         document.getElementById('otherDevicesText').textContent = 'Not signed in on any other device.';
         document.getElementById('btnForgetDevices').disabled = true;

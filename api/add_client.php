@@ -4,6 +4,7 @@ require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/dropbox.php';
 require_once __DIR__ . '/../includes/mailer.php';
+require_once __DIR__ . '/../includes/client_passwords.php';
 requireAdmin();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -31,8 +32,9 @@ if ($fullName === '' || $email === '' || $password === '') {
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     jsonResponse(false, 'Please enter a valid email address.');
 }
-if (strlen($password) < 6) {
-    jsonResponse(false, 'Temporary password must be at least 6 characters.');
+$passwordProblem = clientPasswordProblem($password, $email);
+if ($passwordProblem !== null) {
+    jsonResponse(false, 'Temporary password: ' . lcfirst($passwordProblem));
 }
 
 // Portal creation date: only build it if all three parts were actually
@@ -126,12 +128,12 @@ if ($existingDropboxPath !== '' && dropboxIsConfigured()) {
     }
 }
 
-$stmt = $db->prepare('INSERT INTO clients (full_name, email, password_hash, plain_password, case_type, phone, reference_number, processor_id, dropbox_folder_path, dropbox_folder_link, cc_emails, portal_created_at, dropbox_added_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+$stmt = $db->prepare('INSERT INTO clients (full_name, email, password_hash, must_change_password, case_type, phone, reference_number, processor_id, dropbox_folder_path, dropbox_folder_link, cc_emails, portal_created_at, dropbox_added_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
 $stmt->execute([
     $fullName,
     $email,
     password_hash($password, PASSWORD_DEFAULT),
-    $password,
+    1, // temporary: the client chooses their own at first sign-in
     $caseType ?: null,
     $phone ?: null,
     $referenceNumber ?: null,

@@ -44,10 +44,10 @@ function requireClient(): void
 
     // Checked on every request, not just at sign-in: a client staff have
     // deactivated (or deleted) is signed out on their very next click.
-    $stmt = getDb()->prepare('SELECT is_active FROM clients WHERE id = ?');
+    $stmt = getDb()->prepare('SELECT * FROM clients WHERE id = ?');
     $stmt->execute([(int)$_SESSION['client_id']]);
-    $active = $stmt->fetchColumn();
-    if ($active === false || !(int)$active) {
+    $row = $stmt->fetch();
+    if (!$row || !(int)$row['is_active']) {
         clientRememberForgetAll((int)$_SESSION['client_id']);
         rememberClearCookie('client');
         $_SESSION = [];
@@ -60,4 +60,31 @@ function requireClient(): void
     if (!in_array($method, ['GET', 'HEAD', 'OPTIONS'], true)) {
         verifyCsrfToken();
     }
+
+    // A password staff typed in is temporary: until the client picks their
+    // own, every page except My Profile sends them there.
+    if ((int)($row['must_change_password'] ?? 0) === 1) {
+        $script = basename($_SERVER['SCRIPT_NAME'] ?? '');
+        $allowed = ['profile.php', 'update_client_profile.php', 'logout.php', 'manifest.json'];
+        if (!in_array($script, $allowed, true)) {
+            if (clientIsApiRequest()) {
+                header('Content-Type: application/json');
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Please choose your own password first (My Profile).']);
+                exit;
+            }
+            header('Location: profile.php?set_password=1');
+            exit;
+        }
+    }
+}
+
+/** True when the signed-in client still has a staff-set (temporary) password. */
+function clientMustChangePassword(): bool
+{
+    if (empty($_SESSION['client_id'])) return false;
+    $stmt = getDb()->prepare('SELECT * FROM clients WHERE id = ?');
+    $stmt->execute([(int)$_SESSION['client_id']]);
+    $row = $stmt->fetch();
+    return $row && (int)($row['must_change_password'] ?? 0) === 1;
 }

@@ -187,9 +187,9 @@ sort($clientNoOptions, SORT_NATURAL);
                 <td class="<?= $c['phone'] ? '' : 'cu-muted' ?>"><div class="cu-ellipsis"><?= h($c['phone'] ?: '—') ?></div></td>
                 <td>
                   <div class="password-cell">
-                    <span class="password-value" data-password="<?= h($c['plain_password'] ?: '') ?>" data-visible="0">••••••••</span>
-                    <button type="button" class="icon-btn" data-toggle-password title="Show password" aria-label="Show password"><i class="fa-regular fa-eye"></i></button>
-                    <button type="button" class="icon-btn cu-hover-action" data-edit-password="<?= (int)$c['id'] ?>" title="Set a new password for <?= h($c['full_name']) ?>" aria-label="Set a new password for <?= h($c['full_name']) ?>"><i class="fa-solid fa-pen"></i></button>
+                    <span class="password-value cu-muted" title="Passwords are stored securely and can't be viewed"><?= (int)($c['must_change_password'] ?? 0) ? 'Temporary' : 'Set by client' ?></span>
+                    <button type="button" class="icon-btn" data-send-reset="<?= (int)$c['id'] ?>" data-email="<?= h($c['email']) ?>" title="Email <?= h($c['full_name']) ?> a link to choose a new password" aria-label="Email <?= h($c['full_name']) ?> a password reset link"><i class="fa-regular fa-envelope"></i></button>
+                    <button type="button" class="icon-btn cu-hover-action" data-edit-password="<?= (int)$c['id'] ?>" title="Set a temporary password for <?= h($c['full_name']) ?>" aria-label="Set a temporary password for <?= h($c['full_name']) ?>"><i class="fa-solid fa-key"></i></button>
                   </div>
                 </td>
               </tr>
@@ -251,7 +251,8 @@ sort($clientNoOptions, SORT_NATURAL);
           <p class="modal-column-heading" style="margin-top:20px;">Portal account</p>
           <div class="field">
             <label>Temporary password</label>
-            <input type="text" name="password" required placeholder="Given to the client to log in">
+            <input type="text" name="password" required minlength="8" autocomplete="off" placeholder="Given to the client to log in">
+            <p class="help-text">At least 8 characters. It's in the welcome email, and the client must choose their own the first time they sign in. Nobody can view it afterwards.</p>
           </div>
           <div class="field">
             <label>Portal account created on</label>
@@ -344,19 +345,20 @@ sort($clientNoOptions, SORT_NATURAL);
 
 <div class="modal-backdrop" id="modalEditPassword">
   <div class="modal">
-    <h3>Set a new password<button type="button" class="modal-close-btn" onclick="closeModal('modalEditPassword')" aria-label="Close"><i class="fa-solid fa-xmark"></i></button></h3>
+    <h3>Set a temporary password<button type="button" class="modal-close-btn" onclick="closeModal('modalEditPassword')" aria-label="Close"><i class="fa-solid fa-xmark"></i></button></h3>
     <form id="formEditPassword">
       <div class="modal-body">
       <input type="hidden" name="client_id" value="">
       <div class="field">
         <label>New password</label>
-        <input type="text" name="new_password" required minlength="6" placeholder="Share this with the client">
+        <input type="text" name="new_password" required minlength="8" autocomplete="off" placeholder="Share this with the client">
+        <p class="help-text">At least 8 characters. The client must replace it with their own when they next sign in, and is signed out everywhere now. Prefer the <i class="fa-regular fa-envelope"></i> button: it emails them a link so nobody else ever knows their password.</p>
       </div>
       <p class="error-text" id="editPasswordError" style="display:none;"></p>
       </div>
       <div class="modal-actions">
         <button type="button" class="btn btn-ghost" onclick="closeModal('modalEditPassword')">Cancel</button>
-        <button type="submit" class="btn btn-primary">Save password</button>
+        <button type="submit" class="btn btn-primary">Save temporary password</button>
       </div>
     </form>
   </div>
@@ -529,25 +531,23 @@ document.querySelectorAll('#clientsList tr.cu-row').forEach(row => {
 
 renderClientsTable();
 
-// Show/hide password
-document.querySelectorAll('[data-toggle-password]').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const valueEl = btn.closest('.password-cell').querySelector('.password-value');
-    const icon = btn.querySelector('i');
-    const isVisible = valueEl.dataset.visible === '1';
-    if (isVisible) {
-      valueEl.textContent = '••••••••';
-      valueEl.dataset.visible = '0';
-      icon.className = 'fa-regular fa-eye';
-      btn.title = 'Show password';
-      btn.setAttribute('aria-label', 'Show password');
-    } else {
-      valueEl.textContent = valueEl.dataset.password || '(not set)';
-      valueEl.dataset.visible = '1';
-      icon.className = 'fa-regular fa-eye-slash';
-      btn.title = 'Hide password';
-      btn.setAttribute('aria-label', 'Hide password');
+// Email a "choose a new password" link (staff never see the password).
+document.querySelectorAll('[data-send-reset]').forEach(btn => {
+  btn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    const ok = await showConfirm('Email a link to ' + btn.dataset.email + ' so the client can choose a new password? The link works once, for 7 days. Their current password keeps working until they use it.', { title: 'Send password reset link', confirmLabel: 'Send link' });
+    if (!ok) return;
+    btn.disabled = true;
+    const fd = new FormData();
+    fd.append('client_id', btn.dataset.sendReset);
+    try {
+      const res = await fetch('api/admin_send_client_reset.php', { method: 'POST', body: fd });
+      const data = await res.json();
+      showToast(data.message || (data.success ? 'Link sent.' : 'Could not send the link.'), !data.success);
+    } catch (err) {
+      showToast('Network error. Please try again.', true);
     }
+    btn.disabled = false;
   });
 });
 
@@ -573,13 +573,10 @@ document.getElementById('formEditPassword').addEventListener('submit', async (e)
     const data = await res.json();
     if (data.success) {
       const row = document.querySelector(`[data-edit-password="${editingClientId}"]`).closest('tr');
-      const valueEl = row.querySelector('.password-value');
-      valueEl.dataset.password = data.plain_password;
-      valueEl.dataset.visible = '0';
-      valueEl.textContent = '••••••••';
-      row.querySelector('[data-toggle-password] i').className = 'fa-regular fa-eye';
+      row.querySelector('.password-value').textContent = 'Temporary';
+      e.target.reset();
       closeModal('modalEditPassword');
-      showToast('Password updated.');
+      showToast(data.message || 'Temporary password saved.');
     } else {
       errEl.textContent = data.message || 'Could not update password.';
       errEl.style.display = 'block';
