@@ -21,7 +21,6 @@ $frontDeskData = [
 // Windows whose integrations aren't built yet — shown so staff know
 // what's coming, each says where its data will come from.
 $comingWindows = [
-    ['Contracts', 'fa-solid fa-file-signature', 'var(--revision)', 'Documenso', 'Contracts with the client, waiting for JD, or signed but unpaid.'],
     ['PQ Forms', 'fa-solid fa-list-check', 'var(--class-family)', 'Cognito', 'PQ forms sent and how far each person got.'],
     ['Social Media Posting', 'fa-solid fa-bullhorn', 'var(--class-visit)', 'Meta', 'Scheduled and recent Facebook / Instagram posts.'],
 ];
@@ -141,6 +140,34 @@ $comingWindows = [
           <div class="fd-soon-body">
             <i class="fa-solid fa-plug"></i>
             <div><strong>Not connected yet</strong><span>Today's appointments and new bookings, straight from Calendly.</span></div>
+          </div>
+        <?php endif; ?>
+      </section>
+
+      <section class="fd-win" id="fdContracts" data-enabled="<?= notionEnabled() ? '1' : '0' ?>">
+        <header>
+          <span class="fd-wico" style="--c:var(--revision)"><i class="fa-solid fa-file-signature"></i></span>
+          <h2>Contracts</h2>
+          <span class="fd-count" id="fdConCount"></span>
+          <span class="fd-src<?= notionEnabled() ? ' live' : '' ?>"><?= notionEnabled() ? 'Live' : 'Documenso' ?></span>
+        </header>
+        <?php if (notionEnabled()): ?>
+          <div class="fd-msg-tools">
+            <div class="conv-channels" id="fdConTabs" role="tablist" aria-label="Show">
+              <button type="button" class="on" data-con="client" role="tab" title="Sent through Documenso, the client hasn't signed yet">With client <b data-con-count="client"></b></button>
+              <button type="button" data-con="jd" role="tab" title="The client signed; waiting for JD's signature">Waiting for JD <b data-con-count="jd"></b></button>
+              <button type="button" data-con="unpaid" role="tab" title="Signed, but no payment ticked in Notion">Signed, not paid <b data-con-count="unpaid"></b></button>
+            </div>
+          </div>
+          <ul class="fd-list" id="fdConList"><li class="fd-empty">Loading contracts…</li></ul>
+          <footer>
+            <a href="<?= h(notionContractsUrl()) ?>" target="_blank" rel="noopener">Open in Notion →</a>
+            <button type="button" class="btn btn-ghost btn-sm" id="fdConRefresh"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+          </footer>
+        <?php else: ?>
+          <div class="fd-soon-body">
+            <i class="fa-solid fa-plug"></i>
+            <div><strong>Not connected yet</strong><span>Contracts with the client, waiting for JD, or signed but unpaid.</span></div>
           </div>
         <?php endif; ?>
       </section>

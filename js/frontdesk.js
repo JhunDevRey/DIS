@@ -552,6 +552,132 @@
     setInterval(() => { if (!document.hidden && sched) renderSchedule(); }, 60000);
   }
 
+  // ---- Contracts window ----
+  // Open contracts from the Notion 🖊️ Contracts database (via
+  // api/frontdesk_contracts.php, cached ~60s), grouped by what they're
+  // waiting on. Oldest first, so whoever has waited longest gets chased
+  // first. Clicking a row opens the contract in Notion.
+  const conWin = document.getElementById('fdContracts');
+  if (conWin && conWin.dataset.enabled === '1') {
+    const CON_KEY = 'duqueFrontDeskCon';
+    const CON_POLL_MS = 120000;
+    const CON_ROWS = 5;
+    const FOLLOW_UP_DAYS = 7;   // Documenso already sends one reminder after 2 days
+    const STAGES = ['client', 'jd', 'unpaid'];
+    const conList = document.getElementById('fdConList');
+    const conCount = document.getElementById('fdConCount');
+    const conTabs = document.getElementById('fdConTabs');
+    let conStage = 'client';
+    let conAll = false;
+    let contracts = null;
+    try {
+      const saved = JSON.parse(localStorage.getItem(CON_KEY) || '{}');
+      if (STAGES.includes(saved.stage)) conStage = saved.stage;
+    } catch (e) {}
+    const saveCon = () => { try { localStorage.setItem(CON_KEY, JSON.stringify({ stage: conStage })); } catch (e) {} };
+
+    const daysSince = (iso) => Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86400000));
+    const ageText = (iso) => { const d = daysSince(iso); return d === 0 ? 'Today' : d === 1 ? '1 day' : `${d} days`; };
+    const money = (n) => (typeof n === 'number' && n > 0)
+      ? n.toLocaleString('en-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 2 }) : '';
+    const firstEmail = (s) => (String(s || '').split(/[\s,;]+/).find(x => x.includes('@')) || '');
+    const isPaid = (c) => (c.paid_signed || []).some(x => ['Paid', 'Paid w/ Square', 'Cheque', 'Cash'].includes(x));
+
+    function conHtml(c) {
+      const age = daysSince(c.created_at);
+      const tags = [
+        c.declined && '<span class="fd-inq-tag cancel">Declined</span>',
+        c.stage === 'client' && !c.declined && age >= FOLLOW_UP_DAYS && '<span class="fd-inq-tag follow">Follow up</span>',
+        `<span class="fd-inq-tag">${c.eng ? 'Engagement' : 'PCAIC'}</span>`,
+        ...(c.case_types || []).slice(0, 3).map(t => `<span class="fd-inq-tag">${esc(t)}</span>`),
+        c.client_no && `<span class="fd-inq-tag">#${esc(c.client_no)}</span>`,
+        isPaid(c) && '<span class="fd-inq-tag app">Paid</span>',
+        c.stage !== 'client' && money(c.amount_due) && `<span class="fd-inq-tag emp">${esc(money(c.amount_due))} due</span>`,
+      ].filter(Boolean).join('');
+      const email = firstEmail(c.email) || firstEmail(c.alt_email);
+      const contact = [
+        c.client_id && `<span class="fd-inq-link" role="link" tabindex="0" data-href="client.php?id=${c.client_id}"><i class="fa-regular fa-folder-open"></i> Client file</span>`,
+        c.client_id && `<span class="fd-inq-link" role="link" tabindex="0" data-href="inbox.php?client_id=${c.client_id}"><i class="fa-regular fa-comment"></i> Message</span>`,
+        c.phone && `<span class="fd-inq-link" role="link" tabindex="0" data-href="tel:${esc(c.phone)}"><i class="fa-solid fa-phone"></i> ${esc(c.phone)}</span>`,
+        email && `<span class="fd-inq-link" role="link" tabindex="0" data-href="mailto:${esc(email)}"><i class="fa-regular fa-envelope"></i> ${esc(email)}</span>`,
+      ].filter(Boolean).join('');
+      const since = c.stage === 'client' ? 'Sent' : 'Open';
+      return `<li><a class="fd-inq" href="${esc(c.url)}" target="_blank" rel="noopener">
+        <span class="fd-inq-top"><span class="fd-name">${esc(c.name)}</span><span class="fd-time" title="${since} ${esc(new Date(c.created_at).toLocaleDateString())}">${esc(ageText(c.created_at))}</span></span>
+        <span class="fd-inq-tags">${tags}</span>
+        ${c.note ? `<span class="fd-inq-msg">${esc(c.note)}</span>` : ''}
+        ${contact ? `<span class="fd-inq-contact">${contact}</span>` : ''}
+      </a></li>`;
+    }
+
+    function renderContracts() {
+      conTabs.querySelectorAll('[data-con]').forEach(b => b.classList.toggle('on', b.dataset.con === conStage));
+      if (!contracts) return;
+      const by = {};
+      STAGES.forEach(s => { by[s] = contracts.filter(c => c.stage === s).sort((a, b) => new Date(a.created_at) - new Date(b.created_at)); });
+      STAGES.forEach(s => { conTabs.querySelector(`[data-con-count="${s}"]`).textContent = by[s].length || ''; });
+      const stale = by.client.filter(c => c.declined || daysSince(c.created_at) >= FOLLOW_UP_DAYS).length;
+      conCount.textContent = contracts.length ? `${contracts.length} open${stale ? ` · ${stale} to follow up` : ''}` : 'All caught up';
+      const rows = by[conStage];
+      if (!rows.length) {
+        conList.innerHTML = `<li class="fd-empty"><i class="fa-solid fa-check"></i>${
+          conStage === 'client' ? 'No contracts waiting on a client.'
+          : conStage === 'jd' ? 'Nothing waiting for JD to sign.'
+          : 'Every signed contract is marked paid.'}</li>`;
+        return;
+      }
+      const shown = conAll ? rows : rows.slice(0, CON_ROWS);
+      conList.innerHTML = shown.map(conHtml).join('') +
+        (rows.length > shown.length ? `<li><button type="button" class="fd-inq-more" data-con-more>Show ${rows.length - shown.length} more</button></li>` : '');
+    }
+
+    async function loadContracts(fresh = false) {
+      try {
+        const res = await fetch('api/frontdesk_contracts.php' + (fresh ? '?fresh=1' : ''), { headers: { Accept: 'application/json' } });
+        const out = await res.json();
+        if (!out.success) {
+          if (!contracts) conList.innerHTML = `<li class="fd-empty fd-inq-error">${esc(out.message || 'Could not load contracts.')}</li>`;
+          if (fresh) showToast(out.message || 'Could not load contracts.', true);
+          return;
+        }
+        contracts = out.contracts || [];
+        renderContracts();
+      } catch (e) {
+        if (!contracts) conList.innerHTML = '<li class="fd-empty fd-inq-error">Could not load contracts. Check your connection.</li>';
+      }
+    }
+
+    conTabs.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-con]');
+      if (!b) return;
+      conStage = b.dataset.con;
+      conAll = false;
+      saveCon();
+      renderContracts();
+    });
+    conList.addEventListener('click', (e) => {
+      if (e.target.closest('[data-con-more]')) { conAll = true; renderContracts(); return; }
+      // Client file / message / phone / email (spans, since links can't
+      // nest in the row link) go there instead of opening Notion.
+      const link = e.target.closest('[data-href]');
+      if (link) { e.preventDefault(); location.href = link.dataset.href; }
+    });
+    conList.addEventListener('keydown', (e) => {
+      const link = e.key === 'Enter' && e.target.closest('[data-href]');
+      if (link) { e.preventDefault(); location.href = link.dataset.href; }
+    });
+    const conRefresh = document.getElementById('fdConRefresh');
+    conRefresh.addEventListener('click', async () => {
+      conRefresh.disabled = true;
+      await loadContracts(true);
+      conRefresh.disabled = false;
+    });
+
+    renderContracts();
+    loadContracts();
+    setInterval(() => { if (!document.hidden) loadContracts(); }, CON_POLL_MS);
+  }
+
   // ---- Client quick-search ----
   const input = document.getElementById('fdSearchInput');
   const results = document.getElementById('fdSearchResults');

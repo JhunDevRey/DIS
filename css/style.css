@@ -2852,3 +2852,6 @@ a.fd-inq-link { text-decoration: none; }
   .fd-sch { gap: 10px; }
   .fd-sch-time { min-width: 0; }
 }
+
+/* ---------- Front Desk: Contracts window ---------- */
+.fd-inq-tag.follow { background: var(--revision-tint); color: var(--revision); }

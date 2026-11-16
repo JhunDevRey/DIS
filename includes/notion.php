@@ -151,3 +151,157 @@ function notionRecentInquiries(int $days = 7, bool $fresh = false): array
     @file_put_contents($cacheFile, json_encode($result), LOCK_EX);
     return $result;
 }
+
+// ---- 🖊️ Contracts (Front Desk "Contracts" window) ----
+// Make fills "Documenso Status" as contracts move through Documenso and
+// staff tick "Paid & Signed"; the window groups open contracts by what
+// they're waiting on. The Contracts database must be shared with the same
+// integration as Inquiries.
+define('NOTION_CONTRACTS_DEFAULT_DS', 'f2f9876c-54e8-4952-b0c1-411dfc590aa2');
+define('NOTION_CONTRACTS_DEFAULT_URL', 'https://www.notion.so/f74fe94d062b4f41bf3ecbba683a8075');
+define('NOTION_CONTRACTS_DAYS', 120);   // older open contracts are left to Notion
+define('NOTION_CONTRACTS_PAID', ['Paid', 'Paid w/ Square', 'Cheque', 'Cash']);
+define('NOTION_CONTRACTS_SIGNED', ['Sig', 'Sig n office']);
+
+function notionContractsDataSource(): string
+{
+    return defined('NOTION_CONTRACTS_DS') && NOTION_CONTRACTS_DS ? NOTION_CONTRACTS_DS : NOTION_CONTRACTS_DEFAULT_DS;
+}
+
+function notionContractsUrl(): string
+{
+    return defined('NOTION_CONTRACTS_URL') && NOTION_CONTRACTS_URL ? NOTION_CONTRACTS_URL : NOTION_CONTRACTS_DEFAULT_URL;
+}
+
+/**
+ * Which group an open contract belongs in, or null when it isn't waiting
+ * on anything the front desk can chase:
+ *   client — sent through Documenso, client hasn't signed (or declined)
+ *   jd     — client signed, waiting for JD's signature
+ *   unpaid — fully signed but no payment ticked
+ */
+function notionContractStage(string $docStatus, array $paidSigned): ?string
+{
+    $paid = (bool)array_intersect($paidSigned, NOTION_CONTRACTS_PAID);
+    $signedTick = (bool)array_intersect($paidSigned, NOTION_CONTRACTS_SIGNED);
+    // "Sent - waiting … | Paid - reminders off": the part before " | " is the Documenso state.
+    $state = strtolower(trim(explode('|', $docStatus)[0]));
+
+    if (strpos($state, 'waiting for joel') !== false) return 'jd';
+    if (strpos($state, 'signed by client and joel') !== false || $signedTick) return $paid ? null : 'unpaid';
+    if (strpos($state, 'waiting for client signature') !== false || strpos($state, 'declined') !== false) return 'client';
+    return null;
+}
+
+/** Lower-cased email addresses in one or more free-text email fields. */
+function notionEmailList(?string ...$fields): array
+{
+    $out = [];
+    foreach ($fields as $f) {
+        foreach (preg_split('/[\s,;]+/', strtolower((string)$f)) as $one) {
+            if ($one !== '' && strpos($one, '@') !== false) $out[] = $one;
+        }
+    }
+    return array_values(array_unique($out));
+}
+
+/** One Contracts page shaped for the Front Desk window (null = not open). */
+function notionContractForJson(array $page): ?array
+{
+    $p = $page['properties'] ?? [];
+    $v = fn(string $name) => notionPropValue($p[$name] ?? null);
+    $docStatus = (string)($v('Documenso Status') ?? '');
+    $paidSigned = $v('Paid & Signed') ?: [];
+    $stage = notionContractStage($docStatus, $paidSigned);
+    if ($stage === null) return null;
+
+    $parts = array_values(array_filter(array_map('trim', explode('|', $docStatus)), 'strlen'));
+    $state = array_shift($parts);
+    $alt = trim((string)($v('Alternative Email') ?? ''));
+    return [
+        'id'          => $page['id'] ?? '',
+        'url'         => $page['url'] ?? '',
+        'stage'       => $stage,
+        'name'        => $v('Name') ?? '(no name)',
+        'email'       => $v('Email'),
+        'alt_email'   => $alt !== '' ? $alt : null,
+        'phone'       => $v('Phone No.'),
+        'case_types'  => $v('Case Type') ?: [],
+        'client_no'   => $v('Client No.'),
+        'eng'         => stripos((string)$state, 'ENG') === 0,     // engagement letter vs PCAIC
+        'declined'    => stripos((string)$state, 'declined') !== false,
+        'doc_state'   => $state ?: null,
+        'note'        => $parts ? mb_strimwidth(implode(' · ', $parts), 0, 140, '…') : null,
+        'paid_signed' => $paidSigned,
+        'amount_due'  => $v('Amount Due'),
+        'status'      => $v('Status'),
+        'created_at'  => $page['created_time'] ?? null,
+        'updated_at'  => $page['last_edited_time'] ?? null,
+    ];
+}
+
+/**
+ * Open contracts from the last NOTION_CONTRACTS_DAYS days, newest first,
+ * each with 'client_id' when one of its emails matches an active client.
+ * Cached for NOTION_CACHE_SECONDS; $fresh skips the cache (Refresh button).
+ */
+function notionOpenContracts(bool $fresh = false): array
+{
+    $cacheDir = UPLOAD_DIR . '/cache';
+    $cacheFile = $cacheDir . '/notion_contracts.json';
+    if (!$fresh && is_file($cacheFile) && filemtime($cacheFile) > time() - NOTION_CACHE_SECONDS) {
+        $cached = json_decode((string)file_get_contents($cacheFile), true);
+        if (is_array($cached)) return $cached;
+    }
+
+    $since = gmdate('Y-m-d\TH:i:s\Z', time() - NOTION_CONTRACTS_DAYS * 86400);
+    $body = [
+        'filter' => ['and' => [
+            ['timestamp' => 'created_time', 'created_time' => ['on_or_after' => $since]],
+            ['property' => 'Status', 'status' => ['does_not_equal' => 'Retained']],
+            ['property' => 'Status', 'status' => ['does_not_equal' => 'Expired']],
+            ['or' => [
+                ['property' => 'Documenso Status', 'rich_text' => ['is_not_empty' => true]],
+                ['property' => 'Paid & Signed', 'multi_select' => ['is_not_empty' => true]],
+            ]],
+        ]],
+        'sorts'     => [['timestamp' => 'created_time', 'direction' => 'descending']],
+        'page_size' => 100,
+    ];
+    $pages = [];
+    for ($i = 0; $i < 5; $i++) {
+        $data = notionApi('POST', 'v1/data_sources/' . notionContractsDataSource() . '/query', $body);
+        $pages = array_merge($pages, $data['results'] ?? []);
+        if (empty($data['has_more']) || empty($data['next_cursor'])) break;
+        $body['start_cursor'] = $data['next_cursor'];
+    }
+    $contracts = array_values(array_filter(array_map('notionContractForJson', $pages)));
+
+    // Link to the client's file when an email matches an active client.
+    $all = [];
+    foreach ($contracts as $c) $all = array_merge($all, notionEmailList($c['email'], $c['alt_email']));
+    $clients = [];
+    if ($all) {
+        $all = array_values(array_unique($all));
+        $in = implode(',', array_fill(0, count($all), '?'));
+        $stmt = getDb()->prepare("SELECT id, LOWER(email) AS email FROM clients WHERE is_active = 1 AND LOWER(email) IN ($in)");
+        $stmt->execute($all);
+        foreach ($stmt->fetchAll() as $row) $clients[$row['email']] = (int)$row['id'];
+    }
+    foreach ($contracts as &$c) {
+        $c['client_id'] = null;
+        foreach (notionEmailList($c['email'], $c['alt_email']) as $one) {
+            if (isset($clients[$one])) { $c['client_id'] = $clients[$one]; break; }
+        }
+    }
+    unset($c);
+
+    $result = [
+        'contracts'  => $contracts,
+        'days'       => NOTION_CONTRACTS_DAYS,
+        'fetched_at' => gmdate('Y-m-d\TH:i:s\Z'),
+    ];
+    if (!is_dir($cacheDir)) @mkdir($cacheDir, 0755, true);
+    @file_put_contents($cacheFile, json_encode($result), LOCK_EX);
+    return $result;
+}
