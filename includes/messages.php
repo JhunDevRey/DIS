@@ -377,14 +377,15 @@ function createMessage(int $clientId, string $senderType, string $senderName, st
         $messageId = (int)$db->lastInsertId();
 
         foreach ($files as $i => $file) {
-            $storedName = 'msg' . $messageId . '_' . $i . '_' . time() . '_' . sanitizeFilename($file['name']);
+            $originalName = cleanUploadName((string)$file['name']);
+            $storedName = 'msg' . $messageId . '_' . $i . '_' . time() . '_' . sanitizeFilename($originalName);
             $destination = MESSAGE_UPLOAD_DIR . '/' . $storedName;
             if (!move_uploaded_file($file['tmp_name'], $destination)) {
                 throw new RuntimeException('Could not save the attached file.');
             }
             $movedPaths[] = $destination;
             $db->prepare('INSERT INTO message_files (message_id, original_name, stored_name, file_size) VALUES (?, ?, ?, ?)')
-               ->execute([$messageId, $file['name'], $storedName, (int)$file['size']]);
+               ->execute([$messageId, $originalName, $storedName, (int)$file['size']]);
         }
 
         // Sending a message means you've seen the conversation up to it.
@@ -436,12 +437,7 @@ function streamMessageFile(array $file, bool $inline): void
         @ob_end_clean();
     }
 
-    $safeName = str_replace('"', '', $file['original_name']);
-    header('Content-Type: ' . ($inline ? mimeTypeForExtension($file['original_name']) : 'application/octet-stream'));
-    header('Content-Disposition: ' . ($inline ? 'inline' : 'attachment') . '; filename="' . $safeName . '"');
-    header('Content-Length: ' . filesize($path));
-    header('X-Content-Type-Options: nosniff');
-    header('Cache-Control: no-cache');
+    sendFileHeaders((string)$file['original_name'], $inline, (int)filesize($path));
     readfile($path);
     exit;
 }

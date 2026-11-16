@@ -14,7 +14,7 @@ if (!$fileIds) {
 $db = getDb();
 $in = implode(',', array_fill(0, count($fileIds), '?'));
 $stmt = $db->prepare("
-  SELECT df.*, dr.status AS request_status
+  SELECT df.*, dr.status AS request_status, dr.client_id
   FROM document_files df
   JOIN document_requests dr ON dr.id = df.request_id
   WHERE df.id IN ($in)
@@ -60,27 +60,9 @@ foreach ($files as $file) {
 
 $zip->close();
 
-header('Content-Type: application/zip');
-header('Content-Disposition: attachment; filename="documents.zip"');
-header('Content-Length: ' . filesize($zipPath));
-header('Cache-Control: no-cache');
+sendFileHeaders('documents.zip', false, (int)filesize($zipPath), 'application/zip');
+auditLog('file.download_zip', (int)$files[0]['client_id'], count($files) . ' selected file' . (count($files) === 1 ? '' : 's'));
 readfile($zipPath);
 unlink($zipPath);
 exit;
 
-/**
- * Avoids silently overwriting entries in the zip when two selected files
- * happen to share the same original filename, by appending " (2)", " (3)",
- * etc. to any repeat.
- */
-function uniqueZipEntryName(string $name, array &$usedNames): string
-{
-    if (!isset($usedNames[$name])) {
-        $usedNames[$name] = 1;
-        return $name;
-    }
-    $usedNames[$name]++;
-    $ext = pathinfo($name, PATHINFO_EXTENSION);
-    $base = pathinfo($name, PATHINFO_FILENAME);
-    return $base . ' (' . $usedNames[$name] . ')' . ($ext ? '.' . $ext : '');
-}

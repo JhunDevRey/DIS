@@ -11,7 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $fileId = (int)($_POST['file_id'] ?? 0);
 $db = getDb();
 
-$stmt = $db->prepare('SELECT * FROM document_files WHERE id = ?');
+$stmt = $db->prepare('SELECT df.*, dr.client_id FROM document_files df JOIN document_requests dr ON dr.id = df.request_id WHERE df.id = ?');
 $stmt->execute([$fileId]);
 $file = $stmt->fetch();
 if (!$file) {
@@ -25,6 +25,7 @@ if (is_file($path)) {
     @unlink($path);
 }
 $db->prepare('DELETE FROM document_files WHERE id = ?')->execute([$fileId]);
+auditLog('file.delete', (int)$file['client_id'], (string)$file['original_name']);
 
 // If that was the last file on this field, drop the status back to pending.
 $remaining = $db->prepare('SELECT COUNT(*) FROM document_files WHERE request_id = ?');

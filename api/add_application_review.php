@@ -66,7 +66,7 @@ try {
 } catch (Throwable $e) {
     $db->rollBack();
     error_log('add_application_review failed: ' . $e->getMessage());
-    jsonResponse(false, 'Could not create the review field: ' . $e->getMessage());
+    jsonResponse(false, 'Could not create the review field: ' . userFacingError($e));
 }
 
 // Same as any other new field showing up in the client's checklist — queued

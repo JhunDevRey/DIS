@@ -55,6 +55,12 @@ if ($fileError !== null) {
     jsonResponse(false, $fileError);
 }
 
+// Throttles, so a script (or a stolen login) can't flood the case team.
+enforceActionLimit('msg:client:' . $clientId, 60, 60, "You've sent a lot of messages in the last hour. Please wait a little before sending more.");
+if ($files) {
+    enforceActionLimit('upload:client:' . $clientId, 200, 1440, "You've uploaded a lot of files today. Please wait until tomorrow, or message your case team if you need to send more.", count($files));
+}
+
 $stmt = $db->prepare('SELECT full_name, processor_id, staff_messages_seen_id FROM clients WHERE id = ?');
 $stmt->execute([$clientId]);
 $client = $stmt->fetch();

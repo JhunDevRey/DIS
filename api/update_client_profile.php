@@ -14,6 +14,7 @@ $action = $_POST['action'] ?? '';
 $clientId = (int)$_SESSION['client_id'];
 
 if ($action === 'update_contact_info') {
+    enforceActionLimit('profile:client:' . $clientId, 20, 60, 'Too many changes in the last hour. Please try again later.');
     $phone = trim($_POST['phone'] ?? '');
     $ccEmailsRaw = trim($_POST['cc_emails'] ?? '');
     $designatedName = trim($_POST['designated_person_name'] ?? '');
@@ -54,6 +55,7 @@ if ($action === 'update_password') {
 
     // Other remembered devices must sign in with the new password; this one stays.
     $signedOut = clientRememberForgetAll($clientId, true);
+    auditLog('client.password_changed');
     jsonResponse(true, 'Password updated.' . ($signedOut ? ' Your other devices have been signed out.' : ''));
 }
 

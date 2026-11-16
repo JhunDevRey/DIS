@@ -1,22 +1,8 @@
 <?php
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/functions.php';
-if (session_status() === PHP_SESSION_NONE) {
-    // Same cookie security settings as includes/admin_auth.php — this
-    // page starts the session independently (it can't require the user
-    // already be logged in, being the login page itself), so it needs
-    // the same params applied directly rather than inheriting them.
-    $isHttps = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
-    session_set_cookie_params([
-        'lifetime' => 0,
-        'path' => '/',
-        'secure' => $isHttps,
-        'httponly' => true,
-        'samesite' => 'Lax',
-    ]);
-    session_name('duque_admin_session');
-    session_start();
-}
+startAppSession('duque_admin_session');
+sendSecurityHeaders();
 
 $redirect = safeRelativeRedirect($_GET['redirect'] ?? $_POST['redirect'] ?? '');
 
@@ -31,30 +17,41 @@ if (!empty($_SESSION['admin_id'])) {
 
 $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isLoginRateLimited('admin')) {
+    $username = trim((string)($_POST['username'] ?? ''));
+    $password = (string)($_POST['password'] ?? '');
+    $tokenOk  = hash_equals(csrfToken(), (string)($_POST['csrf_token'] ?? ''));
+
+    if (!$tokenOk) {
+        // Stops another site from silently signing a visitor into an
+        // account of its choosing (login CSRF). A stale tab just retries.
+        $error = 'This page expired. Please try signing in again.';
+    } elseif (isLoginRateLimited('admin', $username)) {
         $error = 'Too many failed login attempts. Please wait ' . LOGIN_LOCKOUT_MINUTES . ' minutes and try again.';
     } else {
-        $username = trim($_POST['username'] ?? '');
-        $password = $_POST['password'] ?? '';
-
         $stmt = getDb()->prepare('SELECT * FROM admin_users WHERE username = ? LIMIT 1');
         $stmt->execute([$username]);
         $admin = $stmt->fetch();
 
-        if ($admin && password_verify($password, $admin['password_hash'])) {
-            clearLoginAttempts('admin');
+        // Always one hash check, so timing can't reveal valid usernames.
+        $passwordOk = password_verify($password, $admin['password_hash'] ?? DUMMY_PASSWORD_HASH);
+        $active = $admin && (!array_key_exists('is_active', $admin) || (int)$admin['is_active']);
+
+        if ($admin && $active && $passwordOk) {
+            clearLoginAttempts('admin', $username);
             // New session id on login, so an id an attacker planted before
             // login (session fixation) is worthless afterwards.
-            session_regenerate_id(true);
+            sessionMarkSignedIn();
             $_SESSION['admin_id'] = $admin['id'];
             $_SESSION['admin_name'] = $admin['admin_name'];
+            auditLog('staff.login', null, !empty($_POST['remember']) ? 'remember this device' : '');
             if (!empty($_POST['remember'])) {
                 adminRememberIssue((int)$admin['id']);
             }
             header('Location: ' . ($redirect ?: 'frontdesk.php'));
             exit;
         }
-        recordFailedLogin('admin');
+        recordFailedLogin('admin', $username);
+        auditLog('staff.login_failed', null, 'username: ' . mb_substr($username, 0, 60), ['type' => 'admin', 'id' => $admin ? (int)$admin['id'] : null, 'name' => $admin['admin_name'] ?? null]);
         $error = 'Incorrect username or password.';
     }
 }
@@ -101,6 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <?php endif; ?>
 
       <form method="POST" id="authForm">
+        <input type="hidden" name="csrf_token" value="<?= h(csrfToken()) ?>">
         <?php if ($redirect): ?>
           <input type="hidden" name="redirect" value="<?= h($redirect) ?>">
         <?php endif; ?>

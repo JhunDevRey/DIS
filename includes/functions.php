@@ -49,75 +49,52 @@ function verifyCsrfToken(): void
     }
 }
 
-/**
- * Best-effort real client IP for login rate limiting only — NOT treated
- * as a trusted security boundary anywhere else, since X-Forwarded-For
- * can be spoofed by the client itself if there's no proxy actually
- * setting it. Good enough to slow down a brute-force script, which is
- * all this is for.
- */
+require_once __DIR__ . '/security.php';
+
+// Sign-in throttling. Two limits, both over a rolling 15 minutes:
+//   - per address: 10 wrong passwords from one IP, whatever the account
+//   - per account: 30 wrong passwords for one login from anywhere, which
+//     stops a slow attack spread over many addresses without letting a
+//     stranger lock the team out with a handful of tries.
+define('LOGIN_LOCKOUT_MINUTES', 15);
+define('LOGIN_MAX_PER_IP', 10);
+define('LOGIN_MAX_PER_ACCOUNT', 30);
+
+function loginLimitKeys(string $realm, string $account): array
+{
+    return [
+        'login-ip:' . $realm . ':' . clientIp(),
+        'login-acct:' . $realm . ':' . mb_strtolower(trim($account)),
+    ];
+}
+
+function isLoginRateLimited(string $realm, string $account = ''): bool
+{
+    [$ipKey, $acctKey] = loginLimitKeys($realm, $account);
+    return rateLimitHit($ipKey, LOGIN_MAX_PER_IP, LOGIN_LOCKOUT_MINUTES)
+        || ($account !== '' && rateLimitHit($acctKey, LOGIN_MAX_PER_ACCOUNT, LOGIN_LOCKOUT_MINUTES));
+}
+
+function recordFailedLogin(string $realm, string $account = ''): void
+{
+    [$ipKey, $acctKey] = loginLimitKeys($realm, $account);
+    rateLimitRecord($ipKey);
+    if ($account !== '') rateLimitRecord($acctKey);
+    // Slows scripted guessing a little; a person never notices.
+    usleep(random_int(250000, 600000));
+}
+
+function clearLoginAttempts(string $realm, string $account = ''): void
+{
+    [$ipKey, $acctKey] = loginLimitKeys($realm, $account);
+    rateLimitClear($ipKey);
+    if ($account !== '') rateLimitClear($acctKey);
+}
+
+/** Kept for older callers; see clientIp() in includes/security.php. */
 function getClientIp(): string
 {
-    if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-        $parts = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
-        return trim($parts[0]);
-    }
-    return $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-}
-
-define('LOGIN_MAX_ATTEMPTS', 5);
-define('LOGIN_LOCKOUT_MINUTES', 15);
-
-/**
- * Login rate limiting — counts recent failed attempts for this IP within
- * a rolling window and blocks further tries once the threshold is hit.
- * The table is created on first use (CREATE TABLE IF NOT EXISTS) rather
- * than requiring a separate manual migration step, specifically so this
- * can't end up silently not working because a migration was missed —
- * exactly the kind of gap that's caused real deployment issues earlier
- * in this project.
- */
-function ensureLoginAttemptsTable(PDO $db): void
-{
-    static $ensured = false;
-    if ($ensured) {
-        return;
-    }
-    $db->exec("
-        CREATE TABLE IF NOT EXISTS login_attempts (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            identifier VARCHAR(100) NOT NULL,
-            attempted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            INDEX idx_identifier_time (identifier, attempted_at)
-        )
-    ");
-    $ensured = true;
-}
-
-function isLoginRateLimited(string $loginType): bool
-{
-    $db = getDb();
-    ensureLoginAttemptsTable($db);
-    $identifier = $loginType . ':' . getClientIp();
-    $stmt = $db->prepare('SELECT COUNT(*) FROM login_attempts WHERE identifier = ? AND attempted_at > (NOW() - INTERVAL ' . LOGIN_LOCKOUT_MINUTES . ' MINUTE)');
-    $stmt->execute([$identifier]);
-    return (int)$stmt->fetchColumn() >= LOGIN_MAX_ATTEMPTS;
-}
-
-function recordFailedLogin(string $loginType): void
-{
-    $db = getDb();
-    ensureLoginAttemptsTable($db);
-    $identifier = $loginType . ':' . getClientIp();
-    $db->prepare('INSERT INTO login_attempts (identifier) VALUES (?)')->execute([$identifier]);
-}
-
-function clearLoginAttempts(string $loginType): void
-{
-    $db = getDb();
-    ensureLoginAttemptsTable($db);
-    $identifier = $loginType . ':' . getClientIp();
-    $db->prepare('DELETE FROM login_attempts WHERE identifier = ?')->execute([$identifier]);
+    return clientIp();
 }
 
 function statusMeta(string $status): array
@@ -391,6 +368,33 @@ function safeRelativeRedirect(?string $path): string
     }
     return '';
 }
+/**
+ * A zip entry name for a stored file: cleaned (no "../", slashes or
+ * control characters can reach the zip), and " (2)", " (3)"… added to a
+ * repeat so two same-named files never overwrite each other.
+ */
+function uniqueZipEntryName(string $name, array &$usedNames): string
+{
+    $name = cleanUploadName($name);
+    $key = mb_strtolower($name);
+    if (!isset($usedNames[$key])) {
+        $usedNames[$key] = 1;
+        return $name;
+    }
+    $usedNames[$key]++;
+    $ext = pathinfo($name, PATHINFO_EXTENSION);
+    $base = pathinfo($name, PATHINFO_FILENAME);
+    return $base . ' (' . $usedNames[$key] . ')' . ($ext ? '.' . $ext : '');
+}
+
+/** A folder name inside a zip (one path segment, never "..", never empty). */
+function sanitizeZipFolderName(string $name): string
+{
+    $name = trim(preg_replace('/[\/\\\\:*?"<>|\x00-\x1F\x7F]/', '-', $name) ?? '');
+    $name = trim($name, '. ');
+    return $name !== '' ? mb_substr($name, 0, 100) : 'Documents';
+}
+
 function sanitizeFilename(string $name): string
 {
     $name = preg_replace('/[^A-Za-z0-9._-]/', '_', $name);
@@ -570,7 +574,10 @@ function storeUploadedDocument(array $file, int $requestId): array
         mkdir(UPLOAD_DIR, 0755, true);
     }
 
-    $storedName = 'req' . $requestId . '_' . time() . '_' . sanitizeFilename($file['name']);
+    // Shown/downloaded name, cleaned once here (see cleanUploadName()). The
+    // random part keeps two same-named uploads in one second apart.
+    $originalName = cleanUploadName((string)$file['name']);
+    $storedName = 'req' . $requestId . '_' . time() . '_' . bin2hex(random_bytes(4)) . '_' . sanitizeFilename($originalName);
     $destination = UPLOAD_DIR . '/' . $storedName;
 
     if (!move_uploaded_file($file['tmp_name'], $destination)) {
@@ -580,7 +587,7 @@ function storeUploadedDocument(array $file, int $requestId): array
     return [
         'ok' => true,
         'stored_name' => $storedName,
-        'original_name' => $file['name'],
+        'original_name' => $originalName,
         'size' => $file['size'],
     ];
 }

@@ -22,6 +22,8 @@ if (!$request) {
     jsonResponse(false, 'Document field not found.');
 }
 
+enforceActionLimit('upload:client:' . (int)$_SESSION['client_id'], 200, 1440, "You've uploaded a lot of files today. Please wait until tomorrow, or message your case team if you need to send more.");
+
 $result = storeUploadedDocument($_FILES['document'] ?? [], $requestId);
 if (!$result['ok']) {
     jsonResponse(false, $result['error']);
@@ -29,6 +31,8 @@ if (!$result['ok']) {
 
 $db->prepare('INSERT INTO document_files (request_id, original_name, stored_name, file_size, uploaded_by, uploaded_by_name) VALUES (?, ?, ?, ?, ?, ?)')
    ->execute([$requestId, $result['original_name'], $result['stored_name'], $result['size'], 'client', $_SESSION['client_name'] ?? 'Client']);
+
+auditLog('file.upload', null, $result['original_name'] . ' -> ' . $request['doc_name']);
 
 // Any fresh upload moves the field back to "received" so staff know it needs review,
 // even if it had previously been marked "needs revision".

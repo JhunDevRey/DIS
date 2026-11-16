@@ -22,4 +22,5 @@ $db = getDb();
 $stmt = $db->prepare('INSERT INTO processors (full_name, email) VALUES (?, ?)');
 $stmt->execute([$fullName, $email]);
 
+auditLog('processor.created', null, $fullName . ' <' . $email . '>');
 jsonResponse(true, 'Processor added.', ['processor_id' => $db->lastInsertId()]);

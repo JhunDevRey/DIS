@@ -64,7 +64,7 @@ try {
 } catch (Throwable $e) {
     $db->rollBack();
     error_log('add_document_request failed: ' . $e->getMessage());
-    jsonResponse(false, 'Could not open field: ' . $e->getMessage());
+    jsonResponse(false, 'Could not open field: ' . userFacingError($e));
 }
 
 // Queued for the client's next daily digest, rather than sent immediately.

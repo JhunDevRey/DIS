@@ -41,6 +41,7 @@ foreach ($stmt->fetchAll() as $file) {
 }
 
 $db->prepare('DELETE FROM document_requests WHERE id = ?')->execute([$requestId]);
+auditLog('docfield.delete', (int)$request['client_id'], $request['doc_name'] . ' (reason: ' . $reason . ')');
 
 // Queued for the client's next daily digest, rather than sent immediately.
 queueClientNotification(

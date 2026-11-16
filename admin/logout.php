@@ -1,23 +1,15 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    // Same params as everywhere else this session name is started —
-    // doesn't change behavior here (the session is destroyed on the very
-    // next line regardless), kept only for consistency across all the
-    // places this session gets started.
-    $isHttps = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
-    session_set_cookie_params([
-        'lifetime' => 0,
-        'path' => '/',
-        'secure' => $isHttps,
-        'httponly' => true,
-        'samesite' => 'Lax',
-    ]);
-    session_name('duque_admin_session');
-    session_start();
-}
-// Signing out also forgets this device, so it asks for the password next time.
+// Signs out: forgets this device's "Keep me signed in" token, empties the
+// session on the server and expires the session cookie in the browser.
+require_once __DIR__ . '/../includes/security.php';
+startAppSession('duque_admin_session');
+sendSecurityHeaders();
 require_once __DIR__ . '/../includes/admin_remember.php';
+auditLog('staff.logout');
 adminRememberForgetCurrent();
+$_SESSION = [];
+$p = session_get_cookie_params();
+setcookie(session_name(), '', ['expires' => time() - 3600, 'path' => $p['path'], 'secure' => $p['secure'], 'httponly' => true, 'samesite' => 'Lax']);
 session_destroy();
 header('Location: login.php');
 exit;

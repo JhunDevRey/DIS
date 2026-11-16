@@ -243,6 +243,7 @@ function waDownloadMedia(string $mediaId, string $waMessageId, ?string $filename
         $ext = waExtensionForMime($mime);
         $original = $filename ?: ('whatsapp-' . gmdate('Ymd-His') . ($ext ? '.' . $ext : ''));
         if ($ext && !pathinfo($original, PATHINFO_EXTENSION)) $original .= '.' . $ext;
+        $original = cleanUploadName($original);
 
         if (!is_dir(MESSAGE_UPLOAD_DIR)) mkdir(MESSAGE_UPLOAD_DIR, 0755, true);
         $stored = 'wa_' . substr(sha1($waMessageId), 0, 16) . '_' . time() . '_' . sanitizeFilename($original);

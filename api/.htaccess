@@ -1,0 +1,8 @@
+# The shared API answers only on the staff and client subdomains.
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteCond %{HTTP_HOST} !^(admin|portal)\.duqueimmigration\.ca$ [NC]
+RewriteCond %{HTTP_HOST} !^(localhost|127\.0\.0\.1)(:[0-9]+)?$ [NC]
+RewriteRule ^ - [F,L]
+</IfModule>
+Options -Indexes

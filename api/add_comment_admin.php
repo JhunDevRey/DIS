@@ -74,7 +74,7 @@ try {
 } catch (Throwable $e) {
     $db->rollBack();
     error_log('add_comment_admin failed: ' . $e->getMessage());
-    jsonResponse(false, 'Could not post comment: ' . $e->getMessage());
+    jsonResponse(false, 'Could not post comment: ' . userFacingError($e));
 }
 
 // Queued for the client's next daily digest, rather than sent immediately.

@@ -17,6 +17,37 @@
  */
 
 /**
+ * Can GD hold this image (plus $copies working copies) in memory? Each
+ * pixel takes about 5 bytes once decoded, so a 48-megapixel phone photo
+ * needs ~240 MB per copy. Raises memory_limit up to 768 MB when that is
+ * enough; otherwise returns false and callers serve the original file
+ * instead of crashing PHP part-way through a download or an Accept.
+ */
+function imageFitsInMemory(int $width, int $height, int $copies = 2): bool
+{
+    if ($width <= 0 || $height <= 0 || $width * $height > 100000000) {
+        return false; // over 100 megapixels: refuse outright
+    }
+    $needed = (int)($width * $height * 5 * $copies) + 32 * 1024 * 1024;
+    $toBytes = function (string $v): int {
+        $v = trim($v);
+        if ($v === '' || $v === '-1') return PHP_INT_MAX;
+        $n = (int)$v;
+        switch (strtolower(substr($v, -1))) {
+            case 'g': return $n * 1073741824;
+            case 'm': return $n * 1048576;
+            case 'k': return $n * 1024;
+        }
+        return $n;
+    };
+    $limit = $toBytes((string)ini_get('memory_limit'));
+    if (memory_get_usage(true) + $needed <= $limit) return true;
+    $ceiling = 768 * 1048576;
+    if (memory_get_usage(true) + $needed > $ceiling) return false;
+    return @ini_set('memory_limit', '768M') !== false;
+}
+
+/**
  * Converts an image file to PDF bytes. Returns the raw PDF content as a
  * string, or null if the file isn't a convertible image or something
  * went wrong reading/re-encoding it.
@@ -33,6 +64,9 @@ function convertImageToPdf(string $imagePath, int $jpegQuality = 78): ?string
     }
 
     [$width, $height, $type] = $info;
+    if (!imageFitsInMemory((int)$width, (int)$height, $type === IMAGETYPE_PNG ? 3 : 2)) {
+        return null; // too big to convert safely; caller serves the original
+    }
 
     switch ($type) {
         case IMAGETYPE_JPEG:
@@ -104,6 +138,9 @@ function convertImageToPdfCompressed(string $imagePath, int $maxBytes = 4194304)
         return null;
     }
     [$origWidth, $origHeight, $type] = $info;
+    if (!imageFitsInMemory((int)$origWidth, (int)$origHeight, $type === IMAGETYPE_PNG ? 3 : 2)) {
+        return null; // too big to convert safely; caller serves the original
+    }
     if (!in_array($type, [IMAGETYPE_JPEG, IMAGETYPE_PNG], true)) {
         return null; // Not a convertible image type.
     }
@@ -172,6 +209,9 @@ function convertScaledImageToPdf(string $imagePath, int $jpegQuality, float $sca
         return null;
     }
     [$width, $height, $type] = $info;
+    if (!imageFitsInMemory((int)$width, (int)$height, $type === IMAGETYPE_PNG ? 3 : 2)) {
+        return null; // too big to convert safely; caller serves the original
+    }
 
     switch ($type) {
         case IMAGETYPE_JPEG:

@@ -18,6 +18,10 @@ $db = getDb();
 // is nullable with ON DELETE SET NULL on the FK, but we do it explicitly
 // too in case the FK constraint wasn't applied via migration).
 $db->prepare('UPDATE clients SET processor_id = NULL WHERE processor_id = ?')->execute([$processorId]);
+$stmt = $db->prepare('SELECT full_name FROM processors WHERE id = ?');
+$stmt->execute([$processorId]);
+$removedName = (string)$stmt->fetchColumn();
 $db->prepare('DELETE FROM processors WHERE id = ?')->execute([$processorId]);
+auditLog('processor.deleted', null, $removedName);
 
 jsonResponse(true, 'Processor removed.');

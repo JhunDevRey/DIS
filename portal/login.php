@@ -1,21 +1,8 @@
 <?php
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/functions.php';
-if (session_status() === PHP_SESSION_NONE) {
-    // Same cookie security settings as includes/client_auth.php — see
-    // the matching comment in admin/login.php for why this is repeated
-    // here rather than shared.
-    $isHttps = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
-    session_set_cookie_params([
-        'lifetime' => 0,
-        'path' => '/',
-        'secure' => $isHttps,
-        'httponly' => true,
-        'samesite' => 'Lax',
-    ]);
-    session_name('duque_client_session');
-    session_start();
-}
+startAppSession('duque_client_session');
+sendSecurityHeaders();
 
 $redirect = safeRelativeRedirect($_GET['redirect'] ?? $_POST['redirect'] ?? '');
 
@@ -31,30 +18,42 @@ if (!empty($_SESSION['client_id'])) {
 
 $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isLoginRateLimited('portal')) {
+    $email    = trim((string)($_POST['email'] ?? ''));
+    $password = (string)($_POST['password'] ?? '');
+    $tokenOk  = hash_equals(csrfToken(), (string)($_POST['csrf_token'] ?? ''));
+
+    if (!$tokenOk) {
+        // Stops another site from silently signing a visitor into an
+        // account of its choosing (login CSRF). A stale tab just retries.
+        $error = 'This page expired. Please try signing in again.';
+    } elseif (isLoginRateLimited('portal', $email)) {
         $error = 'Too many failed login attempts. Please wait ' . LOGIN_LOCKOUT_MINUTES . ' minutes and try again.';
     } else {
-        $email    = trim($_POST['email'] ?? '');
-        $password = $_POST['password'] ?? '';
-
         $stmt = getDb()->prepare('SELECT * FROM clients WHERE email = ? LIMIT 1');
         $stmt->execute([$email]);
         $client = $stmt->fetch();
 
-        if ($client && $client['is_active'] && password_verify($password, $client['password_hash'])) {
-            clearLoginAttempts('portal');
+        // Always run one hash check, so the response time doesn't reveal
+        // whether an email has an account.
+        $hash = $client['password_hash'] ?? DUMMY_PASSWORD_HASH;
+        $passwordOk = password_verify($password, $hash);
+
+        if ($client && (int)$client['is_active'] && $passwordOk) {
+            clearLoginAttempts('portal', $email);
             // New session id on login, so an id an attacker planted before
             // login (session fixation) is worthless afterwards.
-            session_regenerate_id(true);
+            sessionMarkSignedIn();
             $_SESSION['client_id'] = $client['id'];
             $_SESSION['client_name'] = $client['full_name'];
+            auditLog('client.login', (int)$client['id']);
             if (!empty($_POST['remember'])) {
                 clientRememberIssue((int)$client['id']);
             }
             header('Location: ' . ($redirect ?: 'documents.php'));
             exit;
         }
-        recordFailedLogin('portal');
+        recordFailedLogin('portal', $email);
+        auditLog('client.login_failed', $client ? (int)$client['id'] : null, 'email: ' . mb_substr($email, 0, 80), ['type' => 'client', 'id' => $client ? (int)$client['id'] : null, 'name' => $client['full_name'] ?? null]);
         $error = 'Incorrect email or password.';
     }
 }
@@ -101,6 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <?php endif; ?>
 
       <form method="POST" id="authForm">
+        <input type="hidden" name="csrf_token" value="<?= h(csrfToken()) ?>">
         <?php if ($redirect): ?>
           <input type="hidden" name="redirect" value="<?= h($redirect) ?>">
         <?php endif; ?>

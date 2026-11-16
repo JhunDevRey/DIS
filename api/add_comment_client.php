@@ -27,6 +27,8 @@ if (!$request) {
     jsonResponse(false, 'You do not have access to this document.');
 }
 
+enforceActionLimit('comment:client:' . (int)$_SESSION['client_id'], 60, 60, "You've posted a lot of comments in the last hour. Please wait a little before posting more.");
+
 $authorName = $_SESSION['client_name'] ?? 'Client';
 
 $db->prepare('INSERT INTO comments (request_id, author_type, author_name, comment_text) VALUES (?, ?, ?, ?)')

@@ -44,11 +44,13 @@ if ($action === 'update_password') {
     // Staff share this login: every other remembered device must now sign
     // in with the new password. This one stays signed in.
     $signedOut = adminRememberForgetAll($adminId, true);
+    auditLog('staff.password_changed');
     jsonResponse(true, 'Password updated.' . ($signedOut ? ' ' . $signedOut . ' other device' . ($signedOut === 1 ? ' was' : 's were') . ' signed out.' : ''));
 }
 
 if ($action === 'forget_devices') {
     $n = adminRememberForgetAll($adminId, true);
+    auditLog('staff.devices_signed_out', null, $n . ' device(s)');
     jsonResponse(true, $n ? 'Signed out of ' . $n . ' other device' . ($n === 1 ? '' : 's') . '.' : 'No other devices were signed in.');
 }
 

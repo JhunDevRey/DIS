@@ -54,32 +54,18 @@ if (!$inline && $file['request_status'] === 'accepted' && $isConvertibleImage) {
     $pdfData = convertImageToPdf($path);
     if ($pdfData !== null) {
         $pdfName = pathinfo($file['original_name'], PATHINFO_FILENAME) . '.pdf';
-        $safeName = str_replace('"', '', $pdfName);
-
         header('Content-Description: File Transfer');
-        header('Content-Type: application/pdf');
-        header('Content-Disposition: attachment; filename="' . $safeName . '"');
-        header('Content-Length: ' . strlen($pdfData));
-        header('Cache-Control: no-cache');
+        sendFileHeaders($pdfName, false, strlen($pdfData), 'application/pdf');
         echo $pdfData;
         exit;
     }
 }
 
-$safeName = str_replace('"', '', $file['original_name']);
-
-// "Content-Description: File Transfer" deliberately NOT sent here for
-// inline requests — it's a legacy signal from old force-download PHP
-// scripts, with no purpose for something meant to display inline, and
-// removing it for that case is a safe, no-downside change even though
-// it wasn't confirmed to be the actual cause of the Mac-specific issue.
+// "Content-Description: File Transfer" deliberately NOT sent for inline
+// requests — it's a legacy force-download signal with no purpose there.
 if (!$inline) {
     header('Content-Description: File Transfer');
 }
-header('Content-Type: ' . ($inline ? mimeTypeForExtension($file['original_name']) : 'application/octet-stream'));
-header('Content-Disposition: ' . ($inline ? 'inline' : 'attachment') . '; filename="' . $safeName . '"');
-header('Content-Length: ' . filesize($path));
-header('X-Content-Type-Options: nosniff');
-header('Cache-Control: no-cache');
+sendFileHeaders((string)$file['original_name'], $inline, (int)filesize($path));
 readfile($path);
 exit;

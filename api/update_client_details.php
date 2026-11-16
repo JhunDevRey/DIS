@@ -146,6 +146,12 @@ $db->prepare('UPDATE clients SET full_name = ?, email = ?, case_type = ?, phone 
        $clientId,
    ]);
 
+$changed = [];
+foreach (['full_name' => $fullName, 'email' => $email, 'case_type' => $caseType ?: null, 'phone' => $phone ?: null, 'reference_number' => $referenceNumber ?: null, 'processor_id' => $processorId ?: null, 'cc_emails' => $ccEmailsRaw ?: null] as $col => $val) {
+    if ((string)($client[$col] ?? '') !== (string)($val ?? '')) $changed[] = str_replace('_', ' ', $col);
+}
+auditLog('client.updated', $clientId, $changed ? 'Changed: ' . implode(', ', $changed) : 'No changes');
+
 // Anyone newly added to Additional emails gets a short welcome (best-effort).
 $welcomed = notifyNewCcEmails(['full_name' => $fullName, 'email' => $email], $client['cc_emails'], $ccEmailsRaw, 'staff');
 

@@ -114,7 +114,7 @@ try {
 } catch (Throwable $e) {
     $db->rollBack();
     error_log('add_document_checklist failed: ' . $e->getMessage());
-    jsonResponse(false, 'Could not send checklist: ' . $e->getMessage());
+    jsonResponse(false, 'Could not send checklist: ' . userFacingError($e));
 }
 
 // Queued as one entry for the client's next daily digest, rather than an

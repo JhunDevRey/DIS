@@ -250,14 +250,14 @@ function renderPanelClients(clients) {
     heading.className = 'panel-case-group-heading';
     const label = group.label || 'No Case Type';
     const slug = group.label ? (CLASS_CATEGORY_SLUGS[group.label] || 'other') : 'other';
-    heading.innerHTML = `<span class="class-tag class-tag-${slug}">${label}</span> <span class="panel-case-group-count">${group.clients.length}</span>`;
+    heading.innerHTML = `<span class="class-tag class-tag-${escapeHtml(slug)}">${escapeHtml(label)}</span> <span class="panel-case-group-count">${group.clients.length}</span>`;
 
     const rows = group.clients.map(c => `
       <tr>
         <td data-label="Client">
-          <a href="client.php?id=${c.id}" style="display:flex;align-items:center;gap:8px;font-weight:600;color:var(--ink);">
-            <div class="avatar" style="width:26px;height:26px;font-size:10.5px;flex-shrink:0;">${(c.full_name || '?').charAt(0).toUpperCase()}</div>
-            <span style="min-width:0;word-break:break-word;">${c.full_name}</span>
+          <a href="client.php?id=${Number(c.id)}" style="display:flex;align-items:center;gap:8px;font-weight:600;color:var(--ink);">
+            <div class="avatar" style="width:26px;height:26px;font-size:10.5px;flex-shrink:0;">${escapeHtml((c.full_name || '?').charAt(0).toUpperCase())}</div>
+            <span style="min-width:0;word-break:break-word;">${escapeHtml(c.full_name)}</span>
           </a>
         </td>
         <td data-label="Case Type">${c.case_type_tag_html}</td>
@@ -307,7 +307,7 @@ document.querySelectorAll('[data-processor-row]').forEach(row => {
       const data = await res.json();
       if (!data.success) {
         document.getElementById('panelClientCount').textContent = '';
-        document.getElementById('panelClientList').innerHTML = `<p class="error-text">${data.message || 'Could not load clients.'}</p>`;
+        document.getElementById('panelClientList').innerHTML = `<p class="error-text">${escapeHtml(data.message || 'Could not load clients.')}</p>`;
         return;
       }
 

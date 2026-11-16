@@ -28,6 +28,8 @@ if (!$stmt->fetch()) {
 $db->prepare('UPDATE clients SET password_hash = ?, plain_password = ? WHERE id = ?')
    ->execute([password_hash($newPassword, PASSWORD_DEFAULT), $newPassword, $clientId]);
 
+auditLog('client.password_set', $clientId);
+
 // A new password signs the client out of every remembered device.
 require_once __DIR__ . '/../includes/client_remember.php';
 clientRememberForgetAll($clientId);

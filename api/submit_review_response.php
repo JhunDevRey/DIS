@@ -33,6 +33,8 @@ if (!$request || !$request['is_review']) {
     jsonResponse(false, 'You do not have access to this review.');
 }
 
+enforceActionLimit('comment:client:' . (int)$_SESSION['client_id'], 60, 60, "You've sent a lot of responses in the last hour. Please wait a little before sending more.");
+
 $clientName = $_SESSION['client_name'] ?? 'Client';
 $newReviewStatus = $action === 'confirm' ? 'confirmed' : 'changes_requested';
 // Mirrored onto the ordinary status column too, so this field surfaces in

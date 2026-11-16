@@ -17,7 +17,7 @@
  * (all carrying the same old cookie) isn't mistaken for that.
  */
 
-require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/security.php';
 
 const REMEMBER_GRACE_SECONDS = 60;
 
@@ -59,7 +59,7 @@ function rememberSetCookie(string $realm, string $value, int $expires): void
     setcookie(rememberRealm($realm)['cookie'], $value, [
         'expires'  => $expires,
         'path'     => '/',
-        'secure'   => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+        'secure'   => requestIsHttps(),
         'httponly' => true,
         'samesite' => 'Lax',
     ]);
@@ -139,7 +139,7 @@ function rememberTryLogin(string $realm): bool
         return false;
     }
 
-    session_regenerate_id(true);
+    sessionMarkSignedIn();
     $_SESSION[$r['session_id']] = $account[0];
     $_SESSION[$r['session_name']] = $account[1];
 

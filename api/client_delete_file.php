@@ -33,6 +33,7 @@ if (is_file($path)) {
     @unlink($path);
 }
 $db->prepare('DELETE FROM document_files WHERE id = ?')->execute([$fileId]);
+auditLog('file.delete', null, (string)$file['original_name']);
 
 $remaining = $db->prepare('SELECT COUNT(*) FROM document_files WHERE request_id = ?');
 $remaining->execute([$requestId]);

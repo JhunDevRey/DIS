@@ -78,27 +78,10 @@ $zip->close();
 
 $zipFilename = sanitizeZipFolderName($client['full_name']) . ' - All Documents.zip';
 
-header('Content-Type: application/zip');
-header('Content-Disposition: attachment; filename="' . str_replace('"', '', $zipFilename) . '"');
-header('Content-Length: ' . filesize($zipPath));
-header('Cache-Control: no-cache');
+sendFileHeaders($zipFilename, false, (int)filesize($zipPath), 'application/zip');
+auditLog('file.download_zip', $clientId, 'All documents (' . count($files) . ' files)');
 readfile($zipPath);
 unlink($zipPath);
 exit;
 
-function uniqueZipEntryName(string $name, array &$usedNames): string
-{
-    if (!isset($usedNames[$name])) {
-        $usedNames[$name] = 1;
-        return $name;
-    }
-    $usedNames[$name]++;
-    $ext = pathinfo($name, PATHINFO_EXTENSION);
-    $base = pathinfo($name, PATHINFO_FILENAME);
-    return $base . ' (' . $usedNames[$name] . ')' . ($ext ? '.' . $ext : '');
-}
 
-function sanitizeZipFolderName(string $name): string
-{
-    return trim(preg_replace('/[\/\\\\:*?"<>|]/', '-', $name));
-}

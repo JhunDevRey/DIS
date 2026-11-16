@@ -782,7 +782,7 @@ function checklistRowHtml(item) {
       <div>
         <div class="field">
           <label>Document name</label>
-          <input type="text" class="ci-name" value="${name.replace(/"/g,'&quot;')}" placeholder="e.g. Passport bio page">
+          <input type="text" class="ci-name" value="${escapeHtml(name).replace(/"/g,'&quot;')}" placeholder="e.g. Passport bio page">
         </div>
         <div class="field">
           <label style="display:flex;align-items:center;gap:6px;">
@@ -791,7 +791,7 @@ function checklistRowHtml(item) {
           </label>
           <input type="file" class="ci-attachment" hidden>
           <div class="ci-attach-preview" style="display:none;"></div>
-          <textarea class="ci-instructions" rows="2" placeholder="Optional notes for the client" data-live-links>${instructions}</textarea>
+          <textarea class="ci-instructions" rows="2" placeholder="Optional notes for the client" data-live-links>${escapeHtml(instructions)}</textarea>
         </div>
         <div class="checkbox-row">
           <input type="checkbox" class="ci-required" id="${id}-required" ${required ? 'checked' : ''}>
@@ -1387,7 +1387,7 @@ document.querySelectorAll('.comment-form').forEach(form => {
         const div = document.createElement('div');
         div.className = 'comment';
         div.id = 'comment-' + data.comment_id;
-        div.innerHTML = `<div class="comment-head"><span>${data.author_name}</span><span>just now <button type="button" class="comment-delete-btn" title="Delete comment" onclick="deleteComment(${data.comment_id})"><i class="fa-regular fa-trash-can"></i></button></span></div>${text.replace(/</g,'&lt;').replace(/\n/g,'<br>')}`;
+        div.innerHTML = `<div class="comment-head"><span>${escapeHtml(data.author_name)}</span><span>just now <button type="button" class="comment-delete-btn" title="Delete comment" onclick="deleteComment(${Number(data.comment_id)})"><i class="fa-regular fa-trash-can"></i></button></span></div>${text.replace(/</g,'&lt;').replace(/\n/g,'<br>')}`;
         list.appendChild(div);
         textarea.value = '';
 

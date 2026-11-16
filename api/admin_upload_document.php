@@ -29,6 +29,8 @@ if (!$result['ok']) {
 $db->prepare('INSERT INTO document_files (request_id, original_name, stored_name, file_size, uploaded_by, uploaded_by_name) VALUES (?, ?, ?, ?, ?, ?)')
    ->execute([$requestId, $result['original_name'], $result['stored_name'], $result['size'], 'admin', $_SESSION['admin_name'] ?? 'Staff']);
 
+auditLog('file.upload', (int)$request['client_id'], $result['original_name'] . ' -> ' . $request['doc_name']);
+
 // A staff-side upload marks the field Received too, so it shows up for review
 // the same way a client upload would (does not auto-Accept — staff still confirms).
 $db->prepare("UPDATE document_requests SET status = 'received' WHERE id = ?")->execute([$requestId]);

@@ -143,6 +143,9 @@ $stmt->execute([
     $dropboxAddedAt,
 ]);
 
+$newClientId = (int)$db->lastInsertId();
+auditLog('client.created', $newClientId, $fullName . ' <' . $email . '>');
+
 // Welcome emails are best-effort — never block or fail client creation.
 // The client gets their login; each additional email gets its own short
 // welcome without the password.
@@ -150,6 +153,6 @@ notifyClientWelcome(['full_name' => $fullName, 'email' => $email], $password);
 notifyNewCcEmails(['full_name' => $fullName, 'email' => $email], null, $ccEmailsRaw, 'staff');
 
 jsonResponse(true, 'Client created.', [
-    'client_id' => $db->lastInsertId(),
+    'client_id' => $newClientId,
     'dropbox_warning' => $dropboxWarning,
 ]);
