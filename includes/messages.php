@@ -109,7 +109,59 @@ function messageChannels(): array
         'whatsapp'  => ['label' => 'WhatsApp',  'icon' => 'fa-brands fa-whatsapp',          'connected' => defined('WA_API_KEY') && WA_API_KEY !== ''],
         'messenger' => ['label' => 'Messenger', 'icon' => 'fa-brands fa-facebook-messenger', 'connected' => false],
         'instagram' => ['label' => 'Instagram', 'icon' => 'fa-brands fa-instagram',         'connected' => false],
+        'tiktok'    => ['label' => 'TikTok',    'icon' => 'fa-brands fa-tiktok',            'connected' => false],
     ];
+}
+
+/**
+ * Front Desk Messaging window: social channels only (everything except the
+ * portal, which belongs to the Processing Inbox). Each client with at least
+ * one non-portal message, newest first; preview, unread count and channels
+ * come from those messages only. 'unread_portal' lets the window avoid
+ * marking a thread read while portal messages still wait for processing.
+ */
+function frontDeskConversationsForJson(): array
+{
+    $rows = getDb()->query("
+      SELECT c.id AS client_id, c.full_name,
+        last.body AS last_body, last.sender_type AS last_sender_type,
+        last.channel AS last_channel, last.created_at AS last_at,
+        (SELECT COUNT(*) FROM messages u
+          WHERE u.client_id = c.id AND u.sender_type = 'client' AND u.id > c.staff_messages_seen_id
+            AND u.is_history = 0 AND u.channel <> 'portal') AS unread_count,
+        (SELECT COUNT(*) FROM messages u
+          WHERE u.client_id = c.id AND u.sender_type = 'client' AND u.id > c.staff_messages_seen_id
+            AND u.is_history = 0 AND u.channel = 'portal') AS unread_portal,
+        (SELECT GROUP_CONCAT(DISTINCT ch.channel) FROM messages ch
+          WHERE ch.client_id = c.id AND ch.channel <> 'portal') AS channels,
+        (SELECT rc.channel FROM messages rc
+          WHERE rc.client_id = c.id AND rc.sender_type = 'client' AND rc.channel <> 'portal'
+          ORDER BY rc.created_at DESC, rc.id DESC LIMIT 1) AS reply_channel
+      FROM clients c
+      JOIN messages last ON last.id = (SELECT id FROM messages
+        WHERE client_id = c.id AND channel <> 'portal' ORDER BY created_at DESC, id DESC LIMIT 1)
+      ORDER BY last.created_at DESC, last.id DESC
+    ")->fetchAll();
+
+    return array_map(fn($c) => [
+        'client_id'     => (int)$c['client_id'],
+        'full_name'     => $c['full_name'],
+        'preview'       => ($c['last_sender_type'] === 'admin' ? 'You: ' : '') . mb_strimwidth($c['last_body'] !== '' ? $c['last_body'] : '📎 Attachment', 0, 90, '…'),
+        'last_at'       => $c['last_at'],
+        'channel'       => $c['last_channel'],
+        'unread_count'  => (int)$c['unread_count'],
+        'unread_portal' => (int)$c['unread_portal'],
+        'channels'      => array_values(array_filter(explode(',', (string)$c['channels']))),
+        'reply_channel' => (string)($c['reply_channel'] ?: $c['last_channel']),
+    ], $rows);
+}
+
+/** messageChannels() minus the portal — the Front Desk Messaging tabs. */
+function frontDeskChannels(): array
+{
+    $all = messageChannels();
+    unset($all['portal']);
+    return $all;
 }
 
 /**

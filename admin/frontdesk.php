@@ -8,13 +8,15 @@ require_once __DIR__ . '/../includes/calendly.php';
 requireAdmin();
 $activeNav = 'frontdesk';
 
-// Same data the Inbox list uses; the Messaging window re-polls
-// api/admin_messages.php?list=1 to stay current.
+// Social channels only (WhatsApp, Messenger, Instagram, TikTok) — portal
+// messages belong to the Processing Inbox. The Messaging window re-polls
+// api/admin_messages.php?list=1&scope=frontdesk to stay current.
 $frontDeskData = [
-    'conversations' => staffConversationsForJson(),
+    'conversations' => frontDeskConversationsForJson(),
     'clients'       => staffClientDirectory(),
     'unread_total'  => staffUnreadConversationCount(),
 ];
+$fdChannels = frontDeskChannels();
 // "Sending as" names for quick replies (same list as the Inbox composer).
 [$staffSenders, $senderLocked] = staffSenderOptions();
 
@@ -22,7 +24,6 @@ $frontDeskData = [
 // what's coming, each says where its data will come from.
 $comingWindows = [
     ['PQ Forms', 'fa-solid fa-list-check', 'var(--class-family)', 'Cognito', 'PQ forms sent and how far each person got.'],
-    ['Social Media Posting', 'fa-solid fa-bullhorn', 'var(--class-visit)', 'Meta', 'Scheduled and recent Facebook / Instagram posts.'],
 ];
 ?>
 <!DOCTYPE html>
@@ -57,7 +58,6 @@ $comingWindows = [
 
     <div class="fd-actions">
       <a href="clients.php?new=1" class="btn btn-gold"><i class="fa-solid fa-user-plus"></i> Add client</a>
-      <a href="inbox.php" class="btn btn-ghost"><i class="fa-regular fa-paper-plane"></i> Message a client</a>
       <a href="clients.php" class="btn btn-ghost"><i class="fa-solid fa-users"></i> All clients</a>
     </div>
 
@@ -72,7 +72,7 @@ $comingWindows = [
         <div class="fd-msg-tools">
           <div class="conv-channels" id="fdChannelTabs" role="tablist" aria-label="Channel">
             <button type="button" class="on" data-channel="all" role="tab">All <b data-channel-count="all"></b></button>
-            <?php foreach (messageChannels() as $key => $ch): ?>
+            <?php foreach ($fdChannels as $key => $ch): ?>
               <button type="button" data-channel="<?= h($key) ?>" data-connected="<?= $ch['connected'] ? '1' : '0' ?>" data-label="<?= h($ch['label']) ?>" role="tab" title="<?= h($ch['label']) ?><?= $ch['connected'] ? '' : ' (not connected yet)' ?>">
                 <i class="<?= h($ch['icon']) ?>"></i><span class="conv-ch-label"><?= h($ch['label']) ?></span> <b data-channel-count="<?= h($key) ?>"></b>
               </button>
@@ -80,39 +80,10 @@ $comingWindows = [
           </div>
           <label class="fd-unread-toggle"><input type="checkbox" id="fdUnreadOnly"> Unread</label>
         </div>
-        <ul class="fd-list" id="fdMsgList" data-wa="<?= messageChannels()['whatsapp']['connected'] ? '1' : '0' ?>"></ul>
+        <ul class="fd-list" id="fdMsgList" data-wa="<?= $fdChannels['whatsapp']['connected'] ? '1' : '0' ?>" data-any-connected="<?= array_filter(array_column($fdChannels, 'connected')) ? '1' : '0' ?>"></ul>
         <footer>
-          <a href="inbox.php">Open Inbox →</a>
-          <a href="inbox.php" class="btn btn-ghost btn-sm"><i class="fa-regular fa-paper-plane"></i> New message</a>
+          <span class="fd-foot-note">WhatsApp · Messenger · Instagram · TikTok</span>
         </footer>
-      </section>
-
-      <section class="fd-win" id="fdInquiries" data-enabled="<?= notionEnabled() ? '1' : '0' ?>">
-        <header>
-          <span class="fd-wico" style="--c:var(--ink-solid)"><i class="fa-solid fa-n"></i></span>
-          <h2>Notion · Inquiries</h2>
-          <span class="fd-count" id="fdInqCount"></span>
-          <span class="fd-src<?= notionEnabled() ? ' live' : '' ?>"><?= notionEnabled() ? 'Live' : 'Notion' ?></span>
-        </header>
-        <?php if (notionEnabled()): ?>
-          <div class="fd-msg-tools">
-            <div class="conv-channels" id="fdInqTabs" role="tablist" aria-label="Show">
-              <button type="button" class="on" data-inq="today" role="tab">Today <b data-inq-count="today"></b></button>
-              <button type="button" data-inq="week" role="tab">7 days <b data-inq-count="week"></b></button>
-            </div>
-            <label class="fd-unread-toggle"><input type="checkbox" id="fdInqWebsite"> Website only</label>
-          </div>
-          <ul class="fd-list" id="fdInqList"><li class="fd-empty">Loading inquiries…</li></ul>
-          <footer>
-            <a href="<?= h(notionInquiriesUrl()) ?>" target="_blank" rel="noopener">Open in Notion →</a>
-            <button type="button" class="btn btn-ghost btn-sm" id="fdInqRefresh"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
-          </footer>
-        <?php else: ?>
-          <div class="fd-soon-body">
-            <i class="fa-solid fa-plug"></i>
-            <div><strong>Not connected yet</strong><span>New inquiries from the website and staff, straight from Notion.</span></div>
-          </div>
-        <?php endif; ?>
       </section>
 
       <section class="fd-win" id="fdSchedule" data-enabled="<?= calendlyEnabled() ? '1' : '0' ?>">

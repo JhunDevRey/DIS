@@ -3,6 +3,7 @@
  * api/admin_messages.php
  * Staff side of Messages.
  *   GET  ?list=1                       -> conversation list + unread total (inbox sidebar refresh)
+ *   GET  ?list=1&scope=frontdesk       -> same, social channels only (Front Desk Messaging window)
  *   GET  ?client_id=N&after_id=M       -> messages in one conversation newer than M (polling)
  *   POST action=send, client_id, body, attachments[], reply_to_id?, channel=portal|whatsapp -> send a message
  *   POST action=seen, client_id, up_to_id             -> mark conversation read
@@ -23,8 +24,9 @@ $db = getDb();
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     if (!empty($_GET['list'])) {
+        $frontDesk = ($_GET['scope'] ?? '') === 'frontdesk';
         jsonResponse(true, '', [
-            'conversations' => staffConversationsForJson(),
+            'conversations' => $frontDesk ? frontDeskConversationsForJson() : staffConversationsForJson(),
             'clients'       => staffClientDirectory(),
             'unread_total'  => staffUnreadConversationCount() + (waEnabled() ? waUnmatchedCount() : 0),
             'wa_unmatched'  => waEnabled() ? waUnmatchedCount() : 0,

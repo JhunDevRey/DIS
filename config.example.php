@@ -129,10 +129,10 @@ define('PORTAL_APP_URL', 'https://portal.duqueimmigration.ca');
 // built separately — it is not currently persisted to this app's storage.
 define('ADOBE_PDF_EMBED_CLIENT_ID', '');
 
-// ---- Notion (Front Desk "Notion · Inquiries" window, read-only) ----
+// ---- Notion (Front Desk "Contracts" window, read-only) ----
 // Leave NOTION_TOKEN empty to keep the window switched off. Create an
 // internal integration at notion.so/profile/integrations (read content
-// only), copy its secret here, then in Notion open the 📬 Inquiries
+// only), copy its secret here, then in Notion open the 🖊️ Contracts
 // database → ••• → Connections → add the integration.
 define('NOTION_TOKEN', '');
 

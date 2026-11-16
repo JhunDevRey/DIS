@@ -1,7 +1,7 @@
 // js/frontdesk.js — staff Front Desk (admin/frontdesk.php).
-// Greeting, the client quick-search, and the live Messaging window. The
-// window re-polls the same endpoint the Inbox list uses, so both always
-// agree on what's unread.
+// Greeting, the client quick-search, and the live windows. The Messaging
+// window shows social channels only (WhatsApp, Messenger, Instagram,
+// TikTok); portal messages stay in the Processing Inbox.
 (function () {
   'use strict';
 
@@ -49,7 +49,9 @@
   const countEl = document.getElementById('fdMsgCount');
   const tabs = document.getElementById('fdChannelTabs');
   const unreadOnly = document.getElementById('fdUnreadOnly');
-  const onChannel = (conv, ch) => ch === 'all' || (conv.channels || ['portal']).includes(ch);
+  const onChannel = (conv, ch) => ch === 'all' || (conv.channels || []).includes(ch);
+  const anyConnected = list.dataset.anyConnected === '1';
+  const waOn = list.dataset.wa === '1';
 
   // Remember the tab + Unread toggle on this device.
   try {
@@ -78,6 +80,14 @@
     });
 
     const tab = tabs.querySelector(`[data-channel="${channel}"]`);
+    if (channel === 'all' && !anyConnected && !data.conversations.length) {
+      list.innerHTML = `<li class="fd-empty fd-not-connected">
+        <i class="fa-solid fa-plug"></i>
+        <strong>No chat channels connected yet</strong>
+        <span>WhatsApp, Messenger, Instagram and TikTok chats will show up here once they're connected.</span>
+      </li>`;
+      return;
+    }
     if (tab && tab.dataset.connected === '0') {
       list.innerHTML = `<li class="fd-empty fd-not-connected">
         <i class="${esc(tab.querySelector('i').className)}"></i>
@@ -93,7 +103,7 @@
     if (!rows.length) {
       list.innerHTML = `<li class="fd-empty">${unreadOnly.checked
         ? '<i class="fa-solid fa-circle-check"></i> No unread messages.'
-        : 'No conversations yet.'}</li>`;
+        : 'No chats yet.'}</li>`;
       return;
     }
     list.innerHTML = rows.map(conv => {
@@ -106,7 +116,7 @@
           <span class="fd-sub">${esc(conv.preview)}</span>
         </span>
         <span class="fd-time">${esc(timeAgo(conv.last_at))}</span>
-      </a><button type="button" class="fd-reply-btn" data-reply="${conv.client_id}" title="Quick reply to ${esc(conv.full_name)}" aria-label="Quick reply to ${esc(conv.full_name)}"><i class="fa-solid fa-reply"></i></button></li>`;
+      </a>${canReply(conv) ? `<button type="button" class="fd-reply-btn" data-reply="${conv.client_id}" title="Quick reply to ${esc(conv.full_name)} on WhatsApp" aria-label="Quick reply to ${esc(conv.full_name)} on WhatsApp"><i class="fa-solid fa-reply"></i></button>` : ''}</li>`;
     }).join('');
     if (replyFor) {
       if (list.querySelector(`.fd-row[data-client-id="${replyFor}"]`)) openReply(replyFor, false);
@@ -115,6 +125,9 @@
   }
 
   // ---- Quick reply ----
+  // WhatsApp is the only social channel that can send from here so far.
+  const canReply = (conv) => waOn && (conv.channels || []).includes('whatsapp');
+
   function senderOptions() {
     let saved = '';
     try { saved = localStorage.getItem(SEND_AS_KEY) || ''; } catch (e) {}
@@ -139,22 +152,12 @@
     replyFor = clientId;
     row.classList.add('replying');
     const first = String(conv.full_name).trim().split(/\s+/)[0];
-    // WhatsApp on: reply on the channel the client last wrote on (staff
-    // can switch). The server falls back to the portal when it can't send
-    // on WhatsApp, and says so in the toast.
-    const waOn = list.dataset.wa === '1';
-    const via = waOn && conv.reply_channel === 'whatsapp' ? 'whatsapp' : 'portal';
-    const viaHtml = waOn ? `<label class="fd-reply-via"><select aria-label="Send via">
-          <option value="portal"${via === 'portal' ? ' selected' : ''}>Portal</option>
-          <option value="whatsapp"${via === 'whatsapp' ? ' selected' : ''}>WhatsApp</option>
-        </select></label>` : '';
     const box = document.createElement('form');
     box.className = 'fd-reply';
     box.innerHTML = `
       <textarea rows="2" maxlength="${MESSAGE_MAX_LENGTH}" placeholder="Reply to ${esc(first)}…" aria-label="Reply to ${esc(conv.full_name)}"></textarea>
       <div class="fd-reply-bar">
         <label class="fd-reply-as"><i class="fa-solid fa-user-pen"></i><select aria-label="Sending as">${senderOptions()}</select></label>
-        ${viaHtml}
         <span class="fd-reply-actions">
           <button type="button" class="btn btn-ghost btn-sm" data-cancel>Cancel</button>
           <button type="submit" class="btn btn-gold btn-sm"><i class="fa-solid fa-paper-plane"></i> Send</button>
@@ -164,15 +167,10 @@
     row.appendChild(box);
     const ta = box.querySelector('textarea');
     const sel = box.querySelector('.fd-reply-as select');
-    const viaSel = box.querySelector('.fd-reply-via select');
-    const note = box.querySelector('[data-via-note]');
-    const setNote = () => {
-      note.textContent = viaSel && viaSel.value === 'whatsapp'
-        ? 'Goes to their WhatsApp (within 24h of their last WhatsApp; otherwise portal + a WhatsApp notice).'
-        : 'Goes to their portal Messages; they get an email notice to log in.';
-    };
-    setNote();
-    if (viaSel) viaSel.addEventListener('change', setNote);
+    // The server can only send free text on WhatsApp within 24h of the
+    // client's last WhatsApp; after that it falls back and says so.
+    box.querySelector('[data-via-note]').textContent =
+      'Goes to their WhatsApp (within 24h of their last WhatsApp message).';
     ta.value = replyDraft;
     const grow = () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 180) + 'px'; };
     grow();
@@ -199,15 +197,16 @@
     fd.append('body', text);
     const sel = box.querySelector('.fd-reply-as select');
     if (sel.value) fd.append('sender_id', sel.value);
-    const viaSel = box.querySelector('.fd-reply-via select');
-    if (viaSel) fd.append('channel', viaSel.value);
+    fd.append('channel', 'whatsapp');
     try {
       const res = await fetch('api/admin_messages.php', { method: 'POST', body: fd });
       const out = await res.json();
       if (!out.success) { showToast(out.message || 'Could not send the message.', true); btn.disabled = false; return; }
-      // Replying answers everything before it, so the conversation is read.
+      // Replying answers the chat, so it's read — unless portal messages
+      // are also waiting: the read marker covers the whole thread, and
+      // those belong to the Processing Inbox.
       const sent = out.messages && out.messages[out.messages.length - 1];
-      if (sent && conv.unread_count) {
+      if (sent && conv.unread_count && !conv.unread_portal) {
         const seen = new FormData();
         seen.append('action', 'seen');
         seen.append('client_id', conv.client_id);
@@ -216,7 +215,7 @@
       }
       closeReply();
       // WhatsApp sends explain what happened (sent / fell back to portal).
-      showToast(viaSel && out.message && out.message !== 'Message sent.' ? out.message : `Sent to ${conv.full_name}.`);
+      showToast(out.message && out.message !== 'Message sent.' ? out.message : `Sent to ${conv.full_name}.`);
       refresh();
     } catch (err) {
       showToast('Could not send — check your connection and try again.', true);
@@ -243,7 +242,7 @@
 
   async function refresh() {
     try {
-      const res = await fetch('api/admin_messages.php?list=1', { headers: { Accept: 'application/json' } });
+      const res = await fetch('api/admin_messages.php?list=1&scope=frontdesk', { headers: { Accept: 'application/json' } });
       const fresh = await res.json();
       if (!fresh.success) return;
       data = fresh;
@@ -260,119 +259,6 @@
   renderMessages();
   setInterval(() => { if (!document.hidden) refresh(); }, LIST_POLL_MS);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
-
-  // ---- Notion · Inquiries window ----
-  // Read-only list of recent inquiries from the Notion 📬 Inquiries database
-  // (via api/frontdesk_inquiries.php, cached ~60s on the server). Clicking a
-  // row opens the inquiry in Notion; email/phone are one tap away.
-  const inqWin = document.getElementById('fdInquiries');
-  if (inqWin && inqWin.dataset.enabled === '1') {
-    const INQ_KEY = 'duqueFrontDeskInq';
-    const INQ_POLL_MS = 120000;
-    const INQ_ROWS = 5;
-    const inqList = document.getElementById('fdInqList');
-    const inqCount = document.getElementById('fdInqCount');
-    const inqTabs = document.getElementById('fdInqTabs');
-    const inqWebsite = document.getElementById('fdInqWebsite');
-    let inqRange = 'today';
-    let inqAll = false;
-    let inquiries = null;
-    try {
-      const saved = JSON.parse(localStorage.getItem(INQ_KEY) || '{}');
-      if (saved.range === 'week') inqRange = 'week';
-      inqWebsite.checked = !!saved.website;
-    } catch (e) {}
-    const saveInq = () => { try { localStorage.setItem(INQ_KEY, JSON.stringify({ range: inqRange, website: inqWebsite.checked })); } catch (e) {} };
-
-    const isToday = (iso) => new Date(iso).toDateString() === new Date().toDateString();
-    const inqWhen = (iso) => {
-      const d = new Date(iso);
-      return isToday(iso) ? d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-        : d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
-    };
-
-    function inqHtml(q) {
-      const tags = [
-        q.inquiring_as && `<span class="fd-inq-tag ${q.inquiring_as === 'Canadian Employer' ? 'emp' : 'app'}">${esc(q.inquiring_as)}</span>`,
-        q.service && `<span class="fd-inq-tag">${esc(q.service)}</span>`,
-        ...(q.case_types || []).slice(0, 3).map(c => `<span class="fd-inq-tag">${esc(c)}</span>`),
-        q.from_website ? '<span class="fd-inq-tag web">Website</span>' : (q.heard_via && `<span class="fd-inq-tag">${esc(q.heard_via)}</span>`),
-        q.country && `<span class="fd-inq-tag">${esc(q.country)}</span>`,
-      ].filter(Boolean).join('');
-      const contact = [
-        q.phone && `<span class="fd-inq-link" role="link" tabindex="0" data-href="tel:${esc(q.phone)}"><i class="fa-solid fa-phone"></i> ${esc(q.phone)}</span>`,
-        q.email && `<span class="fd-inq-link" role="link" tabindex="0" data-href="mailto:${esc(q.email)}"><i class="fa-regular fa-envelope"></i> ${esc(q.email)}</span>`,
-      ].filter(Boolean).join('');
-      return `<li><a class="fd-inq" href="${esc(q.url)}" target="_blank" rel="noopener">
-        <span class="fd-inq-top"><span class="fd-name">${esc(q.name)}</span><span class="fd-time">${esc(inqWhen(q.created_at))}</span></span>
-        ${tags ? `<span class="fd-inq-tags">${tags}</span>` : ''}
-        ${q.message ? `<span class="fd-inq-msg">${esc(q.message)}</span>` : ''}
-        ${contact ? `<span class="fd-inq-contact">${contact}</span>` : ''}
-      </a></li>`;
-    }
-
-    function renderInquiries() {
-      inqTabs.querySelectorAll('[data-inq]').forEach(b => b.classList.toggle('on', b.dataset.inq === inqRange));
-      if (!inquiries) return;
-      const base = inquiries.filter(q => !inqWebsite.checked || q.from_website);
-      const today = base.filter(q => isToday(q.created_at));
-      inqTabs.querySelector('[data-inq-count="today"]').textContent = today.length || '';
-      inqTabs.querySelector('[data-inq-count="week"]').textContent = base.length || '';
-      const todayAll = inquiries.filter(q => isToday(q.created_at)).length;
-      inqCount.textContent = todayAll ? `${todayAll} new today` : 'None today yet';
-      const rows = inqRange === 'today' ? today : base;
-      if (!rows.length) {
-        inqList.innerHTML = `<li class="fd-empty">${inqRange === 'today' ? 'No new inquiries today yet.' : 'No inquiries in the last 7 days.'}</li>`;
-        return;
-      }
-      const shown = inqAll ? rows : rows.slice(0, INQ_ROWS);
-      inqList.innerHTML = shown.map(inqHtml).join('') +
-        (rows.length > shown.length ? `<li><button type="button" class="fd-inq-more" data-inq-more>Show ${rows.length - shown.length} more</button></li>` : '');
-    }
-
-    async function loadInquiries(fresh = false) {
-      try {
-        const res = await fetch('api/frontdesk_inquiries.php' + (fresh ? '?fresh=1' : ''), { headers: { Accept: 'application/json' } });
-        const out = await res.json();
-        if (!out.success) {
-          if (!inquiries) inqList.innerHTML = `<li class="fd-empty fd-inq-error">${esc(out.message || 'Could not load inquiries.')}</li>`;
-          if (fresh) showToast(out.message || 'Could not load inquiries.', true);
-          return;
-        }
-        inquiries = out.inquiries || [];
-        renderInquiries();
-      } catch (e) {
-        if (!inquiries) inqList.innerHTML = '<li class="fd-empty fd-inq-error">Could not load inquiries. Check your connection.</li>';
-      }
-    }
-
-    inqTabs.addEventListener('click', (e) => {
-      const b = e.target.closest('[data-inq]');
-      if (!b) return;
-      inqRange = b.dataset.inq;
-      inqAll = false;
-      saveInq();
-      renderInquiries();
-    });
-    inqWebsite.addEventListener('change', () => { inqAll = false; saveInq(); renderInquiries(); });
-    inqList.addEventListener('click', (e) => {
-      if (e.target.closest('[data-inq-more]')) { inqAll = true; renderInquiries(); return; }
-      // Phone / email (spans, since links can't nest in the row link) call
-      // or email instead of opening Notion.
-      const contact = e.target.closest('[data-href]');
-      if (contact) { e.preventDefault(); location.href = contact.dataset.href; }
-    });
-    const refreshBtn = document.getElementById('fdInqRefresh');
-    refreshBtn.addEventListener('click', async () => {
-      refreshBtn.disabled = true;
-      await loadInquiries(true);
-      refreshBtn.disabled = false;
-    });
-
-    renderInquiries();
-    loadInquiries();
-    setInterval(() => { if (!document.hidden) loadInquiries(); }, INQ_POLL_MS);
-  }
 
   // ---- Scheduling window (Calendly) ----
   // Today's and the next 7 days' bookings from Calendly (via

@@ -38,10 +38,9 @@ $navUserInitials = strtoupper(substr($navUserParts[0], 0, 1) . (count($navUserPa
   </div>
   <div class="sidebar-drawer">
     <nav>
-      <a href="frontdesk.php" title="Front Desk" class="<?= $activeNav === 'frontdesk' ? 'active' : '' ?>"><i class="fa-solid fa-bell-concierge"></i><span class="nav-label">Front Desk</span></a>
       <a href="clients.php" title="Clients" class="<?= $activeNav === 'clients' && $navClass === '' ? 'active' : '' ?>" data-nav-clients><i class="fa-solid fa-users"></i><span class="nav-label">Clients</span></a>
-      <a href="inbox.php" title="Inbox" class="<?= $activeNav === 'inbox' ? 'active' : '' ?>">
-        <i class="fa-solid fa-inbox"></i><span class="nav-label">Inbox</span>
+      <a href="inbox.php" title="Processing Inbox" class="<?= $activeNav === 'inbox' ? 'active' : '' ?>">
+        <i class="fa-solid fa-inbox"></i><span class="nav-label">Processing Inbox</span>
         <span class="nav-badge" id="navInboxBadge" title="Conversations with unread messages"<?= $navInboxUnread ? '' : ' hidden' ?>><?= $navInboxUnread ?></span>
       </a>
       <a href="processors.php" title="Processors" class="<?= $activeNav === 'processors' ? 'active' : '' ?>"><i class="fa-solid fa-user-tie"></i><span class="nav-label">Processors</span></a>
@@ -62,6 +61,11 @@ $navUserInitials = strtoupper(substr($navUserParts[0], 0, 1) . (count($navUserPa
     </nav>
 
     <div class="spacer"></div>
+    <!-- Front desk work (social chats, bookings, contracts, PQ) sits apart
+         from the processing pages above so processors aren't sent there. -->
+    <nav class="nav-frontdesk" aria-label="Front desk">
+      <a href="frontdesk.php" title="Front Desk" class="<?= $activeNav === 'frontdesk' ? 'active' : '' ?>"><i class="fa-solid fa-bell-concierge"></i><span class="nav-label">Front Desk</span></a>
+    </nav>
     <button type="button" class="nav-install" id="navInstallApp" title="Install the app on this device" hidden>
       <i class="fa-solid fa-download"></i><span class="nav-label">Install app</span>
     </button>

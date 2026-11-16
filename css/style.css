@@ -337,6 +337,9 @@ input, select, textarea { font-family: inherit; }
 
 .sidebar .spacer { flex: 1; min-height: 16px; }
 
+/* Front Desk link, set apart at the bottom of the sidebar */
+.sidebar nav.nav-frontdesk { margin: 0 0 6px; padding-top: 8px; border-top: 1px solid var(--line); }
+
 /* "Install app" (js/pwa-install.js shows it unless already running as the app) */
 .nav-install {
   display: flex; align-items: center; gap: 10px; width: 100%;
@@ -2797,14 +2800,10 @@ button.msg-edited:hover { color: var(--ink); text-decoration: underline; }
   .fd-reply textarea { font-size: 16px; } /* no iOS zoom-on-focus */
 }
 
-/* Front Desk quick reply: Portal / WhatsApp pick (only when WhatsApp is on) */
-.fd-reply-via { flex-shrink: 0; }
-.fd-reply-via select {
-  font: inherit; font-size: 12px; color: var(--text);
-  background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px;
-}
+/* Front Desk Messaging footer: which channels the window covers */
+.fd-foot-note { font-size: 12px; color: var(--text-muted); }
 
-/* ---------- Front Desk: Notion · Inquiries window ---------- */
+/* ---------- Front Desk: list rows shared by the Scheduling and Contracts windows ---------- */
 .fd-inq { display: block; padding: 10px 16px; color: inherit; text-decoration: none; transition: background var(--ease); }
 .fd-inq:hover { background: var(--surface-alt); }
 .fd-inq-top { display: flex; align-items: baseline; gap: 8px; }

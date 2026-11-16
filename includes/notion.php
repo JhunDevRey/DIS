@@ -2,9 +2,9 @@
 /**
  * includes/notion.php
  * Read-only access to the office Notion workspace for the staff Front Desk
- * (the "Notion · Inquiries" window). Uses a Notion internal integration
- * token (NOTION_TOKEN in config.php); the Inquiries database must be shared
- * with that integration in Notion (••• → Connections).
+ * (the "Contracts" window). Uses a Notion internal integration token
+ * (NOTION_TOKEN in config.php); the Contracts database must be shared with
+ * that integration in Notion (••• → Connections).
  *
  * Results are cached on disk for NOTION_CACHE_SECONDS so a room full of
  * open Front Desks doesn't hit Notion's rate limit (~3 requests/second).
@@ -15,24 +15,11 @@ require_once __DIR__ . '/functions.php';
 
 define('NOTION_VERSION', '2025-09-03');
 define('NOTION_CACHE_SECONDS', 60);
-// The 📬 Inquiries data source and the database page staff open in Notion.
-define('NOTION_INQUIRIES_DEFAULT_DS', '54a74c41-aa2a-4718-854c-3433727c4608');
-define('NOTION_INQUIRIES_DEFAULT_URL', 'https://www.notion.so/072cfe33276e44e498ed33cac24b0843');
 
 /** Notion is on only once a token is in config.php. */
 function notionEnabled(): bool
 {
     return defined('NOTION_TOKEN') && NOTION_TOKEN !== '';
-}
-
-function notionInquiriesDataSource(): string
-{
-    return defined('NOTION_INQUIRIES_DS') && NOTION_INQUIRIES_DS ? NOTION_INQUIRIES_DS : NOTION_INQUIRIES_DEFAULT_DS;
-}
-
-function notionInquiriesUrl(): string
-{
-    return defined('NOTION_INQUIRIES_URL') && NOTION_INQUIRIES_URL ? NOTION_INQUIRIES_URL : NOTION_INQUIRIES_DEFAULT_URL;
 }
 
 /**
@@ -100,63 +87,11 @@ function notionPropValue(?array $prop)
     return null;
 }
 
-/** One Inquiries page shaped for the Front Desk window. */
-function notionInquiryForJson(array $page): array
-{
-    $p = $page['properties'] ?? [];
-    $v = fn(string $name) => notionPropValue($p[$name] ?? null);
-    $message = (string)($v('Message') ?? '');
-    return [
-        'id'           => $page['id'] ?? '',
-        'url'          => $page['url'] ?? '',
-        'created_at'   => $page['created_time'] ?? null,     // ISO 8601, UTC
-        'name'         => $v('Name') ?? '(no name)',
-        'email'        => $v('Email'),
-        'phone'        => $v('Phone No.'),
-        'inquiring_as' => $v('Inquiring as'),
-        'service'      => $v('Service'),
-        'case_types'   => $v('Case Type') ?: [],
-        'heard_via'    => $v('Type'),                          // how they found us
-        'from_website' => ($v('Source') ?? '') === 'website_typeform',
-        'country'      => $v('Country'),
-        'message'      => $message !== '' ? mb_strimwidth($message, 0, 220, '…') : null,
-    ];
-}
-
-/**
- * Inquiries created in the last $days days, newest first (max 100).
- * Cached for NOTION_CACHE_SECONDS; $fresh skips the cache (Refresh button).
- */
-function notionRecentInquiries(int $days = 7, bool $fresh = false): array
-{
-    $cacheDir = UPLOAD_DIR . '/cache';
-    $cacheFile = $cacheDir . '/notion_inquiries_' . $days . '.json';
-    if (!$fresh && is_file($cacheFile) && filemtime($cacheFile) > time() - NOTION_CACHE_SECONDS) {
-        $cached = json_decode((string)file_get_contents($cacheFile), true);
-        if (is_array($cached)) return $cached;
-    }
-
-    $since = gmdate('Y-m-d\TH:i:s\Z', time() - $days * 86400);
-    $data = notionApi('POST', 'v1/data_sources/' . notionInquiriesDataSource() . '/query', [
-        'filter'    => ['timestamp' => 'created_time', 'created_time' => ['on_or_after' => $since]],
-        'sorts'     => [['timestamp' => 'created_time', 'direction' => 'descending']],
-        'page_size' => 100,
-    ]);
-    $result = [
-        'inquiries'  => array_map('notionInquiryForJson', $data['results'] ?? []),
-        'fetched_at' => gmdate('Y-m-d\TH:i:s\Z'),
-    ];
-
-    if (!is_dir($cacheDir)) @mkdir($cacheDir, 0755, true);
-    @file_put_contents($cacheFile, json_encode($result), LOCK_EX);
-    return $result;
-}
 
 // ---- 🖊️ Contracts (Front Desk "Contracts" window) ----
 // Make fills "Documenso Status" as contracts move through Documenso and
 // staff tick "Paid & Signed"; the window groups open contracts by what
-// they're waiting on. The Contracts database must be shared with the same
-// integration as Inquiries.
+// they're waiting on.
 define('NOTION_CONTRACTS_DEFAULT_DS', 'f2f9876c-54e8-4952-b0c1-411dfc590aa2');
 define('NOTION_CONTRACTS_DEFAULT_URL', 'https://www.notion.so/f74fe94d062b4f41bf3ecbba683a8075');
 define('NOTION_CONTRACTS_DAYS', 120);   // older open contracts are left to Notion

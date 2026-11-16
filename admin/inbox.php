@@ -43,7 +43,7 @@ $waDefault = $waOn && $openClient && $waNumber ? waPreferredChannel((int)$openCl
 <script>(function(){var t=localStorage.getItem("theme")||(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t);})();</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
 <?php include __DIR__ . '/_pwa_head.php'; ?>
-<title><?= $openClient ? h($openClient['full_name']) . ' · ' : '' ?>Inbox · Duque Immigration Document Portal</title>
+<title><?= $openClient ? h($openClient['full_name']) . ' · ' : '' ?>Processing Inbox · Duque Immigration Document Portal</title>
 <link rel="icon" type="image/png" href="images/duqueimmigration_logo.png?v=<?= assetVersion('images/duqueimmigration_logo.png') ?>">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer">
 <link rel="stylesheet" href="css/style.css?v=<?= cssVersion() ?>">
@@ -55,7 +55,7 @@ $waDefault = $waOn && $openClient && $waNumber ? waPreferredChannel((int)$openCl
   <main class="main">
     <div class="main-header">
       <div>
-        <h1>Inbox</h1>
+        <h1>Processing Inbox</h1>
         <p>Messages between your team and clients<?= $waOn ? ', from the portal and WhatsApp' : '' ?>. Clients see these in the Messages tab of their portal.</p>
       </div>
     </div>
@@ -70,7 +70,7 @@ $waDefault = $waOn && $openClient && $waNumber ? waPreferredChannel((int)$openCl
         <?php // Full-screen (phones/tablets) title bar — hidden on desktop. ?>
         <div class="msg-fs-bar">
           <button type="button" class="msg-fs-icon msg-fs-menu" data-open-nav aria-label="Open menu" title="Menu"><i class="fa-solid fa-bars"></i></button>
-          <span class="msg-fs-title">Inbox</span>
+          <span class="msg-fs-title">Processing Inbox</span>
         </div>
         <div class="conv-channels" id="msgChannelTabs" role="tablist" aria-label="Channel">
           <button type="button" class="on" data-channel="all" role="tab">All <b data-channel-count="all"></b></button>
