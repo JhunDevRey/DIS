@@ -38,6 +38,7 @@ if ($reset && $_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         completeClientReset($reset, $password);
         sessionMarkSignedIn();
+        unset($_SESSION['client_auth_version']);
         $_SESSION['client_id'] = (int)$reset['client_id'];
         $_SESSION['client_name'] = $reset['full_name'];
         auditLog('client.password_reset_done', (int)$reset['client_id']);
@@ -55,7 +56,7 @@ if ($reset && $_SERVER['REQUEST_METHOD'] === 'POST') {
 <meta name="referrer" content="no-referrer">
 <title>Choose a new password · Duque Immigration Client Portal</title>
 <link rel="icon" type="image/png" href="images/duqueimmigration_logo.png?v=<?= assetVersion('images/duqueimmigration_logo.png') ?>">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer">
 <link rel="stylesheet" href="css/style.css?v=<?= cssVersion() ?>">
 </head>
 <body class="auth-page">

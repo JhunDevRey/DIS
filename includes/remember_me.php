@@ -51,7 +51,8 @@ function rememberLookupAccount(string $realm, int $id): ?array
     $stmt = getDb()->prepare('SELECT * FROM admin_users WHERE id = ?');
     $stmt->execute([$id]);
     $a = $stmt->fetch();
-    return $a ? [$id, $a['admin_name'] ?? $a['full_name'] ?? 'Staff'] : null;
+    $active = $a && (!array_key_exists('is_active', $a) || (int)$a['is_active'] === 1);
+    return $active ? [$id, $a['admin_name'] ?? $a['full_name'] ?? 'Staff'] : null;
 }
 
 function rememberSetCookie(string $realm, string $value, int $expires): void
@@ -140,6 +141,7 @@ function rememberTryLogin(string $realm): bool
     }
 
     sessionMarkSignedIn();
+    unset($_SESSION[$realm . '_auth_version']); // adopt the account's current version
     $_SESSION[$r['session_id']] = $account[0];
     $_SESSION[$r['session_name']] = $account[1];
 

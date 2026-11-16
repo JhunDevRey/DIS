@@ -1,7 +1,14 @@
 <?php
+/**
+ * api/update_admin_profile.php — the signed-in staff account's own profile.
+ *   POST action=update_name, full_name
+ *   POST action=update_password, current_password, new_password
+ *   POST action=forget_devices   -> sign this account out everywhere else
+ */
 require_once __DIR__ . '/../includes/admin_auth.php';
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/functions.php';
+require_once __DIR__ . '/../includes/staff_security.php';
 requireAdmin();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -10,12 +17,13 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $db = getDb();
 $action = $_POST['action'] ?? '';
-$adminId = (int)$_SESSION['admin_id'];
+$admin = currentAdmin();
+$adminId = (int)$admin['id'];
 
 if ($action === 'update_name') {
-    $fullName = trim($_POST['full_name'] ?? '');
-    if ($fullName === '') {
-        jsonResponse(false, 'Full name is required.');
+    $fullName = trim((string)($_POST['full_name'] ?? ''));
+    if ($fullName === '' || mb_strlen($fullName) > 100) {
+        jsonResponse(false, 'Please enter your name (up to 100 characters).');
     }
     $db->prepare('UPDATE admin_users SET admin_name = ? WHERE id = ?')->execute([$fullName, $adminId]);
     $_SESSION['admin_name'] = $fullName;
@@ -23,35 +31,39 @@ if ($action === 'update_name') {
 }
 
 if ($action === 'update_password') {
-    $current = $_POST['current_password'] ?? '';
-    $new     = $_POST['new_password'] ?? '';
+    $current = (string)($_POST['current_password'] ?? '');
+    $new     = (string)($_POST['new_password'] ?? '');
 
-    if (strlen($new) < 6) {
-        jsonResponse(false, 'New password must be at least 6 characters.');
-    }
+    // Guessing the current password here is throttled like signing in.
+    enforceActionLimit('pwchange:staff:' . $adminId, 10, 15, 'Too many attempts. Please wait 15 minutes and try again.');
 
-    $stmt = $db->prepare('SELECT password_hash FROM admin_users WHERE id = ?');
-    $stmt->execute([$adminId]);
-    $row = $stmt->fetch();
-
-    if (!$row || !password_verify($current, $row['password_hash'])) {
+    if (!password_verify($current, $admin['password_hash'])) {
         jsonResponse(false, 'Current password is incorrect.');
     }
+    $problem = staffPasswordProblem($new, (string)$admin['username']);
+    if ($problem !== null) {
+        jsonResponse(false, $problem);
+    }
+    if (password_verify($new, $admin['password_hash'])) {
+        jsonResponse(false, 'Please choose a password different from the current one.');
+    }
 
-    $db->prepare('UPDATE admin_users SET password_hash = ? WHERE id = ?')
+    $db->prepare('UPDATE admin_users SET password_hash = ?, must_change_password = 0 WHERE id = ?')
        ->execute([password_hash($new, PASSWORD_DEFAULT), $adminId]);
 
-    // Staff share this login: every other remembered device must now sign
+    // Every other session and remembered device of this account must sign
     // in with the new password. This one stays signed in.
-    $signedOut = adminRememberForgetAll($adminId, true);
+    $otherDevices = adminRememberOtherDeviceCount($adminId);
+    adminSignOutEverywhere($adminId, true);
     auditLog('staff.password_changed');
-    jsonResponse(true, 'Password updated.' . ($signedOut ? ' ' . $signedOut . ' other device' . ($signedOut === 1 ? ' was' : 's were') . ' signed out.' : ''));
+    jsonResponse(true, 'Password updated.' . ($otherDevices ? ' ' . $otherDevices . ' other device' . ($otherDevices === 1 ? ' was' : 's were') . ' signed out.' : ''));
 }
 
 if ($action === 'forget_devices') {
-    $n = adminRememberForgetAll($adminId, true);
-    auditLog('staff.devices_signed_out', null, $n . ' device(s)');
-    jsonResponse(true, $n ? 'Signed out of ' . $n . ' other device' . ($n === 1 ? '' : 's') . '.' : 'No other devices were signed in.');
+    $n = adminRememberOtherDeviceCount($adminId);
+    adminSignOutEverywhere($adminId, true);
+    auditLog('staff.devices_signed_out', null, $n . ' remembered device(s)');
+    jsonResponse(true, 'Signed out of every other device' . ($n ? ' (' . $n . ' remembered)' : '') . '.');
 }
 
 jsonResponse(false, 'Unknown action.');

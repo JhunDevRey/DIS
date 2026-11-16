@@ -1,5 +1,5 @@
 <?php
-// $activeNav should be set by the including page: 'frontdesk' | 'clients' | 'inbox' | 'processors' | 'profile'
+// $activeNav should be set by the including page: 'frontdesk' | 'clients' | 'inbox' | 'processors' | 'staff' | 'activity' | 'profile'
 $activeNav = $activeNav ?? '';
 
 // Inbox badge = conversations with unread client messages. Wrapped so a
@@ -19,6 +19,7 @@ try {
 $navClass = $activeNav === 'clients' ? (string)($_GET['class'] ?? '') : '';
 $navUserName = $_SESSION['admin_name'] ?? 'Staff';
 $navUserParts = preg_split('/\s+/', trim($navUserName));
+$navIsOwner = (int)(($GLOBALS['currentAdmin'] ?? [])['is_owner'] ?? 0) === 1;
 $navUserInitials = strtoupper(substr($navUserParts[0], 0, 1) . (count($navUserParts) > 1 ? substr(end($navUserParts), 0, 1) : ''));
 ?>
 <aside class="sidebar" id="appSidebar">
@@ -44,6 +45,10 @@ $navUserInitials = strtoupper(substr($navUserParts[0], 0, 1) . (count($navUserPa
         <span class="nav-badge" id="navInboxBadge" title="Conversations with unread messages"<?= $navInboxUnread ? '' : ' hidden' ?>><?= $navInboxUnread ?></span>
       </a>
       <a href="processors.php" title="Processors" class="<?= $activeNav === 'processors' ? 'active' : '' ?>"><i class="fa-solid fa-user-tie"></i><span class="nav-label">Processors</span></a>
+      <?php if ($navIsOwner): ?>
+      <a href="staff.php" title="Staff accounts" class="<?= $activeNav === 'staff' ? 'active' : '' ?>"><i class="fa-solid fa-users-gear"></i><span class="nav-label">Staff accounts</span></a>
+      <a href="activity.php" title="Activity" class="<?= $activeNav === 'activity' ? 'active' : '' ?>"><i class="fa-solid fa-clock-rotate-left"></i><span class="nav-label">Activity</span></a>
+      <?php endif; ?>
       <a href="profile.php" title="My Profile" class="<?= $activeNav === 'profile' ? 'active' : '' ?>"><i class="fa-solid fa-id-badge"></i><span class="nav-label">My Profile</span></a>
     </nav>
 
@@ -66,7 +71,7 @@ $navUserInitials = strtoupper(substr($navUserParts[0], 0, 1) . (count($navUserPa
     </div>
     <div class="user-box">
       <span class="user-avatar" title="<?= h($navUserName) ?>"><?= h($navUserInitials) ?></span>
-      <span class="user-meta"><span class="name"><?= h($navUserName) ?></span><small>Staff</small></span>
+      <span class="user-meta"><span class="name"><?= h($navUserName) ?></span><small><?= $navIsOwner ? 'Owner' : 'Staff' ?></small></span>
       <a href="logout.php" class="user-signout" title="Sign out" aria-label="Sign out"><i class="fa-solid fa-right-from-bracket"></i></a>
     </div>
   </div>

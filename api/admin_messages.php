@@ -85,6 +85,9 @@ if ($action === 'seen') {
 // trusted as free text). No pick = the team name.
 function inboxActorName(PDO $db): string
 {
+    // An account linked to a processor always sends as that person.
+    [$allowed, $locked] = staffSenderOptions();
+    if ($locked) return $allowed[0]['full_name'];
     $senderId = (int)($_POST['sender_id'] ?? 0);
     if ($senderId > 0) {
         $stmt = $db->prepare('SELECT full_name FROM processors WHERE id = ? AND is_active = 1');

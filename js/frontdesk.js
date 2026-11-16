@@ -118,7 +118,8 @@
   function senderOptions() {
     let saved = '';
     try { saved = localStorage.getItem(SEND_AS_KEY) || ''; } catch (e) {}
-    return `<option value="">Duque Immigration (team)</option>` + senders.map(s =>
+    const locked = document.getElementById('fdSenders').dataset.locked === '1';
+    return (locked ? '' : `<option value="">Duque Immigration (team)</option>`) + senders.map(s =>
       `<option value="${s.id}"${String(s.id) === saved ? ' selected' : ''}>${esc(s.name)}</option>`).join('');
   }
 

@@ -50,11 +50,21 @@ function commonPasswords(): array
         'canada123', 'manila123', 'winnipeg', 'immigration', 'duque123', 'changeme', 'p@ssw0rd'];
 }
 
-/** Sets a client's password. $temporary = set by staff, must be changed. */
+/**
+ * Sets a client's password. $temporary = set by staff, must be changed.
+ * Every other open session of this client ends (auth_version goes up);
+ * if the client is changing their own, their current session carries on.
+ */
 function setClientPassword(int $clientId, string $password, bool $temporary): void
 {
-    getDb()->prepare('UPDATE clients SET password_hash = ?, plain_password = NULL, must_change_password = ? WHERE id = ?')
-           ->execute([password_hash($password, PASSWORD_DEFAULT), $temporary ? 1 : 0, $clientId]);
+    $db = getDb();
+    $db->prepare('UPDATE clients SET password_hash = ?, plain_password = NULL, must_change_password = ?, auth_version = auth_version + 1 WHERE id = ?')
+       ->execute([password_hash($password, PASSWORD_DEFAULT), $temporary ? 1 : 0, $clientId]);
+    if (session_name() === 'duque_client_session' && (int)($_SESSION['client_id'] ?? 0) === $clientId) {
+        $stmt = $db->prepare('SELECT auth_version FROM clients WHERE id = ?');
+        $stmt->execute([$clientId]);
+        $_SESSION['client_auth_version'] = (int)$stmt->fetchColumn();
+    }
 }
 
 /** Creates a reset link for this client and returns its full URL. */

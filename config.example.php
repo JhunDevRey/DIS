@@ -167,3 +167,19 @@ define('WA_NOTICE_TEMPLATE_LANG', 'en');
 // international client base.
 
 date_default_timezone_set('UTC');
+
+// ---- Security ----
+// Encrypts staff two-step sign-in secrets. Required for two-step sign-in.
+// Generate once and never change it (changing it switches every staff
+// member's two-step sign-in off until they set it up again):
+//   php -r "echo bin2hex(random_bytes(32)), PHP_EOL;"
+define('SECURITY_KEY', '');
+// true = every staff account must turn on two-step sign-in before using
+// the portal (they're sent to My Profile to set it up). Recommended once
+// everyone has their own account.
+define('ADMIN_REQUIRE_2FA', false);
+// Only if the site sits behind a proxy/CDN that hides the visitor's IP:
+// the header it sets and the start of its own addresses. Leave empty
+// otherwise. Never trust X-Forwarded-For without this, since anyone can send it.
+// define('TRUSTED_PROXY_IP_HEADER', 'HTTP_X_FORWARDED_FOR');
+// define('TRUSTED_PROXY_PREFIXES', ['10.', '172.16.']);

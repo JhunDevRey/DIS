@@ -11,7 +11,7 @@ $db = getDb();
 $clientDirectory = staffClientDirectory();
 $processorNames = array_values(array_unique(array_filter(array_column($clientDirectory, 'processor'))));
 sort($processorNames, SORT_NATURAL | SORT_FLAG_CASE);
-$staffSenders = $db->query('SELECT id, full_name FROM processors WHERE is_active = 1 ORDER BY full_name ASC')->fetchAll();
+[$staffSenders, $senderLocked] = staffSenderOptions();
 
 $openClient = null;
 $openClientId = (int)($_GET['client_id'] ?? 0);
@@ -45,7 +45,7 @@ $waDefault = $waOn && $openClient && $waNumber ? waPreferredChannel((int)$openCl
 <?php include __DIR__ . '/_pwa_head.php'; ?>
 <title><?= $openClient ? h($openClient['full_name']) . ' · ' : '' ?>Inbox · Duque Immigration Document Portal</title>
 <link rel="icon" type="image/png" href="images/duqueimmigration_logo.png?v=<?= assetVersion('images/duqueimmigration_logo.png') ?>">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer">
 <link rel="stylesheet" href="css/style.css?v=<?= cssVersion() ?>">
 </head>
 <body class="page-messages">
@@ -199,7 +199,7 @@ $waDefault = $waOn && $openClient && $waNumber ? waPreferredChannel((int)$openCl
             <div class="msg-sendas">
               <label for="msgSendAs"><i class="fa-solid fa-user-pen"></i> Sending as</label>
               <select id="msgSendAs">
-                <option value="">Duque Immigration (team)</option>
+                <?php if (!$senderLocked): ?><option value="">Duque Immigration (team)</option><?php endif; ?>
                 <?php foreach ($staffSenders as $s): ?>
                   <option value="<?= (int)$s['id'] ?>"><?= h($s['full_name']) ?></option>
                 <?php endforeach; ?>

@@ -55,6 +55,18 @@ function requireClient(): void
         clientDenyAccess();
     }
 
+    // Password changed or reset since this session started? Then it's over.
+    // (Sessions restored from a remembered device adopt the current version;
+    // those tokens are deleted whenever the password changes.)
+    $version = (int)($row['auth_version'] ?? 0);
+    if (!isset($_SESSION['client_auth_version'])) {
+        $_SESSION['client_auth_version'] = $version;
+    } elseif ((int)$_SESSION['client_auth_version'] !== $version) {
+        $_SESSION = [];
+        session_regenerate_id(true);
+        clientDenyAccess();
+    }
+
     // Every state-changing request must carry this session's CSRF token.
     $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
     if (!in_array($method, ['GET', 'HEAD', 'OPTIONS'], true)) {

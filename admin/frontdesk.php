@@ -15,7 +15,7 @@ $frontDeskData = [
     'unread_total'  => staffUnreadConversationCount(),
 ];
 // "Sending as" names for quick replies (same list as the Inbox composer).
-$staffSenders = getDb()->query('SELECT id, full_name FROM processors WHERE is_active = 1 ORDER BY full_name ASC')->fetchAll();
+[$staffSenders, $senderLocked] = staffSenderOptions();
 
 // Windows whose integrations aren't built yet — shown so staff know
 // what's coming, each says where its data will come from.
@@ -36,7 +36,7 @@ $comingWindows = [
 <?php include __DIR__ . '/_pwa_head.php'; ?>
 <title>Front Desk · Duque Immigration Document Portal</title>
 <link rel="icon" type="image/png" href="images/duqueimmigration_logo.png?v=<?= assetVersion('images/duqueimmigration_logo.png') ?>">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer">
 <link rel="stylesheet" href="css/style.css?v=<?= cssVersion() ?>">
 </head>
 <body>
@@ -134,7 +134,7 @@ $comingWindows = [
 </div>
 <div id="toast"></div>
 <script id="fdData" type="application/json"><?= json_encode($frontDeskData, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
-<script id="fdSenders" type="application/json"><?= json_encode(array_map(fn($s) => ['id' => (int)$s['id'], 'name' => $s['full_name']], $staffSenders), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
+<script id="fdSenders" type="application/json" data-locked="<?= $senderLocked ? '1' : '0' ?>"><?= json_encode(array_map(fn($s) => ['id' => (int)$s['id'], 'name' => $s['full_name']], $staffSenders), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
 <script src="js/ui-kit.js?v=<?= assetVersion('js/ui-kit.js') ?>"></script>
 <script src="js/frontdesk.js?v=<?= assetVersion('js/frontdesk.js') ?>"></script>
 </body>
