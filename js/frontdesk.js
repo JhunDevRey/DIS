@@ -374,6 +374,184 @@
     setInterval(() => { if (!document.hidden) loadInquiries(); }, INQ_POLL_MS);
   }
 
+  // ---- Scheduling window (Calendly) ----
+  // Today's and the next 7 days' bookings from Calendly (via
+  // api/frontdesk_schedule.php, cached ~60s on the server). Times are shown
+  // in the office timezone (the API says which); a booker in another
+  // timezone also gets their own local time. Invitees whose email matches
+  // a client link straight to that client's file.
+  const schWin = document.getElementById('fdSchedule');
+  if (schWin && schWin.dataset.enabled === '1') {
+    const SCH_KEY = 'duqueFrontDeskSch';
+    const SCH_POLL_MS = 120000;
+    const SCH_ROWS = 6;
+    const NEW_HOURS = 24;
+    const schList = document.getElementById('fdSchList');
+    const schCount = document.getElementById('fdSchCount');
+    const schTabs = document.getElementById('fdSchTabs');
+    const schCanceled = document.getElementById('fdSchCanceled');
+    let schRange = 'today';
+    let schAll = false;
+    let sched = null;
+    try {
+      const saved = JSON.parse(localStorage.getItem(SCH_KEY) || '{}');
+      if (['today', 'week', 'new'].includes(saved.range)) schRange = saved.range;
+      schCanceled.checked = !!saved.canceled;
+    } catch (e) {}
+    const saveSch = () => { try { localStorage.setItem(SCH_KEY, JSON.stringify({ range: schRange, canceled: schCanceled.checked })); } catch (e) {} };
+
+    const fmt = (iso, tz, opts) => {
+      try { return new Date(iso).toLocaleString([], Object.assign({ timeZone: tz }, opts)); }
+      catch (e) { return new Date(iso).toLocaleString([], opts); }
+    };
+    const T = { hour: 'numeric', minute: '2-digit' };
+    const dayKey = (iso, tz) => fmt(iso, tz, { year: 'numeric', month: '2-digit', day: '2-digit' });
+    const tzShort = (tz) => {
+      try {
+        const p = new Intl.DateTimeFormat([], { timeZone: tz, timeZoneName: 'short' }).formatToParts(new Date());
+        return (p.find(x => x.type === 'timeZoneName') || {}).value || '';
+      } catch (e) { return ''; }
+    };
+    const city = (tz) => (tz || '').split('/').pop().replace(/_/g, ' ');
+    const isNewBooking = (ev) => ev.booked_at && Date.now() - new Date(ev.booked_at).getTime() < NEW_HOURS * 3600000;
+    const isCanceled = (ev) => ev.status === 'canceled';
+
+    function personHtml(ev, p, tz) {
+      const tags = [
+        p.client && `<a class="fd-inq-tag client" href="client.php?id=${p.client.client_id}" title="Open client file"><i class="fa-regular fa-folder-open"></i> Client</a>`,
+        p.rescheduled && '<span class="fd-inq-tag">Rescheduled</span>',
+        p.no_show && '<span class="fd-inq-tag cancel">No-show</span>',
+        p.status === 'canceled' && !isCanceled(ev) && '<span class="fd-inq-tag cancel">Canceled</span>',
+        p.timezone && p.timezone !== tz && !isCanceled(ev) && fmt(ev.start, p.timezone, T) !== fmt(ev.start, tz, T) &&
+          `<span class="fd-inq-tag" title="${esc(p.timezone)}">Their time ${esc(fmt(ev.start, p.timezone, T))} · ${esc(city(p.timezone))}</span>`,
+      ].filter(Boolean).join('');
+      const contact = [
+        p.client && `<a class="fd-inq-link" href="inbox.php?client_id=${p.client.client_id}"><i class="fa-regular fa-comment"></i> Message</a>`,
+        p.phone && `<a class="fd-inq-link" href="tel:${esc(p.phone)}"><i class="fa-solid fa-phone"></i> ${esc(p.phone)}</a>`,
+        p.email && `<a class="fd-inq-link" href="mailto:${esc(p.email)}"><i class="fa-regular fa-envelope"></i> ${esc(p.email)}</a>`,
+      ].filter(Boolean).join('');
+      const qa = (p.answers || []).slice(0, 2).map(a => `<span class="fd-sch-qa"><b>${esc(a.q)}</b> ${esc(a.a)}</span>`).join('');
+      return `<div class="fd-sch-person">
+        <span class="fd-name">${esc(p.name)}</span>
+        ${tags ? `<span class="fd-inq-tags">${tags}</span>` : ''}
+        ${qa}
+        ${contact ? `<span class="fd-inq-contact">${contact}</span>` : ''}
+      </div>`;
+    }
+
+    function schHtml(ev, tz, now, nextId) {
+      const start = new Date(ev.start).getTime();
+      const end = new Date(ev.end).getTime();
+      const state = isCanceled(ev) ? 'canceled'
+        : (start <= now && now < end) ? 'now'
+        : end <= now ? 'past'
+        : ev.id === nextId ? 'next' : '';
+      const people = ev.invitees.length ? ev.invitees : [{ name: '(no invitee)', answers: [] }];
+      const evTags = [
+        state === 'now' && '<span class="fd-inq-tag now">Now</span>',
+        state === 'next' && '<span class="fd-inq-tag next">Up next</span>',
+        isCanceled(ev) && `<span class="fd-inq-tag cancel">Canceled${ev.canceled_by ? ' by ' + esc(ev.canceled_by) : ''}</span>`,
+        isNewBooking(ev) && !isCanceled(ev) && `<span class="fd-inq-tag web" title="Booked ${esc(fmt(ev.booked_at, tz, { weekday: 'short', hour: 'numeric', minute: '2-digit' }))}">New</span>`,
+        ev.location.label && `<span class="fd-inq-tag">${esc(ev.location.label)}</span>`,
+        ev.hosts.length && `<span class="fd-inq-tag"><i class="fa-regular fa-user"></i> ${esc(ev.hosts.join(', '))}</span>`,
+      ].filter(Boolean).join('');
+      const join = ev.location.join_url && !isCanceled(ev) && state !== 'past'
+        ? `<a class="btn btn-ghost btn-sm fd-sch-join" href="${esc(ev.location.join_url)}" target="_blank" rel="noopener"><i class="fa-solid fa-video"></i> Join</a>` : '';
+      return `<li class="fd-sch${state ? ' is-' + state : ''}">
+        <span class="fd-sch-time"><b>${esc(fmt(ev.start, tz, T))}</b><span>${esc(fmt(ev.end, tz, T))}</span></span>
+        <span class="fd-sch-body">
+          <span class="fd-inq-top"><span class="fd-name fd-sch-title">${esc(ev.name)}</span>${join}</span>
+          ${evTags ? `<span class="fd-inq-tags">${evTags}</span>` : ''}
+          ${ev.cancel_reason ? `<span class="fd-inq-msg">“${esc(ev.cancel_reason)}”</span>` : ''}
+          ${people.map(p => personHtml(ev, p, tz)).join('')}
+        </span>
+      </li>`;
+    }
+
+    function renderSchedule() {
+      schTabs.querySelectorAll('[data-sch]').forEach(b => b.classList.toggle('on', b.dataset.sch === schRange));
+      if (!sched) return;
+      const tz = sched.timezone;
+      const now = Date.now();
+      const todayKey = dayKey(new Date().toISOString(), tz);
+      const all = sched.events;
+      const visible = all.filter(ev => schCanceled.checked || !isCanceled(ev));
+      const today = visible.filter(ev => dayKey(ev.start, tz) === todayKey);
+      const fresh = visible.filter(isNewBooking);
+      schTabs.querySelector('[data-sch-count="today"]').textContent = today.length || '';
+      schTabs.querySelector('[data-sch-count="week"]').textContent = visible.length || '';
+      schTabs.querySelector('[data-sch-count="new"]').textContent = fresh.length || '';
+
+      const activeToday = all.filter(ev => !isCanceled(ev) && dayKey(ev.start, tz) === todayKey);
+      const left = activeToday.filter(ev => new Date(ev.end).getTime() > now).length;
+      schCount.textContent = activeToday.length ? `${activeToday.length} today · ${left} left` : 'Nothing today';
+      schCount.title = `Times in office time: ${tzShort(tz) || tz} (${city(tz)})`;
+      const next = all.find(ev => !isCanceled(ev) && new Date(ev.start).getTime() > now);
+      const nextId = next && next.id;
+
+      const rows = schRange === 'today' ? today : schRange === 'new' ? fresh : visible;
+      if (!rows.length) {
+        schList.innerHTML = `<li class="fd-empty">${
+          schRange === 'today' ? 'No appointments today.'
+          : schRange === 'new' ? `No new bookings in the last ${NEW_HOURS} hours (for the next 7 days).`
+          : 'No appointments in the next 7 days.'}</li>`;
+        return;
+      }
+      const shown = schAll ? rows : rows.slice(0, SCH_ROWS);
+      // Day headings in the 7-day and new-bookings lists.
+      let lastDay = schRange === 'today' ? todayKey : null;
+      schList.innerHTML = shown.map(ev => {
+        const k = dayKey(ev.start, tz);
+        const head = k !== lastDay
+          ? `<li class="fd-sch-day">${esc(k === todayKey ? 'Today' : fmt(ev.start, tz, { weekday: 'long', month: 'short', day: 'numeric' }))}</li>` : '';
+        lastDay = k;
+        return head + schHtml(ev, tz, now, nextId);
+      }).join('') +
+        (rows.length > shown.length ? `<li><button type="button" class="fd-inq-more" data-sch-more>Show ${rows.length - shown.length} more</button></li>` : '');
+    }
+
+    async function loadSchedule(freshLoad = false) {
+      try {
+        const res = await fetch('api/frontdesk_schedule.php' + (freshLoad ? '?fresh=1' : ''), { headers: { Accept: 'application/json' } });
+        const out = await res.json();
+        if (!out.success) {
+          if (!sched) schList.innerHTML = `<li class="fd-empty fd-inq-error">${esc(out.message || 'Could not load bookings.')}</li>`;
+          if (freshLoad) showToast(out.message || 'Could not load bookings.', true);
+          return;
+        }
+        sched = out;
+        renderSchedule();
+      } catch (e) {
+        if (!sched) schList.innerHTML = '<li class="fd-empty fd-inq-error">Could not load bookings. Check your connection.</li>';
+      }
+    }
+
+    schTabs.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-sch]');
+      if (!b) return;
+      schRange = b.dataset.sch;
+      schAll = false;
+      saveSch();
+      renderSchedule();
+    });
+    schCanceled.addEventListener('change', () => { schAll = false; saveSch(); renderSchedule(); });
+    schList.addEventListener('click', (e) => {
+      if (e.target.closest('[data-sch-more]')) { schAll = true; renderSchedule(); }
+    });
+    const schRefresh = document.getElementById('fdSchRefresh');
+    schRefresh.addEventListener('click', async () => {
+      schRefresh.disabled = true;
+      await loadSchedule(true);
+      schRefresh.disabled = false;
+    });
+
+    renderSchedule();
+    loadSchedule();
+    setInterval(() => { if (!document.hidden) loadSchedule(); }, SCH_POLL_MS);
+    // Re-draw every minute so "Now" / "Up next" move without a reload.
+    setInterval(() => { if (!document.hidden && sched) renderSchedule(); }, 60000);
+  }
+
   // ---- Client quick-search ----
   const input = document.getElementById('fdSearchInput');
   const results = document.getElementById('fdSearchResults');

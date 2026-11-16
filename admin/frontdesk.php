@@ -4,6 +4,7 @@ require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/messages.php';
 require_once __DIR__ . '/../includes/notion.php';
+require_once __DIR__ . '/../includes/calendly.php';
 requireAdmin();
 $activeNav = 'frontdesk';
 
@@ -20,7 +21,6 @@ $frontDeskData = [
 // Windows whose integrations aren't built yet — shown so staff know
 // what's coming, each says where its data will come from.
 $comingWindows = [
-    ['Scheduling', 'fa-regular fa-calendar', 'var(--accepted)', 'Calendly', "Today's appointments and new bookings."],
     ['Contracts', 'fa-solid fa-file-signature', 'var(--revision)', 'Documenso', 'Contracts with the client, waiting for JD, or signed but unpaid.'],
     ['PQ Forms', 'fa-solid fa-list-check', 'var(--class-family)', 'Cognito', 'PQ forms sent and how far each person got.'],
     ['Social Media Posting', 'fa-solid fa-bullhorn', 'var(--class-visit)', 'Meta', 'Scheduled and recent Facebook / Instagram posts.'],
@@ -112,6 +112,35 @@ $comingWindows = [
           <div class="fd-soon-body">
             <i class="fa-solid fa-plug"></i>
             <div><strong>Not connected yet</strong><span>New inquiries from the website and staff, straight from Notion.</span></div>
+          </div>
+        <?php endif; ?>
+      </section>
+
+      <section class="fd-win" id="fdSchedule" data-enabled="<?= calendlyEnabled() ? '1' : '0' ?>">
+        <header>
+          <span class="fd-wico" style="--c:var(--accepted)"><i class="fa-regular fa-calendar"></i></span>
+          <h2>Scheduling</h2>
+          <span class="fd-count" id="fdSchCount"></span>
+          <span class="fd-src<?= calendlyEnabled() ? ' live' : '' ?>"><?= calendlyEnabled() ? 'Live' : 'Calendly' ?></span>
+        </header>
+        <?php if (calendlyEnabled()): ?>
+          <div class="fd-msg-tools">
+            <div class="conv-channels" id="fdSchTabs" role="tablist" aria-label="Show">
+              <button type="button" class="on" data-sch="today" role="tab">Today <b data-sch-count="today"></b></button>
+              <button type="button" data-sch="week" role="tab">Next 7 days <b data-sch-count="week"></b></button>
+              <button type="button" data-sch="new" role="tab">New bookings <b data-sch-count="new"></b></button>
+            </div>
+            <label class="fd-unread-toggle"><input type="checkbox" id="fdSchCanceled"> Canceled</label>
+          </div>
+          <ul class="fd-list" id="fdSchList"><li class="fd-empty">Loading bookings…</li></ul>
+          <footer>
+            <a href="https://calendly.com/app/scheduled_events/user/me" target="_blank" rel="noopener">Open in Calendly →</a>
+            <button type="button" class="btn btn-ghost btn-sm" id="fdSchRefresh"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+          </footer>
+        <?php else: ?>
+          <div class="fd-soon-body">
+            <i class="fa-solid fa-plug"></i>
+            <div><strong>Not connected yet</strong><span>Today's appointments and new bookings, straight from Calendly.</span></div>
           </div>
         <?php endif; ?>
       </section>

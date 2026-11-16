@@ -2822,3 +2822,33 @@ button.msg-edited:hover { color: var(--ink); text-decoration: underline; }
 .fd-inq-more { display: block; width: 100%; padding: 9px 16px; border: none; border-top: 1px solid var(--line); background: none;
   font: inherit; font-size: 12.5px; font-weight: 600; color: var(--gold); cursor: pointer; text-align: left; }
 .fd-inq-error { color: var(--maple); }
+
+/* ---------- Front Desk: Scheduling window (Calendly) ---------- */
+.fd-sch { display: flex; gap: 12px; padding: 10px 16px; }
+.fd-sch-time { flex: 0 0 auto; min-width: 58px; white-space: nowrap; display: flex; flex-direction: column; font-size: 12px; color: var(--text-muted); line-height: 1.35; }
+.fd-sch-time b { font-size: 13.5px; color: var(--text); font-weight: 700; }
+.fd-sch-body { flex: 1; min-width: 0; display: block; }
+.fd-sch-title { font-weight: 700; }
+.fd-sch-join { flex-shrink: 0; padding: 2px 9px; font-size: 12px; }
+.fd-sch-person { margin-top: 6px; padding-left: 10px; border-left: 2px solid var(--line); }
+.fd-sch-person .fd-name { font-size: 13px; }
+.fd-sch-qa { display: block; font-size: 12px; color: var(--text); margin-top: 3px; line-height: 1.4;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.fd-sch-qa b { color: var(--text-muted); font-weight: 600; }
+.fd-sch-day { padding: 6px 16px; font-size: 11.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--text-muted); background: var(--surface-alt); }
+.fd-sch.is-past { opacity: .55; }
+.fd-sch.is-canceled .fd-sch-title, .fd-sch.is-canceled .fd-sch-time b { text-decoration: line-through; }
+.fd-sch.is-canceled { opacity: .7; }
+.fd-sch.is-now { box-shadow: inset 3px 0 0 var(--accepted); background: var(--accepted-tint); }
+.fd-sch.is-next { box-shadow: inset 3px 0 0 var(--received); }
+.fd-inq-tag.now { background: var(--accepted); color: #fff; }
+.fd-inq-tag.next { background: var(--received-tint); color: var(--received); }
+.fd-inq-tag.cancel { background: var(--maple-tint); color: var(--maple); }
+a.fd-inq-tag.client { background: var(--accepted-tint); color: var(--accepted); text-decoration: none; }
+a.fd-inq-tag.client:hover { text-decoration: underline; }
+a.fd-inq-link { text-decoration: none; }
+@media (max-width: 768px) {
+  .fd-sch { gap: 10px; }
+  .fd-sch-time { min-width: 0; }
+}

@@ -136,6 +136,14 @@ define('ADOBE_PDF_EMBED_CLIENT_ID', '');
 // database → ••• → Connections → add the integration.
 define('NOTION_TOKEN', '');
 
+// ---- Calendly (Front Desk "Scheduling" window, read-only) ----
+// Leave CALENDLY_TOKEN empty to keep the window switched off. In Calendly:
+// Integrations & apps -> API & webhooks -> Personal access tokens -> create
+// one and paste it here. Made by an organization owner/admin it shows the
+// whole team's bookings; otherwise only that person's own.
+define('CALENDLY_TOKEN', '');
+// define('CALENDLY_TIMEZONE', 'America/Winnipeg'); // office time used for "Today"
+
 // ---- WhatsApp (via 360dialog, Coexistence with the office WhatsApp Business app) ----
 // Leave WA_API_KEY empty to keep WhatsApp switched off — the Inbox then
 // works exactly as before. See docs/WHATSAPP_SETUP.md.
