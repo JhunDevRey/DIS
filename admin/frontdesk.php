@@ -5,6 +5,7 @@ require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/messages.php';
 require_once __DIR__ . '/../includes/notion.php';
 require_once __DIR__ . '/../includes/calendly.php';
+require_once __DIR__ . '/../includes/cognito.php';
 requireAdmin();
 $activeNav = 'frontdesk';
 
@@ -22,9 +23,7 @@ $fdChannels = frontDeskChannels();
 
 // Windows whose integrations aren't built yet — shown so staff know
 // what's coming, each says where its data will come from.
-$comingWindows = [
-    ['PQ Forms', 'fa-solid fa-list-check', 'var(--class-family)', 'Cognito', 'PQ forms sent and how far each person got.'],
-];
+$comingWindows = [];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -130,6 +129,33 @@ $comingWindows = [
           <div class="fd-soon-body">
             <i class="fa-solid fa-plug"></i>
             <div><strong>Not connected yet</strong><span>Contracts with the client, waiting for JD, or signed but unpaid.</span></div>
+          </div>
+        <?php endif; ?>
+      </section>
+
+      <section class="fd-win" id="fdPq" data-enabled="<?= cognitoEnabled() ? '1' : '0' ?>">
+        <header>
+          <span class="fd-wico" style="--c:var(--class-family)"><i class="fa-solid fa-list-check"></i></span>
+          <h2>PQ Forms</h2>
+          <span class="fd-count" id="fdPqCount"></span>
+          <span class="fd-src<?= cognitoEnabled() ? ' live' : '' ?>"><?= cognitoEnabled() ? 'Live' : 'Cognito' ?></span>
+        </header>
+        <?php if (cognitoEnabled()): ?>
+          <div class="fd-msg-tools">
+            <div class="conv-channels" id="fdPqTabs" role="tablist" aria-label="Show">
+              <button type="button" class="on" data-pq="waiting" role="tab" title="Started or sent, but not submitted yet">Waiting <b data-pq-count="waiting"></b></button>
+              <button type="button" data-pq="submitted" role="tab" title="Submitted in the last 14 days">Submitted <b data-pq-count="submitted"></b></button>
+            </div>
+          </div>
+          <ul class="fd-list" id="fdPqList"><li class="fd-empty">Loading PQ forms…</li></ul>
+          <footer>
+            <a href="<?= h(cognitoEntriesUrl()) ?>" target="_blank" rel="noopener">Open in Cognito →</a>
+            <button type="button" class="btn btn-ghost btn-sm" id="fdPqRefresh"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+          </footer>
+        <?php else: ?>
+          <div class="fd-soon-body">
+            <i class="fa-solid fa-plug"></i>
+            <div><strong>Not connected yet</strong><span>PQ forms sent and which ones have been submitted.</span></div>
           </div>
         <?php endif; ?>
       </section>

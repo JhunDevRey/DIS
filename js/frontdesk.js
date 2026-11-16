@@ -554,4 +554,118 @@
     setInterval(() => { if (!document.hidden) loadContracts(); }, CON_POLL_MS);
   }
 
+  // ---- PQ Forms window ----
+  // Entries on the Cognito Forms PQ form (via api/frontdesk_pq.php, cached
+  // ~60s): Waiting = not submitted yet (oldest first, so the longest wait is
+  // chased first), Submitted = in the last 14 days (newest first).
+  const pqWin = document.getElementById('fdPq');
+  if (pqWin && pqWin.dataset.enabled === '1') {
+    const PQ_KEY = 'duqueFrontDeskPq';
+    const PQ_POLL_MS = 120000;
+    const PQ_ROWS = 5;
+    const PQ_DONE_DAYS = 14;
+    const PQ_CHASE_DAYS = 3;    // waiting this long gets a "Follow up" tag
+    const PQ_STAGES = ['waiting', 'submitted'];
+    const pqList = document.getElementById('fdPqList');
+    const pqCount = document.getElementById('fdPqCount');
+    const pqTabs = document.getElementById('fdPqTabs');
+    let pqStage = 'waiting';
+    let pqAll = false;
+    let pqEntries = null;
+    try {
+      const saved = JSON.parse(localStorage.getItem(PQ_KEY) || '{}');
+      if (PQ_STAGES.includes(saved.stage)) pqStage = saved.stage;
+    } catch (e) {}
+    const savePq = () => { try { localStorage.setItem(PQ_KEY, JSON.stringify({ stage: pqStage })); } catch (e) {} };
+
+    const pqDays = (iso) => Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86400000));
+    const pqAge = (iso) => { const d = pqDays(iso); return d === 0 ? 'Today' : d === 1 ? '1 day' : `${d} days`; };
+
+    function pqHtml(p) {
+      const when = p.stage === 'submitted' ? p.submitted_at : p.created_at;
+      const tags = [
+        p.stage === 'waiting' && pqDays(p.created_at) >= PQ_CHASE_DAYS && '<span class="fd-inq-tag follow">Follow up</span>',
+        p.stage === 'waiting' && `<span class="fd-inq-tag">${esc(p.status)}</span>`,
+        p.stage === 'submitted' && '<span class="fd-inq-tag app">Submitted</span>',
+        p.number != null && `<span class="fd-inq-tag">#${esc(p.number)}</span>`,
+      ].filter(Boolean).join('');
+      const contact = [
+        p.client_id && `<span class="fd-inq-link" role="link" tabindex="0" data-href="client.php?id=${p.client_id}"><i class="fa-regular fa-folder-open"></i> Client file</span>`,
+        p.client_id && `<span class="fd-inq-link" role="link" tabindex="0" data-href="inbox.php?client_id=${p.client_id}"><i class="fa-regular fa-comment"></i> Message</span>`,
+      ].filter(Boolean).join('');
+      const inner = `<span class="fd-inq-top"><span class="fd-name">${esc(p.name)}</span><span class="fd-time" title="${p.stage === 'submitted' ? 'Submitted' : 'Started'} ${esc(new Date(when).toLocaleDateString())}">${esc(pqAge(when))}</span></span>
+        <span class="fd-inq-tags">${tags}</span>
+        ${contact ? `<span class="fd-inq-contact">${contact}</span>` : ''}`;
+      return p.url
+        ? `<li><a class="fd-inq" href="${esc(p.url)}" target="_blank" rel="noopener">${inner}</a></li>`
+        : `<li><div class="fd-inq">${inner}</div></li>`;
+    }
+
+    function renderPq() {
+      pqTabs.querySelectorAll('[data-pq]').forEach(b => b.classList.toggle('on', b.dataset.pq === pqStage));
+      if (!pqEntries) return;
+      const by = {
+        waiting: pqEntries.filter(p => p.stage === 'waiting').sort((a, b) => new Date(a.created_at) - new Date(b.created_at)),
+        submitted: pqEntries.filter(p => p.stage === 'submitted' && pqDays(p.submitted_at) <= PQ_DONE_DAYS)
+          .sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at)),
+      };
+      PQ_STAGES.forEach(s => { pqTabs.querySelector(`[data-pq-count="${s}"]`).textContent = by[s].length || ''; });
+      const chase = by.waiting.filter(p => pqDays(p.created_at) >= PQ_CHASE_DAYS).length;
+      pqCount.textContent = by.waiting.length ? `${by.waiting.length} waiting${chase ? ` · ${chase} to follow up` : ''}` : 'All caught up';
+      const rows = by[pqStage];
+      if (!rows.length) {
+        pqList.innerHTML = `<li class="fd-empty"><i class="fa-solid fa-check"></i>${
+          pqStage === 'waiting' ? 'No PQ forms waiting on anyone.' : `Nothing submitted in the last ${PQ_DONE_DAYS} days.`}</li>`;
+        return;
+      }
+      const shown = pqAll ? rows : rows.slice(0, PQ_ROWS);
+      pqList.innerHTML = shown.map(pqHtml).join('') +
+        (rows.length > shown.length ? `<li><button type="button" class="fd-inq-more" data-pq-more>Show ${rows.length - shown.length} more</button></li>` : '');
+    }
+
+    async function loadPq(fresh = false) {
+      try {
+        const res = await fetch('api/frontdesk_pq.php' + (fresh ? '?fresh=1' : ''), { headers: { Accept: 'application/json' } });
+        const out = await res.json();
+        if (!out.success) {
+          if (!pqEntries) pqList.innerHTML = `<li class="fd-empty fd-inq-error">${esc(out.message || 'Could not load PQ forms.')}</li>`;
+          if (fresh) showToast(out.message || 'Could not load PQ forms.', true);
+          return;
+        }
+        pqEntries = out.entries || [];
+        renderPq();
+      } catch (e) {
+        if (!pqEntries) pqList.innerHTML = '<li class="fd-empty fd-inq-error">Could not load PQ forms. Check your connection.</li>';
+      }
+    }
+
+    pqTabs.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-pq]');
+      if (!b) return;
+      pqStage = b.dataset.pq;
+      pqAll = false;
+      savePq();
+      renderPq();
+    });
+    pqList.addEventListener('click', (e) => {
+      if (e.target.closest('[data-pq-more]')) { pqAll = true; renderPq(); return; }
+      const link = e.target.closest('[data-href]');
+      if (link) { e.preventDefault(); location.href = link.dataset.href; }
+    });
+    pqList.addEventListener('keydown', (e) => {
+      const link = e.key === 'Enter' && e.target.closest('[data-href]');
+      if (link) { e.preventDefault(); location.href = link.dataset.href; }
+    });
+    const pqRefresh = document.getElementById('fdPqRefresh');
+    pqRefresh.addEventListener('click', async () => {
+      pqRefresh.disabled = true;
+      await loadPq(true);
+      pqRefresh.disabled = false;
+    });
+
+    renderPq();
+    loadPq();
+    setInterval(() => { if (!document.hidden) loadPq(); }, PQ_POLL_MS);
+  }
+
 })();

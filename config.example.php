@@ -144,6 +144,15 @@ define('NOTION_TOKEN', '');
 define('CALENDLY_TOKEN', '');
 // define('CALENDLY_TIMEZONE', 'America/Winnipeg'); // office time used for "Today"
 
+// ---- Cognito Forms (Front Desk "PQ Forms" window, read-only) ----
+// Leave COGNITO_API_KEY empty to keep the window switched off. In Cognito:
+// click the organization name -> Settings -> Integrations -> New API Key
+// (read access to entries only), and copy it here at once - it can't be
+// shown again. COGNITO_PQ_FORM is the PQ form's internal name or number
+// (the part of its entries link after cognitoforms.com/).
+define('COGNITO_API_KEY', '');
+define('COGNITO_PQ_FORM', '');
+
 // ---- WhatsApp (via 360dialog, Coexistence with the office WhatsApp Business app) ----
 // Leave WA_API_KEY empty to keep WhatsApp switched off — the Inbox then
 // works exactly as before. See docs/WHATSAPP_SETUP.md.
