@@ -61,8 +61,12 @@
     pager.hidden = total <= limit && offset === 0;
   }
 
+  // newOffset may be a function, worked out when the load actually runs,
+  // so a click queued behind a refit uses the page size that refit chose.
   function load(newOffset, newLimit, push = false) {
-    queue = queue.then(() => fetchRows(newOffset, newLimit, push));
+    queue = queue.then(() => typeof newOffset === 'function'
+      ? fetchRows(newOffset(), limit, push)
+      : fetchRows(newOffset, newLimit, push));
     return queue;
   }
 
@@ -113,17 +117,17 @@
     e.preventDefault();
     if (a.classList.contains('disabled')) return;
     const go = a.dataset.go;
-    const next = go === 'first' ? 0 : go === 'prev' ? Math.max(0, offset - limit)
-      : go === 'next' ? offset + limit : lastOffset();
-    load(next, limit, true);
+    // "Oldest" asks past the end; the server snaps to the last full page.
+    load(() => go === 'first' ? 0 : go === 'prev' ? Math.max(0, offset - limit)
+      : go === 'next' ? offset + limit : total + limit, null, true);
   });
 
   // Arrow keys page through (when not typing in the filters).
   document.addEventListener('keydown', (e) => {
     if (e.altKey || e.ctrlKey || e.metaKey) return;
     if (/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '')) return;
-    if (e.key === 'ArrowRight' && offset + limit < total) load(offset + limit, limit, true);
-    if (e.key === 'ArrowLeft' && offset > 0) load(Math.max(0, offset - limit), limit, true);
+    if (e.key === 'ArrowRight' && offset + limit < total) load(() => offset + limit, null, true);
+    if (e.key === 'ArrowLeft' && offset > 0) load(() => Math.max(0, offset - limit), null, true);
   });
 
   window.addEventListener('popstate', (e) => {

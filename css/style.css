@@ -495,7 +495,7 @@ input, select, textarea { font-family: inherit; }
 
 .dashboard-columns {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
   gap: 18px;
   align-items: start;
 }
@@ -507,7 +507,7 @@ input, select, textarea { font-family: inherit; }
      for both at a reasonable width, one stacked column on a narrower
      screen — no separate mobile breakpoint needed, same pattern already
      used for .dashboard-columns above. */
-  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr));
   gap: 24px;
   align-items: start;
 }
@@ -904,7 +904,9 @@ select.status-select {
 .status-dropdown-toggle:hover { filter: brightness(0.95); }
 [data-theme="dark"] .status-dropdown-toggle:hover { filter: brightness(1.2); }
 .status-dropdown-toggle.open i { transform: rotate(180deg); }
-.status-dropdown-menu {
+.dropdown-menu.status-dropdown-menu {
+  /* Opens leftwards from the pill so it never runs off the right edge
+     (the general .dropdown-menu rule further down would otherwise win). */
   left: auto;
   right: 0;
   min-width: 170px;
@@ -1941,7 +1943,7 @@ html.file-viewer-html, .file-viewer-html body { height: 100%; margin: 0; }
      mobile override needed (replacing the old fixed-280px-column /
      horizontal-scroll approach, which needed one). */
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
   gap: 4px 28px;
   margin: 4px 0;
 }
@@ -2664,7 +2666,7 @@ button.msg-edited:hover { color: var(--ink); text-decoration: underline; }
 .fd-hello h1 { margin: 0; font-family: var(--font-display); font-size: 22px; color: var(--ink); }
 .fd-hello p { margin: 4px 0 0; color: var(--text-muted); font-size: 13px; }
 
-.fd-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; align-items: start; }
+.fd-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 16px; align-items: start; }
 .fd-win { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; min-width: 0; }
 .fd-win > header { display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: var(--surface-alt); border-bottom: 1px solid var(--line); }
 .fd-win > header h2 { margin: 0; flex: 1; min-width: 0; font: 700 13px var(--font-display); color: var(--ink); text-transform: uppercase; letter-spacing: .3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -2770,7 +2772,11 @@ button.msg-edited:hover { color: var(--ink); text-decoration: underline; }
 }
 
 /* Front Desk Messaging footer: which channels the window covers */
-.fd-foot-note { font-size: 12px; color: var(--text-muted); }
+.fd-foot-note { font-size: 12px; color: var(--text-muted); text-align: right; }
+.fd-win > footer a:not(.btn) { white-space: nowrap; }
+@media (max-width: 480px) { .fd-foot-note { display: none; } }
+/* Long case-type tags shrink (…) instead of running under the time. */
+.fd-name .class-tag { max-width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ---------- Front Desk: list rows shared by the Scheduling and Contracts windows ---------- */
 .fd-inq { display: block; padding: 10px 16px; color: inherit; text-decoration: none; transition: background var(--ease); }
@@ -2838,3 +2844,78 @@ a.fd-inq-link { text-decoration: none; }
 .act-range { min-width: 150px; text-align: center; font-size: 13px; font-weight: 600; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .btn.disabled { opacity: .4; pointer-events: none; }
 @media (max-width: 768px) { .act-detail { max-width: none; } }
+
+/* ======================================================================
+   Touch & smoothness (whole app, staff + client)
+   - Touch screens get finger-sized targets (~40px), desktop keeps the
+     compact look (pointer: fine).
+   - No 300ms tap delay / grey tap flash, no iOS text inflation, scroll
+     chaining stopped at the drawer, and motion trimmed for anyone who
+     asked their system to reduce it.
+   ====================================================================== */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body { -webkit-tap-highlight-color: transparent; }
+a, button, input, select, textarea, label, summary, [role="button"], [role="tab"], [role="link"] { touch-action: manipulation; }
+.sidebar-drawer, .modal, .side-panel, .dropdown-menu, .conv-list, .msg-thread { overscroll-behavior: contain; }
+img, video, canvas, iframe { max-width: 100%; }
+pre, code { overflow-wrap: anywhere; }
+
+@media (pointer: coarse) {
+  .btn { min-height: 40px; }
+  .btn-sm { min-height: 36px; padding: 8px 12px; }
+  .icon-btn { width: 36px; height: 36px; font-size: 14px; }
+  .mobile-nav-toggle { min-width: 44px; min-height: 44px; }
+  .msg-fs-icon { min-width: 40px; min-height: 40px; }
+  .email-chip button { width: 26px; height: 26px; }
+  input[type="checkbox"], input[type="radio"] { width: 20px; height: 20px; }
+  .fd-unread-toggle, .conv-unread-toggle, .auth-remember { min-height: 36px; }
+  .fd-unread-toggle input, .conv-unread-toggle input { width: 18px; height: 18px; }
+  .conv-channels button, .fd-msg-tools .conv-channels button { min-height: 34px; }
+  .client-back, .fd-win > footer a:not(.btn) { display: inline-flex; align-items: center; min-height: 36px; }
+  .act-pager .btn { min-width: 44px; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
+
+/* Wide tables scroll inside their card instead of pushing the page sideways. */
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+/* Cells holding free text (instructions, links) may break long words. */
+td.cell-wrap { overflow-wrap: anywhere; }
+
+@media (pointer: coarse) {
+  .cu-group-toggle, .comment-toggle { min-height: 36px; }
+  .status-dropdown-toggle { min-height: 32px; }
+  .edit-link-btn, .comment-delete-btn { min-width: 32px; min-height: 32px; display: inline-flex; align-items: center; justify-content: center; }
+  a.file-name { padding-block: 6px; }
+  .email-chips-input { min-height: 36px; }
+}
+
+/* ---------- Activity log on phones: compact cards + tidy filters ---------- */
+.act-filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+.act-filters .field { margin: 0; min-width: 150px; }
+@media (max-width: 700px) {
+  .act-filters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; }
+  .act-filters .field { min-width: 0; }
+  .act-filters .field select, .act-filters .field input { width: 100%; }
+  .act-filters .btn { grid-column: 1 / -1; justify-content: center; }
+  .act-card table.responsive-table tr {
+    display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: start;
+  }
+  .act-card table.responsive-table td { padding: 0; }
+  .act-card table.responsive-table td[data-label]::before { display: none; }
+  .act-card td[data-label="When"] { grid-column: 2; grid-row: 1; font-size: 12px; color: var(--text-muted); }
+  .act-card td[data-label="What"] { grid-column: 1; grid-row: 1; font-weight: 600; }
+  .act-card td[data-label="Who"] { grid-column: 1 / -1; font-size: 13px; }
+  .act-card td[data-label="Who"] .cu-muted { display: inline; margin-left: 4px; }
+  .act-card td[data-label="Who"] .cu-muted::before { content: "· "; }
+  .act-card td[data-label="Client"] { grid-column: 1 / -1; font-size: 13px; }
+  .act-card td[data-label="Client"]:empty { display: none; }
+  .act-card td[data-label="Details"] { grid-column: 1 / -1; font-size: 12.5px; color: var(--text-muted); }
+  .act-card td[data-label="Details"]:empty { display: none; }
+  .act-card td[data-label="From"] { display: none; }
+}

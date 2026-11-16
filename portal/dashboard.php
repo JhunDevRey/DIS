@@ -110,7 +110,7 @@ $recentComments = $stmt->fetchAll();
               <tbody>
                 <?php foreach ($attentionNeeded as $r): $meta = statusMeta($r['status']); ?>
                   <tr class="row-link" onclick="location.href='documents.php'">
-                    <td>
+                    <td class="cell-wrap">
                       <div style="font-weight:600;color:var(--ink);"><?= h($r['doc_name']) ?></div>
                       <?php if ($r['instructions']): ?>
                         <div style="font-size:12.5px;color:var(--text-muted);"><?= h($r['instructions']) ?></div>

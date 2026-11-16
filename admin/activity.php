@@ -128,16 +128,16 @@ if (($_GET['format'] ?? '') === 'json') {
       </div>
     </div>
 
-    <form class="card card-pad" method="get" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
+    <form class="card card-pad act-filters" method="get">
       <?php if ($clientId): ?><input type="hidden" name="client_id" value="<?= $clientId ?>"><?php endif; ?>
-      <div class="field" style="margin:0;min-width:150px;"><label>Show</label>
+      <div class="field"><label>Show</label>
         <select name="type"><option value="">Everything</option><?php foreach ($types as $k => [$label]): ?><option value="<?= h($k) ?>"<?= $type === $k ? ' selected' : '' ?>><?= h($label) ?></option><?php endforeach; ?></select>
       </div>
-      <div class="field" style="margin:0;min-width:150px;"><label>Staff member</label>
+      <div class="field"><label>Staff member</label>
         <select name="actor"><option value="">Anyone</option><?php foreach ($staff as $s): $v = 'admin:' . (int)$s['id']; ?><option value="<?= h($v) ?>"<?= $actor === $v ? ' selected' : '' ?>><?= h($s['admin_name'] . ' (@' . $s['username'] . ')') ?></option><?php endforeach; ?></select>
       </div>
-      <div class="field" style="margin:0;"><label>From</label><input type="date" name="from" value="<?= h($from) ?>"></div>
-      <div class="field" style="margin:0;"><label>To</label><input type="date" name="to" value="<?= h($to) ?>"></div>
+      <div class="field"><label>From</label><input type="date" name="from" value="<?= h($from) ?>"></div>
+      <div class="field"><label>To</label><input type="date" name="to" value="<?= h($to) ?>"></div>
       <button type="submit" class="btn btn-primary"><i class="fa-solid fa-filter"></i> Filter</button>
       <?php if ($where): ?><a class="btn btn-ghost" href="activity.php">Clear</a><?php endif; ?>
     </form>

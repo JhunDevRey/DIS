@@ -57,7 +57,7 @@ $accountsJson = array_map(fn($a) => [
       </div>
     <?php endif; ?>
 
-    <div class="card">
+    <div class="card table-scroll">
       <table class="responsive-table" id="staffTable">
         <thead>
           <tr><th>Name</th><th>Username</th><th>Sends messages as</th><th>Two-step</th><th>Last sign-in</th><th>Status</th><th></th></tr>
