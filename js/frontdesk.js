@@ -699,6 +699,7 @@
     const pqTabs = document.getElementById('fdPqTabs');
     let pqStage = 'waiting';
     let pqAll = false;
+    let pqQuery = '';
     let pqEntries = null;
     let pqPartialTries = 0;
     try {
@@ -736,18 +737,25 @@
     function renderPq() {
       pqTabs.querySelectorAll('[data-pq]').forEach(b => b.classList.toggle('on', b.dataset.pq === pqStage));
       if (!pqEntries) return;
+      const q = pqQuery.trim().toLowerCase();
+      const matches = (p) => !q || [p.name, p.form, p.number, p.status].filter(x => x != null && x !== '').join(' ').toLowerCase().includes(q);
       const by = {
-        waiting: pqEntries.filter(p => p.stage === 'waiting').sort((a, b) => new Date(a.created_at) - new Date(b.created_at)),
-        submitted: pqEntries.filter(p => p.stage === 'submitted' && pqDays(p.submitted_at) <= PQ_DONE_DAYS)
+        waiting: pqEntries.filter(p => p.stage === 'waiting' && matches(p)).sort((a, b) => new Date(a.created_at) - new Date(b.created_at)),
+        submitted: pqEntries.filter(p => p.stage === 'submitted' && pqDays(p.submitted_at) <= PQ_DONE_DAYS && matches(p))
           .sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at)),
       };
       PQ_STAGES.forEach(s => { pqTabs.querySelector(`[data-pq-count="${s}"]`).textContent = by[s].length || ''; });
-      const chase = by.waiting.filter(p => pqDays(p.created_at) >= PQ_CHASE_DAYS).length;
-      pqCount.textContent = by.waiting.length ? `${by.waiting.length} waiting${chase ? ` · ${chase} to follow up` : ''}` : 'All caught up';
+      const allWaiting = pqEntries.filter(p => p.stage === 'waiting');
+      const chase = allWaiting.filter(p => pqDays(p.created_at) >= PQ_CHASE_DAYS).length;
+      pqCount.textContent = q ? `${by.waiting.length + by.submitted.length} found`
+        : allWaiting.length ? `${allWaiting.length} waiting${chase ? ` · ${chase} to follow up` : ''}` : 'All caught up';
       const rows = by[pqStage];
       if (!rows.length) {
-        pqList.innerHTML = `<li class="fd-empty"><i class="fa-solid fa-check"></i>${
-          pqStage === 'waiting' ? 'No PQ forms waiting on anyone.' : `Nothing submitted in the last ${PQ_DONE_DAYS} days.`}</li>`;
+        const other = PQ_STAGES.find(s => s !== pqStage && by[s].length);
+        pqList.innerHTML = q
+          ? `<li class="fd-empty"><i class="fa-solid fa-magnifying-glass"></i>No match in this tab${other ? ` — ${by[other].length} in “${other === 'waiting' ? 'Waiting' : 'Submitted'}”` : ''}.</li>`
+          : `<li class="fd-empty"><i class="fa-solid fa-check"></i>${
+            pqStage === 'waiting' ? 'No PQ forms waiting on anyone.' : `Nothing submitted in the last ${PQ_DONE_DAYS} days.`}</li>`;
         return;
       }
       const shown = pqAll ? rows : rows.slice(0, PQ_ROWS);
@@ -823,6 +831,12 @@
       if (dl) { e.preventDefault(); downloadPq(dl); return; }
       const link = e.key === 'Enter' && e.target.closest('[data-href]');
       if (link) { e.preventDefault(); location.href = link.dataset.href; }
+    });
+    const pqSearch = document.getElementById('fdPqSearch');
+    pqSearch.addEventListener('input', () => {
+      pqQuery = pqSearch.value;
+      pqAll = false;
+      renderPq();
     });
     const pqRefresh = document.getElementById('fdPqRefresh');
     pqRefresh.addEventListener('click', async () => {

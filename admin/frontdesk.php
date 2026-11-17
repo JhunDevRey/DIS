@@ -150,6 +150,10 @@ $comingWindows = [];
               <button type="button" data-pq="submitted" role="tab" title="Submitted in the last 14 days">Submitted <b data-pq-count="submitted"></b></button>
             </div>
           </div>
+          <div class="fd-con-search">
+            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+            <input type="search" id="fdPqSearch" placeholder="Search name, form, entry no.…" autocomplete="off" aria-label="Search PQ forms">
+          </div>
           <ul class="fd-list" id="fdPqList"><li class="fd-empty">Loading PQ forms…</li></ul>
           <footer>
             <a href="<?= h(cognitoEntriesUrl()) ?>" target="_blank" rel="noopener">Open in Cognito →</a>
