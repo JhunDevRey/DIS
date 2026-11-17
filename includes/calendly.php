@@ -19,10 +19,30 @@ define('CALENDLY_MAX_EVENTS', 60);   // per window load (today + next 7 days)
 // Calendly works in UTC; "today" on the Front Desk means today at the office.
 define('CALENDLY_DEFAULT_TZ', 'America/Winnipeg');
 
+/**
+ * The Calendly tokens in config.php. CALENDLY_TOKEN holds one token, or
+ * several separated by commas when bookings live on more than one Calendly
+ * account (each person's own login has its own token).
+ */
+function calendlyTokens(): array
+{
+    if (!defined('CALENDLY_TOKEN')) return [];
+    $list = array_map('trim', explode(',', (string)CALENDLY_TOKEN));
+    return array_values(array_unique(array_filter($list, 'strlen')));
+}
+
 /** Calendly is on only once a token is in config.php. */
 function calendlyEnabled(): bool
 {
-    return defined('CALENDLY_TOKEN') && CALENDLY_TOKEN !== '';
+    return count(calendlyTokens()) > 0;
+}
+
+/** The token requests are currently made with (set per account while fetching). */
+function calendlyToken(?string $set = null): string
+{
+    static $current = null;
+    if ($set !== null) $current = $set;
+    return $current ?? (calendlyTokens()[0] ?? '');
 }
 
 function calendlyTimezone(): DateTimeZone
@@ -45,7 +65,7 @@ function calendlyCurl(string $url)
         CURLOPT_TIMEOUT        => 15,
         CURLOPT_CONNECTTIMEOUT => 5,
         CURLOPT_HTTPHEADER     => [
-            'Authorization: Bearer ' . CALENDLY_TOKEN,
+            'Authorization: Bearer ' . calendlyToken(),
             'Accept: application/json',
         ],
     ]);
@@ -169,7 +189,7 @@ function calendlyClientsByEmail(array $emails): array
  */
 function calendlyMe(): array
 {
-    $cacheFile = UPLOAD_DIR . '/cache/calendly_me_' . substr(hash('sha256', CALENDLY_TOKEN), 0, 12) . '.json';
+    $cacheFile = UPLOAD_DIR . '/cache/calendly_me_' . substr(hash('sha256', calendlyToken()), 0, 12) . '.json';
     if (is_file($cacheFile) && filemtime($cacheFile) > time() - 86400) {
         $cached = json_decode((string)file_get_contents($cacheFile), true);
         if (!empty($cached['user'])) return [$cached['user'], $cached['org'] ?? ''];
@@ -228,6 +248,50 @@ function calendlyUpcoming(bool $fresh = false): array
     $tz = calendlyTimezone();
     $from = new DateTimeImmutable('today', $tz);
     $to = $from->modify('+8 days');
+
+    // One pass per Calendly account; a failing account doesn't hide the others.
+    $out = [];
+    $seen = [];
+    $scopes = [];
+    $failed = 0;
+    $lastError = null;
+    foreach (calendlyTokens() as $token) {
+        calendlyToken($token);
+        try {
+            [$list, $scope] = calendlyUpcomingFor($from, $to);
+        } catch (Throwable $e) {
+            $failed++;
+            $lastError = $e;
+            error_log('calendly account: ' . $e->getMessage());
+            continue;
+        }
+        $scopes[$scope] = true;
+        foreach ($list as $ev) {
+            if (isset($seen[$ev['id']])) continue;  // same event visible from two tokens
+            $seen[$ev['id']] = true;
+            $out[] = $ev;
+        }
+    }
+    if ($lastError && $failed === count(calendlyTokens())) throw $lastError;
+    usort($out, fn($a, $b) => strcmp((string)$a['start'], (string)$b['start']));
+
+    $result = [
+        'events'     => $out,
+        'scope'      => count($scopes) === 1 ? array_key_first($scopes) : 'mixed',
+        'accounts'   => count(calendlyTokens()),
+        'failed_accounts' => $failed,
+        'timezone'   => $tz->getName(),
+        'today'      => $from->format('Y-m-d'),
+        'fetched_at' => gmdate('Y-m-d\TH:i:s\Z'),
+    ];
+    if (!is_dir($cacheDir)) @mkdir($cacheDir, 0755, true);
+    @file_put_contents($cacheFile, json_encode($result), LOCK_EX);
+    return $result;
+}
+
+/** One Calendly account's bookings between two instants, shaped for the window. Returns [events, scope]. */
+function calendlyUpcomingFor(DateTimeInterface $from, DateTimeInterface $to): array
+{
     [$events, $scope] = calendlyEventsBetween($from, $to);
 
     $inviteePages = calendlyGetMany(array_map(
@@ -280,14 +344,5 @@ function calendlyUpcoming(bool $fresh = false): array
         ];
     }
 
-    $result = [
-        'events'     => $out,
-        'scope'      => $scope,
-        'timezone'   => $tz->getName(),
-        'today'      => $from->format('Y-m-d'),
-        'fetched_at' => gmdate('Y-m-d\TH:i:s\Z'),
-    ];
-    if (!is_dir($cacheDir)) @mkdir($cacheDir, 0755, true);
-    @file_put_contents($cacheFile, json_encode($result), LOCK_EX);
-    return $result;
+    return [$out, $scope];
 }

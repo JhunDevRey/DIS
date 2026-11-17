@@ -140,7 +140,10 @@ define('NOTION_TOKEN', '');
 // Leave CALENDLY_TOKEN empty to keep the window switched off. In Calendly:
 // Integrations & apps -> API & webhooks -> Personal access tokens -> create
 // one and paste it here. Made by an organization owner/admin it shows the
-// whole team's bookings; otherwise only that person's own.
+// whole team's bookings; otherwise only that person's own. Scopes needed:
+// users:read, scheduled_events:read (organizations:read optional).
+// Bookings on several Calendly logins? Put every token here, separated by
+// commas: define('CALENDLY_TOKEN', 'tokenForJoel,tokenForKyle');
 define('CALENDLY_TOKEN', '');
 // define('CALENDLY_TIMEZONE', 'America/Winnipeg'); // office time used for "Today"
 
