@@ -722,6 +722,8 @@
       const contact = [
         p.client_id && `<span class="fd-inq-link" role="link" tabindex="0" data-href="client.php?id=${p.client_id}"><i class="fa-regular fa-folder-open"></i> Client file</span>`,
         p.client_id && `<span class="fd-inq-link" role="link" tabindex="0" data-href="inbox.php?client_id=${p.client_id}"><i class="fa-regular fa-comment"></i> Message</span>`,
+        // Cognito's generated PDF, fetched by our server (api/frontdesk_pq_file.php).
+        p.stage === 'submitted' && p.form && p.number != null && `<span class="fd-inq-link" role="link" tabindex="0" data-pq-dl="${esc(p.id)}"><i class="fa-solid fa-download"></i> Download PDF</span>`,
       ].filter(Boolean).join('');
       const inner = `<span class="fd-inq-top"><span class="fd-name">${esc(p.name)}</span><span class="fd-time" title="${p.stage === 'submitted' ? 'Submitted' : 'Started'} ${esc(new Date(when).toLocaleDateString())}">${esc(pqAge(when))}</span></span>
         <span class="fd-inq-tags">${tags}</span>
@@ -780,12 +782,45 @@
       savePq();
       renderPq();
     });
+    // Download the PQ's PDF in the background so a failure shows a message
+    // instead of replacing the page with an error.
+    async function downloadPq(btn) {
+      if (btn.dataset.busy) return;
+      btn.dataset.busy = '1';
+      const label = btn.innerHTML;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparing…';
+      try {
+        const res = await fetch('api/frontdesk_pq_file.php?id=' + encodeURIComponent(btn.dataset.pqDl));
+        if (!res.ok) { showToast((await res.text()).slice(0, 160) || 'Could not download the PQ.', true); return; }
+        const blob = await res.blob();
+        const cd = res.headers.get('Content-Disposition') || '';
+        const star = /filename\*=UTF-8''([^;]+)/i.exec(cd);
+        const plain = /filename="([^"]+)"/i.exec(cd);
+        let fname = 'PQ.pdf';
+        try { fname = star ? decodeURIComponent(star[1]) : (plain ? plain[1] : fname); } catch (e) {}
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = fname;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+      } catch (err) {
+        showToast('Could not download the PQ. Check your connection.', true);
+      } finally {
+        btn.innerHTML = label;
+        delete btn.dataset.busy;
+      }
+    }
     pqList.addEventListener('click', (e) => {
       if (e.target.closest('[data-pq-more]')) { pqAll = true; renderPq(); return; }
+      const dl = e.target.closest('[data-pq-dl]');
+      if (dl) { e.preventDefault(); downloadPq(dl); return; }
       const link = e.target.closest('[data-href]');
       if (link) { e.preventDefault(); location.href = link.dataset.href; }
     });
     pqList.addEventListener('keydown', (e) => {
+      const dl = e.key === 'Enter' && e.target.closest('[data-pq-dl]');
+      if (dl) { e.preventDefault(); downloadPq(dl); return; }
       const link = e.key === 'Enter' && e.target.closest('[data-href]');
       if (link) { e.preventDefault(); location.href = link.dataset.href; }
     });

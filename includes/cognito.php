@@ -479,3 +479,61 @@ function cognitoPqEntries(bool $fresh = false): array
         'fetched_at'   => $state['fetched_at'] ?? gmdate('Y-m-d\TH:i:s\Z'),
     ];
 }
+
+/**
+ * The generated PDF of one submitted entry (Cognito's "Document" link on the
+ * entry). Fetches the entry fresh so the link is current, then downloads the
+ * PDF without sending our API key to the document link. Returns
+ * ['name' => person name, 'pdf' => bytes]. Throws RuntimeException with a
+ * message that is safe to show staff.
+ */
+function cognitoEntryPdf(string $form, int $number): array
+{
+    if (!in_array($form, cognitoForms(), true) || $number < 1) throw new RuntimeException('Unknown PQ form entry.');
+
+    $ch = cognitoCurl('forms/' . rawurlencode($form) . '/entries/' . $number);
+    $raw = curl_exec($ch);
+    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    if ($code === 429) throw new RuntimeException('Cognito Forms is busy right now. Try again in a minute.');
+    if ($code === 404) throw new RuntimeException('That entry no longer exists in Cognito Forms.');
+    if ($code !== 200 || !is_array($row = json_decode((string)$raw, true))) {
+        error_log('cognitoEntryPdf: entry http ' . $code);
+        throw new RuntimeException('Could not reach Cognito Forms right now.');
+    }
+
+    $entry = cognitoEntryForJson($row);
+    if (!$entry || $entry['stage'] !== 'submitted') throw new RuntimeException('This PQ has not been submitted yet, so there is no PDF.');
+
+    $meta = is_array($row['Entry'] ?? null) ? $row['Entry'] : [];
+    $links = [];
+    foreach ($meta as $k => $v) {
+        if (is_string($v) && preg_match('/^Document\d*$/', (string)$k)) $links[(string)$k] = $v;
+    }
+    ksort($links, SORT_NATURAL);
+    $url = $links ? reset($links) : '';
+    $host = strtolower((string)parse_url($url, PHP_URL_HOST));
+    if ($url === '' || strncasecmp($url, 'https://', 8) !== 0 || ($host !== 'cognitoforms.com' && substr($host, -17) !== '.cognitoforms.com')) {
+        throw new RuntimeException('Cognito Forms has no PDF for this entry.');
+    }
+
+    $dl = curl_init($url);
+    curl_setopt_array($dl, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_MAXREDIRS      => 3,
+        CURLOPT_PROTOCOLS      => CURLPROTO_HTTPS,
+        CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTPS,
+        CURLOPT_TIMEOUT        => 40,
+        CURLOPT_CONNECTTIMEOUT => 5,
+        CURLOPT_MAXFILESIZE    => 40 * 1024 * 1024,
+    ]);
+    $pdf = curl_exec($dl);
+    $dlCode = (int)curl_getinfo($dl, CURLINFO_HTTP_CODE);
+    curl_close($dl);
+    if ($pdf === false || $dlCode !== 200 || strncmp($pdf, '%PDF', 4) !== 0) {
+        error_log('cognitoEntryPdf: document http ' . $dlCode);
+        throw new RuntimeException('Cognito Forms did not return the PDF. Try again in a moment.');
+    }
+    return ['name' => $entry['name'], 'pdf' => $pdf];
+}
