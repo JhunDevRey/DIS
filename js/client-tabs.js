@@ -87,6 +87,18 @@
     });
   }
 
+  // The sidebar's theme switch only changes this outer page; push the same
+  // theme into every client frame (now, on load, and whenever it changes).
+  function syncTheme(f) {
+    try {
+      var th = document.documentElement.getAttribute('data-theme');
+      if (th) f.contentDocument.documentElement.setAttribute('data-theme', th);
+    } catch (e) { /* frame still navigating */ }
+  }
+  new MutationObserver(function () {
+    Object.keys(frames).forEach(function (k) { syncTheme(frames[k]); });
+  }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
   function frameFor(id) {
     if (frames[id]) return frames[id];
     var f = document.createElement('iframe');
@@ -95,6 +107,7 @@
     f.src = 'client.php?id=' + id + '&embed=1';
     f.hidden = true;
     f.addEventListener('load', function () {
+      syncTheme(f);
       try {
         var path = f.contentWindow.location.pathname;
         if (/\/client\.php$/.test(path)) {
