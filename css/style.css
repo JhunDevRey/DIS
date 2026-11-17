@@ -2981,3 +2981,24 @@ td.cell-wrap { overflow-wrap: anywhere; }
 /* Inside a tab: no sidebar, and no "All clients" link (the tab bar replaces it) */
 .client-embed .client-back { display: none; }
 @media (max-width: 860px) { .ct-main { height: calc(100dvh - 56px); } .ct-tab { max-width: 160px; } }
+
+/* ---------- Checklist colour coding (client page, documents column) ----------
+   Each document is a coloured box so what's missing is obvious at a glance:
+   red = awaiting upload (missing), blue = received (needs review),
+   orange = needs revision, green = accepted. */
+#docRail .doc-item {
+  --st: #D63031; --st-bg: rgba(214, 48, 49, .10); --st-line: rgba(214, 48, 49, .35);
+  background: var(--st-bg);
+  border: 1px solid var(--st-line);
+  border-left: 6px solid var(--st);
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+  padding: 14px 12px;
+}
+#docRail .doc-item:last-child { border-bottom: 1px solid var(--st-line); }
+#docRail .doc-item:hover { background: var(--st-bg); filter: brightness(.98); }
+#docRail .doc-item[data-status="received"]       { --st: #2483C5; --st-bg: rgba(36, 131, 197, .12); --st-line: rgba(36, 131, 197, .35); }
+#docRail .doc-item[data-status="needs_revision"] { --st: #E08A00; --st-bg: rgba(224, 138, 0, .15);  --st-line: rgba(224, 138, 0, .45); }
+#docRail .doc-item[data-status="accepted"]       { --st: #24886F; --st-bg: rgba(36, 136, 111, .11); --st-line: rgba(36, 136, 111, .35); }
+#docRail .doc-item[data-status="pending"] .doc-marker { border-color: var(--st); color: #fff; background: var(--st); }
+#docRail .doc-item .doc-meta .file-row { background: var(--card); }
