@@ -500,8 +500,20 @@
       const d = conDialog; conDialog = null;
       d.classList.remove('open');
       setTimeout(() => d.remove(), 180);
-      // Documenso → Make → Notion takes a few seconds after JD signs.
-      if (conSigned) { conSigned = false; setTimeout(() => loadContracts(true), 6000); }
+      // Documenso → Make → Notion takes up to a minute or two after JD signs,
+      // so keep checking (every 10s, up to 3 min) until the contract moves.
+      if (conSigned) { const id = conSigned; conSigned = false; watchSigned(id); }
+    }
+    function watchSigned(id) {
+      let tries = 0;
+      const tick = async () => {
+        tries++;
+        await loadContracts(true);
+        const c = (contracts || []).find(x => x.id === id);
+        if (!c || c.stage !== 'jd') { if (c) showToast('Contract moved to Fully signed.'); return; }
+        if (tries < 18) setTimeout(tick, 10000);
+      };
+      setTimeout(tick, 5000);
     }
     function openConDialog(c, startSigning) {
       closeConDialog();
@@ -560,7 +572,7 @@
           });
           const out = await res.json();
           if (!out.success) { showToast(out.message || 'Could not start signing.', true); signBtn.disabled = false; return; }
-          conSigned = true;
+          conSigned = c.id;
           d.querySelector('.fd-con-sheet').hidden = true;
           d.querySelector('.fd-con-frame').hidden = false;
           d.querySelector('.fd-con-frame iframe').src = out.signing_url;
