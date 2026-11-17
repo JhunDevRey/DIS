@@ -8,6 +8,9 @@
  *   DOCUMENSO_TOKEN      API token (Documenso → team settings → API tokens)
  *   DOCUMENSO_JD_EMAIL   optional: JD's recipient email, used to pick the
  *                        right recipient when more than one is unsigned
+ *   DOCUMENSO_JD_SIGNATURE_ID  optional: any fixed opaque id (e.g. 'jd-signer'); opens
+ *                        the embed signing page so Documenso remembers and
+ *                        pre-fills JD's signature (needs the Platform Plan)
  *   DOCUMENSO_API_BASE   tests only (default https://app.documenso.com/api/v2)
  *   DOCUMENSO_APP_URL    tests only (default https://app.documenso.com)
  *
@@ -124,6 +127,16 @@ function documensoJdSigningUrl(string $envelopeId): string
     $appHost = parse_url(documensoAppUrl(), PHP_URL_HOST);
     if ($url === '' || !$host || strcasecmp($host, (string)$appHost) !== 0 || !preg_match('#^https?://#i', $url)) {
         throw new RuntimeException('Documenso did not give a signing link.');
+    }
+
+    // Optional "remember JD's signature" mode (Documenso Platform Plan): open
+    // the embed signing page with a fixed opaque client id, so Documenso
+    // pre-fills the signature pad with the one JD used last time.
+    if (defined('DOCUMENSO_JD_SIGNATURE_ID') && preg_match('/^[A-Za-z0-9_\-]{1,64}$/', (string)DOCUMENSO_JD_SIGNATURE_ID)) {
+        $token = (string)($r['token'] ?? basename((string)parse_url($url, PHP_URL_PATH)));
+        if (preg_match('/^[A-Za-z0-9_\-]+$/', $token)) {
+            return documensoAppUrl() . '/embed/sign/' . $token . '?clientUserId=' . DOCUMENSO_JD_SIGNATURE_ID;
+        }
     }
     return $url;
 }
