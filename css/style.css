@@ -2956,17 +2956,17 @@ td.cell-wrap { overflow-wrap: anywhere; }
    Browser-style tab bar; each client is a kept-alive iframe of client.php
    (?embed=1), so switching never loses typed text or an open document. */
 .ct-main { padding: 0; display: flex; flex-direction: column; height: 100vh; min-width: 0; }
-.ct-bar { position: relative; display: flex; align-items: flex-end; gap: 4px; padding: 8px 12px 0; background: var(--surface-alt); border-bottom: 1px solid var(--line); flex-shrink: 0; }
-.ct-tabs { display: flex; gap: 2px; min-width: 0; overflow-x: auto; scrollbar-width: thin; }
-.ct-tab { display: flex; align-items: center; gap: 6px; max-width: 220px; min-width: 96px; padding: 8px 6px 8px 12px; border: 1px solid transparent; border-bottom: 0; border-radius: 8px 8px 0 0; color: var(--ink); font-size: 13px; cursor: pointer; white-space: nowrap; flex: 0 1 auto; opacity: .8; }
+.ct-bar { position: relative; z-index: 30; display: flex; align-items: flex-end; gap: 4px; padding: 8px 12px 0; background: var(--surface-alt); border-bottom: 1px solid var(--line); flex-shrink: 0; }
+.ct-tabs { display: flex; gap: 2px; min-width: 0; flex: 0 1 auto; overflow: hidden; }
+.ct-tab { display: flex; align-items: center; gap: 6px; max-width: 220px; min-width: 0; padding: 8px 6px 8px 12px; border: 1px solid transparent; border-bottom: 0; border-radius: 8px 8px 0 0; color: var(--ink); font-size: 13px; cursor: pointer; white-space: nowrap; flex: 1 1 0; opacity: .8; }
 .ct-tab:hover { background: var(--card); opacity: 1; }
 .ct-tab.on { background: var(--card); border-color: var(--line); font-weight: 600; margin-bottom: -1px; opacity: 1; }
-.ct-name { overflow: hidden; text-overflow: ellipsis; }
+.ct-name { overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1; }
 .ct-x { border: 0; background: none; color: inherit; width: 20px; height: 20px; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; cursor: pointer; opacity: .6; flex-shrink: 0; }
 .ct-x:hover { background: var(--line); opacity: 1; }
 .ct-add { border: 0; background: none; color: var(--ink); width: 30px; height: 30px; margin-bottom: 4px; border-radius: 6px; cursor: pointer; flex-shrink: 0; }
 .ct-add:hover { background: var(--line); }
-.ct-pop { position: absolute; top: 100%; right: 12px; width: min(340px, calc(100vw - 24px)); background: var(--card); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.18); padding: 8px; z-index: 30; }
+.ct-pop { position: fixed; top: 44px; left: 12px; width: min(340px, calc(100vw - 24px)); background: var(--card); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.18); padding: 8px; z-index: 30; }
 .ct-pop[hidden] { display: none; }
 .ct-pop input { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--ink); font-size: 14px; }
 .ct-pop ul { list-style: none; margin: 6px 0 0; padding: 0; max-height: 320px; overflow-y: auto; }
@@ -2980,4 +2980,4 @@ td.cell-wrap { overflow-wrap: anywhere; }
 .ct-frame[hidden] { display: none; }
 /* Inside a tab: no sidebar, and no "All clients" link (the tab bar replaces it) */
 .client-embed .client-back { display: none; }
-@media (max-width: 860px) { .ct-main { height: calc(100dvh - 56px); } .ct-tab { min-width: 80px; max-width: 160px; } }
+@media (max-width: 860px) { .ct-main { height: calc(100dvh - 56px); } .ct-tab { max-width: 160px; } }

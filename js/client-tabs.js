@@ -179,7 +179,11 @@
     });
   }
   function openPop() {
+    // Anchor the popover under the + button, kept inside the window.
+    var r = addBtn.getBoundingClientRect();
     pop.hidden = false;
+    pop.style.top = Math.round(r.bottom + 4) + 'px';
+    pop.style.left = Math.max(8, Math.min(Math.round(r.left), window.innerWidth - pop.offsetWidth - 8)) + 'px';
     addBtn.setAttribute('aria-expanded', 'true');
     search.value = '';
     renderResults();
