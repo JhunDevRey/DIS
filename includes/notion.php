@@ -156,6 +156,7 @@ function notionContractForJson(array $page): ?array
         'id'          => $page['id'] ?? '',
         'url'         => $page['url'] ?? '',
         'stage'       => $stage,
+        'documenso_id' => preg_match('/^envelope_[A-Za-z0-9]+$/', trim((string)($v('Documenso ID') ?? ''))) ? trim((string)$v('Documenso ID')) : null,
         'name'        => $v('Name') ?? '(no name)',
         'email'       => $v('Email'),
         'alt_email'   => $alt !== '' ? $alt : null,

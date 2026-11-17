@@ -2799,7 +2799,14 @@ button.msg-edited:hover { color: var(--ink); text-decoration: underline; }
 /* Contracts window: clickable name + preview dialog */
 .fd-con-open { background: none; border: 0; padding: 0; margin: 0; font: inherit; font-weight: 600; color: var(--ink); text-align: left; cursor: pointer; text-decoration: none; }
 .fd-con-open:hover { color: var(--gold); text-decoration: underline; }
+.fd-con-actions { display: flex; margin-top: 8px; }
+.fd-con-frame { height: min(72vh, 760px); background: var(--surface-alt); }
+.fd-con-frame[hidden], .fd-con-sheet[hidden] { display: none; }
+.fd-con-frame iframe { width: 100%; height: 100%; border: 0; display: block; background: #fff; }
+.fd-con-hint { margin: 0; padding: 8px 20px; font-size: 12.5px; color: var(--text-muted); border-top: 1px solid var(--line); }
+.fd-con-hint a { color: var(--gold); font-weight: 600; }
 .fd-con-modal { max-width: 560px; display: flex; flex-direction: column; }
+.fd-con-modal:has(.fd-con-frame:not([hidden])) { max-width: 960px; }
 .fd-con-backdrop { align-items: center; padding: 20px; }
 .fd-con-sheet { margin: 0; padding: 6px 24px; overflow-y: auto; max-height: 70vh; }
 .fd-con-row { display: grid; grid-template-columns: 120px 1fr; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; }
@@ -2814,6 +2821,7 @@ button.msg-edited:hover { color: var(--ink); text-decoration: underline; }
   .fd-con-modal { max-width: none; height: 100%; border-radius: 0; }
   .fd-con-sheet { flex: 1; max-height: none; padding: 6px 16px; }
   .fd-con-row { grid-template-columns: 96px 1fr; }
+  .fd-con-frame { flex: 1; height: auto; }
 }
 
 /* ---------- Front Desk: Scheduling window (Calendly) ---------- */

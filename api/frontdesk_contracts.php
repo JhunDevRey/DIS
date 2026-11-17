@@ -25,4 +25,14 @@ try {
     jsonResponse(false, $msg, ['enabled' => true]);
 }
 
+// The Documenso envelope id stays on the server. Owners get "Sign as JD" on
+// client-signed contracts once DOCUMENSO_TOKEN is in config.php.
+require_once __DIR__ . '/../includes/documenso.php';
+$canSign = documensoEnabled() && adminIsOwner();
+$out['contracts'] = array_map(function ($c) use ($canSign) {
+    $c['can_sign'] = $canSign && $c['stage'] === 'jd' && !empty($c['documenso_id']);
+    unset($c['documenso_id']);
+    return $c;
+}, $out['contracts']);
+
 jsonResponse(true, '', ['enabled' => true, 'notion_url' => notionContractsUrl()] + $out);

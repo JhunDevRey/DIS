@@ -476,25 +476,35 @@
       ].filter(Boolean).join('');
       // The name opens the contract preview.
       const nameEl = `<button type="button" class="fd-name fd-con-open" data-con-open="${esc(c.id)}" title="Preview contract">${esc(c.name)}</button>`;
+      // Owners only (the API sets can_sign): sign JD's part without leaving the portal.
+      const signBtn = c.can_sign
+        ? `<span class="fd-con-actions"><button type="button" class="btn btn-primary btn-sm" data-con-sign="${esc(c.id)}"><i class="fa-solid fa-signature"></i> Sign as JD</button></span>` : '';
       return `<li><div class="fd-inq">
         <span class="fd-inq-top">${nameEl}<span class="fd-time" title="Created ${esc(new Date(c.created_at).toLocaleDateString())}">${esc(ageText(c.created_at))}</span></span>
         <span class="fd-inq-tags">${tags}</span>
         ${c.note ? `<span class="fd-inq-msg">${esc(c.note)}</span>` : ''}
         ${contact ? `<span class="fd-inq-contact">${contact}</span>` : ''}
+        ${signBtn}
       </div></li>`;
     }
 
     // Preview dialog: the contract's Notion record laid out as a sheet, with
-    // Download (one-page PDF summary) and Open in Notion.
+    // Download (one-page PDF summary) and Open in Notion. Owners also get
+    // "Sign as JD" on client-signed contracts: it swaps the sheet for JD's
+    // Documenso signing page (api/frontdesk_contract_sign.php).
     let conDialog = null;
+    let conSigned = false;
     function closeConDialog() {
       if (!conDialog) return;
       const d = conDialog; conDialog = null;
       d.classList.remove('open');
       setTimeout(() => d.remove(), 180);
+      // Documenso → Make → Notion takes a few seconds after JD signs.
+      if (conSigned) { conSigned = false; setTimeout(() => loadContracts(true), 6000); }
     }
-    function openConDialog(c) {
+    function openConDialog(c, startSigning) {
       closeConDialog();
+      conSigned = false;
       const when = (iso) => iso ? new Date(iso).toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' }) : '';
       const emails = [firstEmail(c.email), firstEmail(c.alt_email)].filter(Boolean);
       const row = (label, html) => html ? `<div class="fd-con-row"><dt>${label}</dt><dd>${html}</dd></div>` : '';
@@ -520,10 +530,13 @@
       d.innerHTML = `<div class="modal fd-con-modal" role="dialog" aria-modal="true" aria-label="Contract preview">
         <h3>${esc(c.name)}<button type="button" class="modal-close-btn" data-x aria-label="Close">&times;</button></h3>
         <dl class="fd-con-sheet">${rows}</dl>
+        <div class="fd-con-frame" hidden><iframe title="Sign contract"></iframe></div>
+        <p class="fd-con-hint" hidden></p>
         <div class="modal-actions fd-con-bar">
-          <a class="btn btn-primary" href="api/frontdesk_contract_summary.php?id=${encodeURIComponent(c.id)}"><i class="fa-solid fa-download"></i> Download</a>
-          <a class="btn btn-ghost" href="${esc(c.url)}" target="_blank" rel="noopener"><i class="fa-solid fa-arrow-up-right-from-square"></i> Open in Notion</a>
+          <a class="btn btn-ghost" data-dl href="api/frontdesk_contract_summary.php?id=${encodeURIComponent(c.id)}"><i class="fa-solid fa-download"></i> Download</a>
+          <a class="btn btn-ghost" data-notion href="${esc(c.url)}" target="_blank" rel="noopener"><i class="fa-solid fa-arrow-up-right-from-square"></i> Open in Notion</a>
           <span class="fd-con-spacer"></span>
+          ${c.can_sign ? '<button type="button" class="btn btn-primary" data-sign><i class="fa-solid fa-signature"></i> Sign as JD</button>' : ''}
           <button type="button" class="btn btn-ghost" data-x>Close</button>
         </div>
       </div>`;
@@ -533,6 +546,36 @@
       d.addEventListener('click', (e) => { if (e.target === d || e.target.closest('[data-x]')) closeConDialog(); });
       const onKey = (e) => { if (e.key === 'Escape') { document.removeEventListener('keydown', onKey); closeConDialog(); } };
       document.addEventListener('keydown', onKey);
+
+      const signBtn = d.querySelector('[data-sign]');
+      if (signBtn) signBtn.addEventListener('click', async () => {
+        if (conSigned) { closeConDialog(); return; }   // "I've signed"
+        signBtn.disabled = true;
+        try {
+          const res = await fetch('api/frontdesk_contract_sign.php', {
+            method: 'POST',
+            headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'id=' + encodeURIComponent(c.id),
+          });
+          const out = await res.json();
+          if (!out.success) { showToast(out.message || 'Could not start signing.', true); signBtn.disabled = false; return; }
+          conSigned = true;
+          d.querySelector('.fd-con-sheet').hidden = true;
+          d.querySelector('.fd-con-frame').hidden = false;
+          d.querySelector('.fd-con-frame iframe').src = out.signing_url;
+          const hint = d.querySelector('.fd-con-hint');
+          hint.hidden = false;
+          hint.innerHTML = 'Sign below, then press “I’ve signed”. If the page stays blank, <a href="' + esc(out.signing_url) + '" target="_blank" rel="noopener">open the signing page in a new tab</a>.';
+          d.querySelector('[data-dl]').hidden = true;
+          d.querySelector('[data-notion]').hidden = true;
+          signBtn.innerHTML = '<i class="fa-solid fa-check"></i> I’ve signed';
+          signBtn.disabled = false;
+        } catch (err) {
+          showToast('Could not start signing. Check your connection.', true);
+          signBtn.disabled = false;
+        }
+      });
+      if (startSigning && signBtn) signBtn.click();
     }
 
     function renderContracts() {
@@ -579,10 +622,11 @@
     });
     conList.addEventListener('click', (e) => {
       if (e.target.closest('[data-con-more]')) { conAll = true; renderContracts(); return; }
-      const open = e.target.closest('[data-con-open]');
-      if (open) {
-        const c = (contracts || []).find(x => x.id === open.dataset.conOpen);
-        if (c) openConDialog(c);
+      const hit = e.target.closest('[data-con-open], [data-con-sign]');
+      if (hit) {
+        const sign = hit.hasAttribute('data-con-sign');
+        const c = (contracts || []).find(x => x.id === (sign ? hit.dataset.conSign : hit.dataset.conOpen));
+        if (c) openConDialog(c, sign);
         return;
       }
       // Client file / message / phone / email (spans, since links can't

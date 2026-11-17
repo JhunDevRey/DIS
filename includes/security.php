@@ -107,7 +107,7 @@ function sendSecurityHeaders(): void
         "img-src 'self' data: blob: $adobe",
         "connect-src 'self' https://cdnjs.cloudflare.com $adobe",
         "worker-src 'self' blob: https://cdnjs.cloudflare.com",
-        "frame-src 'self' blob: $adobe",
+        "frame-src 'self' blob: https://app.documenso.com $adobe",
         "media-src 'self' blob:",
         "manifest-src 'self'",
         "object-src 'none'",
