@@ -115,9 +115,8 @@ $comingWindows = [];
         <?php if (notionEnabled()): ?>
           <div class="fd-msg-tools">
             <div class="conv-channels" id="fdConTabs" role="tablist" aria-label="Show">
-              <button type="button" class="on" data-con="client" role="tab" title="Sent through Documenso, the client hasn't signed yet">With client <b data-con-count="client"></b></button>
-              <button type="button" data-con="jd" role="tab" title="The client signed; waiting for JD's signature">For JD <b data-con-count="jd"></b></button>
-              <button type="button" data-con="unpaid" role="tab" title="Signed, but no payment ticked in Notion">Unpaid <b data-con-count="unpaid"></b></button>
+              <button type="button" class="on" data-con="jd" role="tab" title="The client has signed; JD hasn't yet">Client signed <b data-con-count="jd"></b></button>
+              <button type="button" data-con="done" role="tab" title="Signed by the client and by JD">Fully signed <b data-con-count="done"></b></button>
             </div>
           </div>
           <ul class="fd-list" id="fdConList"><li class="fd-empty">Loading contracts…</li></ul>
@@ -128,7 +127,7 @@ $comingWindows = [];
         <?php else: ?>
           <div class="fd-soon-body">
             <i class="fa-solid fa-plug"></i>
-            <div><strong>Not connected yet</strong><span>Contracts with the client, waiting for JD, or signed but unpaid.</span></div>
+            <div><strong>Not connected yet</strong><span>Contracts the client has signed, and contracts signed by both.</span></div>
           </div>
         <?php endif; ?>
       </section>

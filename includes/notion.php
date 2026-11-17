@@ -89,14 +89,14 @@ function notionPropValue(?array $prop)
 
 
 // ---- 🖊️ Contracts (Front Desk "Contracts" window) ----
-// Make fills "Documenso Status" as contracts move through Documenso and
-// staff tick "Paid & Signed"; the window groups open contracts by what
-// they're waiting on.
+// Make fills "Documenso Status" as contracts move through Documenso; the
+// window lists the ones the client has signed (waiting for JD) and the ones
+// both have signed. The PDF itself comes from Documenso (includes/documenso.php).
 define('NOTION_CONTRACTS_DEFAULT_DS', 'f2f9876c-54e8-4952-b0c1-411dfc590aa2');
 define('NOTION_CONTRACTS_DEFAULT_URL', 'https://www.notion.so/f74fe94d062b4f41bf3ecbba683a8075');
-define('NOTION_CONTRACTS_DAYS', 120);   // older open contracts are left to Notion
+define('NOTION_CONTRACTS_DAYS', 120);   // older contracts are left to Notion
+define('NOTION_CONTRACTS_DONE_DAYS', 30); // fully signed ones drop off after this long
 define('NOTION_CONTRACTS_PAID', ['Paid', 'Paid w/ Square', 'Cheque', 'Cash']);
-define('NOTION_CONTRACTS_SIGNED', ['Sig', 'Sig n office']);
 
 function notionContractsDataSource(): string
 {
@@ -109,22 +109,21 @@ function notionContractsUrl(): string
 }
 
 /**
- * Which group an open contract belongs in, or null when it isn't waiting
- * on anything the front desk can chase:
- *   client — sent through Documenso, client hasn't signed (or declined)
- *   jd     — client signed, waiting for JD's signature
- *   unpaid — fully signed but no payment ticked
+ * Which tab a contract belongs in, or null when it isn't one the Front
+ * Desk shows (not sent yet, or still waiting for the client):
+ *   jd   — the client has signed; JD hasn't yet
+ *   done — signed by both the client and JD
  */
 function notionContractStage(string $docStatus, array $paidSigned): ?string
 {
-    $paid = (bool)array_intersect($paidSigned, NOTION_CONTRACTS_PAID);
-    $signedTick = (bool)array_intersect($paidSigned, NOTION_CONTRACTS_SIGNED);
     // "Sent - waiting … | Paid - reminders off": the part before " | " is the Documenso state.
     $state = strtolower(trim(explode('|', $docStatus)[0]));
 
     if (strpos($state, 'waiting for joel') !== false) return 'jd';
-    if (strpos($state, 'signed by client and joel') !== false || $signedTick) return $paid ? null : 'unpaid';
-    if (strpos($state, 'waiting for client signature') !== false || strpos($state, 'declined') !== false) return 'client';
+    if (strpos($state, 'signed by client and joel') !== false) return 'done';
+    if (strpos($state, 'waiting for client signature') !== false || strpos($state, 'declined') !== false) return null;
+    // Signed on paper in the office (no Documenso state to go by).
+    if ($state === '' && in_array('Sig n office', $paidSigned, true)) return 'done';
     return null;
 }
 
@@ -157,6 +156,7 @@ function notionContractForJson(array $page): ?array
         'id'          => $page['id'] ?? '',
         'url'         => $page['url'] ?? '',
         'stage'       => $stage,
+        'documenso_id' => preg_match('/^envelope_[A-Za-z0-9]+$/', trim((string)($v('Documenso ID') ?? ''))) ? trim((string)$v('Documenso ID')) : null,
         'name'        => $v('Name') ?? '(no name)',
         'email'       => $v('Email'),
         'alt_email'   => $alt !== '' ? $alt : null,
@@ -193,8 +193,6 @@ function notionOpenContracts(bool $fresh = false): array
     $body = [
         'filter' => ['and' => [
             ['timestamp' => 'created_time', 'created_time' => ['on_or_after' => $since]],
-            ['property' => 'Status', 'status' => ['does_not_equal' => 'Retained']],
-            ['property' => 'Status', 'status' => ['does_not_equal' => 'Expired']],
             ['or' => [
                 ['property' => 'Documenso Status', 'rich_text' => ['is_not_empty' => true]],
                 ['property' => 'Paid & Signed', 'multi_select' => ['is_not_empty' => true]],
@@ -211,6 +209,10 @@ function notionOpenContracts(bool $fresh = false): array
         $body['start_cursor'] = $data['next_cursor'];
     }
     $contracts = array_values(array_filter(array_map('notionContractForJson', $pages)));
+    // Fully signed contracts only stay on the list for a month after the last edit.
+    $doneSince = time() - NOTION_CONTRACTS_DONE_DAYS * 86400;
+    $contracts = array_values(array_filter($contracts, fn($c) =>
+        $c['stage'] !== 'done' || strtotime((string)($c['updated_at'] ?? $c['created_at'] ?? '')) >= $doneSince));
 
     // Link to the client's file when an email matches an active client.
     $all = [];
