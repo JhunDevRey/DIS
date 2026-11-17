@@ -431,10 +431,9 @@
   // ---- Contracts window ----
   // Contracts from the Notion 🖊️ Contracts database (via
   // api/frontdesk_contracts.php, cached ~60s): "Client signed" (waiting for
-  // JD) and "Fully signed". Clicking a name opens a preview of the contract
-  // PDF (fetched from Documenso by api/frontdesk_contract_file.php) with a
-  // Download button; owners also get "Sign as JD" on the first tab, which
-  // opens JD's Documenso signing page in the same dialog.
+  // JD) and "Fully signed". Clicking a name opens a preview of the contract's
+  // Notion record with a Download button (one-page PDF summary from
+  // api/frontdesk_contract_summary.php) and a link to the Notion page.
   const conWin = document.getElementById('fdContracts');
   if (conWin && conWin.dataset.enabled === '1') {
     const CON_KEY = 'duqueFrontDeskCon';
@@ -447,7 +446,6 @@
     let conStage = 'jd';
     let conAll = false;
     let contracts = null;
-    let canSign = false;
     try {
       const saved = JSON.parse(localStorage.getItem(CON_KEY) || '{}');
       if (STAGES.includes(saved.stage)) conStage = saved.stage;
@@ -476,84 +474,65 @@
         c.phone && `<span class="fd-inq-link" role="link" tabindex="0" data-href="tel:${esc(c.phone)}"><i class="fa-solid fa-phone"></i> ${esc(c.phone)}</span>`,
         email && `<span class="fd-inq-link" role="link" tabindex="0" data-href="mailto:${esc(email)}"><i class="fa-regular fa-envelope"></i> ${esc(email)}</span>`,
       ].filter(Boolean).join('');
-      // The name opens the preview (or Notion when there's no Documenso file).
-      const nameEl = c.has_file
-        ? `<button type="button" class="fd-name fd-con-open" data-con-open="${esc(c.id)}" title="Preview contract">${esc(c.name)}</button>`
-        : `<a class="fd-name fd-con-open" href="${esc(c.url)}" target="_blank" rel="noopener" title="Open in Notion">${esc(c.name)}</a>`;
-      const signBtn = canSign && c.has_file && c.stage === 'jd'
-        ? `<button type="button" class="btn btn-primary btn-sm fd-con-sign" data-con-sign="${esc(c.id)}"><i class="fa-solid fa-signature"></i> Sign as JD</button>` : '';
+      // The name opens the contract preview.
+      const nameEl = `<button type="button" class="fd-name fd-con-open" data-con-open="${esc(c.id)}" title="Preview contract">${esc(c.name)}</button>`;
       return `<li><div class="fd-inq">
         <span class="fd-inq-top">${nameEl}<span class="fd-time" title="Created ${esc(new Date(c.created_at).toLocaleDateString())}">${esc(ageText(c.created_at))}</span></span>
         <span class="fd-inq-tags">${tags}</span>
         ${c.note ? `<span class="fd-inq-msg">${esc(c.note)}</span>` : ''}
         ${contact ? `<span class="fd-inq-contact">${contact}</span>` : ''}
-        ${signBtn ? `<span class="fd-con-actions">${signBtn}</span>` : ''}
       </div></li>`;
     }
 
-    // Preview dialog: the PDF in an iframe, Download, and (owners, client-signed
-    // tab) Sign as JD, which swaps the iframe for JD's Documenso signing page.
+    // Preview dialog: the contract's Notion record laid out as a sheet, with
+    // Download (one-page PDF summary) and Open in Notion.
     let conDialog = null;
-    function closeConDialog(refresh) {
+    function closeConDialog() {
       if (!conDialog) return;
       const d = conDialog; conDialog = null;
       d.classList.remove('open');
       setTimeout(() => d.remove(), 180);
-      // Documenso → Make → Notion takes a few seconds after JD signs.
-      if (refresh) setTimeout(() => loadContracts(true), 6000);
     }
-    function openConDialog(c, startSigning) {
-      closeConDialog(false);
-      const fileUrl = `api/frontdesk_contract_file.php?id=${encodeURIComponent(c.id)}`;
+    function openConDialog(c) {
+      closeConDialog();
+      const when = (iso) => iso ? new Date(iso).toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' }) : '';
+      const emails = [firstEmail(c.email), firstEmail(c.alt_email)].filter(Boolean);
+      const row = (label, html) => html ? `<div class="fd-con-row"><dt>${label}</dt><dd>${html}</dd></div>` : '';
+      const status = c.stage === 'done'
+        ? '<span class="fd-inq-tag app">Signed by the client and JD</span>'
+        : '<span class="fd-inq-tag follow">Client signed — waiting for JD</span>';
+      const rows = [
+        row('Signing', status),
+        row('Contract', c.eng ? 'Engagement letter' : 'PCAIC contract'),
+        row('Case type', (c.case_types || []).map(t => `<span class="fd-inq-tag">${esc(t)}</span>`).join(' ')),
+        row('Client no.', c.client_no ? '#' + esc(c.client_no) : ''),
+        row('Email', emails.map(esc).join('<br>')),
+        row('Phone', esc(c.phone || '')),
+        row('Amount due', money(c.amount_due) ? esc(money(c.amount_due)) + ' CAD' : ''),
+        row('Paid & signed', (c.paid_signed || []).map(t => `<span class="fd-inq-tag${isPaid({ paid_signed: [t] }) ? ' app' : ''}">${esc(t)}</span>`).join(' ')),
+        row('Case status', esc(c.status || '')),
+        row('Created', esc(when(c.created_at))),
+        row('Last updated', esc(when(c.updated_at))),
+        row('Notes', esc(c.note || '')),
+      ].join('');
       const d = document.createElement('div');
       d.className = 'modal-backdrop fd-con-backdrop';
-      d.setAttribute('data-no-outside-close', '');
       d.innerHTML = `<div class="modal fd-con-modal" role="dialog" aria-modal="true" aria-label="Contract preview">
         <h3>${esc(c.name)}<button type="button" class="modal-close-btn" data-x aria-label="Close">&times;</button></h3>
-        <div class="fd-con-frame"><iframe title="Contract" src="${fileUrl}"></iframe></div>
-        <p class="fd-con-hint" hidden></p>
+        <dl class="fd-con-sheet">${rows}</dl>
         <div class="modal-actions fd-con-bar">
-          <a class="btn btn-ghost" href="${fileUrl}&download=1"><i class="fa-solid fa-download"></i> Download</a>
-          <a class="btn btn-ghost" href="${esc(c.url)}" target="_blank" rel="noopener">Open in Notion</a>
+          <a class="btn btn-primary" href="api/frontdesk_contract_summary.php?id=${encodeURIComponent(c.id)}"><i class="fa-solid fa-download"></i> Download</a>
+          <a class="btn btn-ghost" href="${esc(c.url)}" target="_blank" rel="noopener"><i class="fa-solid fa-arrow-up-right-from-square"></i> Open in Notion</a>
           <span class="fd-con-spacer"></span>
-          ${canSign && c.stage === 'jd' ? '<button type="button" class="btn btn-primary" data-sign><i class="fa-solid fa-signature"></i> Sign as JD</button>' : ''}
           <button type="button" class="btn btn-ghost" data-x>Close</button>
         </div>
       </div>`;
       document.body.appendChild(d);
       conDialog = d;
       requestAnimationFrame(() => d.classList.add('open'));
-      let signing = false;
-      const signBtn = d.querySelector('[data-sign]');
-      const hint = d.querySelector('.fd-con-hint');
-      d.addEventListener('click', (e) => {
-        if (e.target === d || e.target.closest('[data-x]')) closeConDialog(signing);
-      });
-      const onKey = (e) => { if (e.key === 'Escape') { document.removeEventListener('keydown', onKey); closeConDialog(signing); } };
+      d.addEventListener('click', (e) => { if (e.target === d || e.target.closest('[data-x]')) closeConDialog(); });
+      const onKey = (e) => { if (e.key === 'Escape') { document.removeEventListener('keydown', onKey); closeConDialog(); } };
       document.addEventListener('keydown', onKey);
-      if (signBtn) signBtn.addEventListener('click', async () => {
-        if (signing) { closeConDialog(true); return; }
-        signBtn.disabled = true;
-        try {
-          const res = await fetch('api/frontdesk_contract_sign.php', {
-            method: 'POST',
-            headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: 'id=' + encodeURIComponent(c.id),
-          });
-          const out = await res.json();
-          if (!out.success) { showToast(out.message || 'Could not start signing.', true); signBtn.disabled = false; return; }
-          signing = true;
-          d.querySelector('.fd-con-frame iframe').src = out.signing_url;
-          hint.hidden = false;
-          hint.innerHTML = 'Sign below. If the page stays blank, <a href="' + esc(out.signing_url) + '" target="_blank" rel="noopener">open the signing page in a new tab</a>.';
-          signBtn.innerHTML = '<i class="fa-solid fa-check"></i> I\'ve signed';
-          signBtn.disabled = false;
-        } catch (err) {
-          showToast('Could not start signing. Check your connection.', true);
-          signBtn.disabled = false;
-        }
-      });
-      if (startSigning && signBtn) signBtn.click();
     }
 
     function renderContracts() {
@@ -584,7 +563,6 @@
           return;
         }
         contracts = out.contracts || [];
-        canSign = !!out.can_sign;
         renderContracts();
       } catch (e) {
         if (!contracts) conList.innerHTML = '<li class="fd-empty fd-inq-error">Could not load contracts. Check your connection.</li>';
@@ -602,11 +580,9 @@
     conList.addEventListener('click', (e) => {
       if (e.target.closest('[data-con-more]')) { conAll = true; renderContracts(); return; }
       const open = e.target.closest('[data-con-open]');
-      const sign = e.target.closest('[data-con-sign]');
-      const hit = open || sign;
-      if (hit) {
-        const c = (contracts || []).find(x => x.id === (hit.dataset.conOpen || hit.dataset.conSign));
-        if (c) openConDialog(c, !!sign);
+      if (open) {
+        const c = (contracts || []).find(x => x.id === open.dataset.conOpen);
+        if (c) openConDialog(c);
         return;
       }
       // Client file / message / phone / email (spans, since links can't

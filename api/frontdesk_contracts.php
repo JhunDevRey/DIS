@@ -25,18 +25,4 @@ try {
     jsonResponse(false, $msg, ['enabled' => true]);
 }
 
-// The Documenso envelope id stays on the server; the page only learns
-// whether a file can be previewed.
-require_once __DIR__ . '/../includes/documenso.php';
-$files = documensoEnabled();
-$out['contracts'] = array_map(function ($c) use ($files) {
-    $c['has_file'] = $files && !empty($c['documenso_id']);
-    unset($c['documenso_id']);
-    return $c;
-}, $out['contracts']);
-
-jsonResponse(true, '', [
-    'enabled'    => true,
-    'notion_url' => notionContractsUrl(),
-    'can_sign'   => $files && adminIsOwner(),
-] + $out);
+jsonResponse(true, '', ['enabled' => true, 'notion_url' => notionContractsUrl()] + $out);

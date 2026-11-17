@@ -91,7 +91,7 @@ function notionPropValue(?array $prop)
 // ---- 🖊️ Contracts (Front Desk "Contracts" window) ----
 // Make fills "Documenso Status" as contracts move through Documenso; the
 // window lists the ones the client has signed (waiting for JD) and the ones
-// both have signed. The PDF itself comes from Documenso (includes/documenso.php).
+// both have signed. Everything shown comes from the Notion record itself.
 define('NOTION_CONTRACTS_DEFAULT_DS', 'f2f9876c-54e8-4952-b0c1-411dfc590aa2');
 define('NOTION_CONTRACTS_DEFAULT_URL', 'https://www.notion.so/f74fe94d062b4f41bf3ecbba683a8075');
 define('NOTION_CONTRACTS_DAYS', 120);   // older contracts are left to Notion
@@ -156,7 +156,6 @@ function notionContractForJson(array $page): ?array
         'id'          => $page['id'] ?? '',
         'url'         => $page['url'] ?? '',
         'stage'       => $stage,
-        'documenso_id' => preg_match('/^envelope_[A-Za-z0-9]+$/', trim((string)($v('Documenso ID') ?? ''))) ? trim((string)$v('Documenso ID')) : null,
         'name'        => $v('Name') ?? '(no name)',
         'email'       => $v('Email'),
         'alt_email'   => $alt !== '' ? $alt : null,
