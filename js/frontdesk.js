@@ -589,7 +589,9 @@
       const matches = (c) => !q || hay(c).includes(q)
         || (phoneDigits.length >= 3 && String(c.phone || '').replace(/\D/g, '').includes(phoneDigits));
       const by = {};
-      STAGES.forEach(s => { by[s] = contracts.filter(c => c.stage === s && matches(c)).sort((a, b) => new Date(a.created_at) - new Date(b.created_at)); });
+      // Most recently updated first: a contract that was just signed lands at the top.
+      const touched = (c) => new Date(c.updated_at || c.created_at).getTime();
+      STAGES.forEach(s => { by[s] = contracts.filter(c => c.stage === s && matches(c)).sort((a, b) => touched(b) - touched(a)); });
       STAGES.forEach(s => { conTabs.querySelector(`[data-con-count="${s}"]`).textContent = by[s].length || ''; });
       const waiting = contracts.filter(c => c.stage === 'jd').length;
       conCount.textContent = q ? `${by.jd.length + by.done.length} found`
