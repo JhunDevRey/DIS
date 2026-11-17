@@ -119,6 +119,10 @@ $comingWindows = [];
               <button type="button" data-con="done" role="tab" title="Signed by the client and by JD">Fully signed <b data-con-count="done"></b></button>
             </div>
           </div>
+          <div class="fd-con-search">
+            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+            <input type="search" id="fdConSearch" placeholder="Search name, email, phone, case type…" autocomplete="off" aria-label="Search contracts">
+          </div>
           <ul class="fd-list" id="fdConList"><li class="fd-empty">Loading contracts…</li></ul>
           <footer>
             <a href="<?= h(notionContractsUrl()) ?>" target="_blank" rel="noopener">Open in Notion →</a>

@@ -445,6 +445,7 @@
     const conTabs = document.getElementById('fdConTabs');
     let conStage = 'jd';
     let conAll = false;
+    let conQuery = '';
     let contracts = null;
     try {
       const saved = JSON.parse(localStorage.getItem(CON_KEY) || '{}');
@@ -581,14 +582,25 @@
     function renderContracts() {
       conTabs.querySelectorAll('[data-con]').forEach(b => b.classList.toggle('on', b.dataset.con === conStage));
       if (!contracts) return;
+      const q = conQuery.trim().toLowerCase();
+      const hay = (c) => [c.name, c.email, c.alt_email, c.phone, c.client_no, (c.case_types || []).join(' '), c.note]
+        .filter(Boolean).join(' ').toLowerCase();
+      const phoneDigits = q.replace(/\D/g, '');
+      const matches = (c) => !q || hay(c).includes(q)
+        || (phoneDigits.length >= 3 && String(c.phone || '').replace(/\D/g, '').includes(phoneDigits));
       const by = {};
-      STAGES.forEach(s => { by[s] = contracts.filter(c => c.stage === s).sort((a, b) => new Date(a.created_at) - new Date(b.created_at)); });
+      STAGES.forEach(s => { by[s] = contracts.filter(c => c.stage === s && matches(c)).sort((a, b) => new Date(a.created_at) - new Date(b.created_at)); });
       STAGES.forEach(s => { conTabs.querySelector(`[data-con-count="${s}"]`).textContent = by[s].length || ''; });
-      conCount.textContent = by.jd.length ? `${by.jd.length} for JD to sign` : (contracts.length ? 'All signed' : 'Nothing yet');
+      const waiting = contracts.filter(c => c.stage === 'jd').length;
+      conCount.textContent = q ? `${by.jd.length + by.done.length} found`
+        : waiting ? `${waiting} for JD to sign` : (contracts.length ? 'All signed' : 'Nothing yet');
       const rows = by[conStage];
       if (!rows.length) {
-        conList.innerHTML = `<li class="fd-empty"><i class="fa-solid fa-check"></i>${
-          conStage === 'jd' ? 'Nothing waiting for JD to sign.' : 'No fully signed contracts in the last 30 days.'}</li>`;
+        const other = STAGES.find(s => s !== conStage && by[s].length);
+        conList.innerHTML = q
+          ? `<li class="fd-empty"><i class="fa-solid fa-magnifying-glass"></i>No match in this tab${other ? ` — ${by[other].length} in “${other === 'jd' ? 'Client signed' : 'Fully signed'}”` : ''}.</li>`
+          : `<li class="fd-empty"><i class="fa-solid fa-check"></i>${
+            conStage === 'jd' ? 'Nothing waiting for JD to sign.' : 'No fully signed contracts in the last 30 days.'}</li>`;
         return;
       }
       const shown = conAll ? rows : rows.slice(0, CON_ROWS);
@@ -637,6 +649,12 @@
     conList.addEventListener('keydown', (e) => {
       const link = e.key === 'Enter' && e.target.closest('[data-href]');
       if (link) { e.preventDefault(); location.href = link.dataset.href; }
+    });
+    const conSearch = document.getElementById('fdConSearch');
+    conSearch.addEventListener('input', () => {
+      conQuery = conSearch.value;
+      conAll = false;
+      renderContracts();
     });
     const conRefresh = document.getElementById('fdConRefresh');
     conRefresh.addEventListener('click', async () => {
