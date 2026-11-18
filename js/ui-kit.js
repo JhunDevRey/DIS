@@ -739,6 +739,14 @@ document.addEventListener('DOMContentLoaded', () => {
    inline script in each page's <head> (before any CSS/JS loads), so the
    page never flashes the wrong theme. This part just wires up the switch
    in the sidebar and keeps localStorage in sync when the person flips it. */
+// Theme flipped somewhere else (another browser window, or the tab shell while
+// this page sits in a tab or the client side panel): follow it right away.
+window.addEventListener('storage', (e) => {
+  if (e.key === 'theme' && (e.newValue === 'dark' || e.newValue === 'light')) {
+    document.documentElement.setAttribute('data-theme', e.newValue);
+  }
+});
+
 document.addEventListener('DOMContentLoaded', () => {
   const toggle = document.getElementById('themeToggle');
   if (!toggle) return;
