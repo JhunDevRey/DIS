@@ -188,5 +188,6 @@ $comingWindows = [];
 <script id="fdSenders" type="application/json" data-locked="<?= $senderLocked ? '1' : '0' ?>"><?= json_encode(array_map(fn($s) => ['id' => (int)$s['id'], 'name' => $s['full_name']], $staffSenders), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
 <script src="js/ui-kit.js?v=<?= assetVersion('js/ui-kit.js') ?>"></script>
 <script src="js/frontdesk.js?v=<?= assetVersion('js/frontdesk.js') ?>"></script>
+<script src="js/client-panel.js?v=<?= assetVersion('js/client-panel.js') ?>"></script>
 </body>
 </html>

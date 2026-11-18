@@ -118,6 +118,7 @@ $processors = $db->query("
 <div id="toast"></div>
 <script src="js/ui-kit.js?v=<?= assetVersion('js/ui-kit.js') ?>"></script>
 <script src="js/admin.js?v=<?= assetVersion('js/admin.js') ?>"></script>
+<script src="js/client-panel.js?v=<?= assetVersion('js/client-panel.js') ?>"></script>
 <script>
 document.getElementById('btnNewProcessor').addEventListener('click', () => openModal('modalNewProcessor'));
 
@@ -255,7 +256,7 @@ function renderPanelClients(clients) {
     const rows = group.clients.map(c => `
       <tr>
         <td data-label="Client">
-          <a href="client.php?id=${Number(c.id)}" style="display:flex;align-items:center;gap:8px;font-weight:600;color:var(--ink);">
+          <a href="client.php?id=${Number(c.id)}" data-client-name="${escapeHtml(c.full_name)}" style="display:flex;align-items:center;gap:8px;font-weight:600;color:var(--ink);">
             <div class="avatar" style="width:26px;height:26px;font-size:10.5px;flex-shrink:0;">${escapeHtml((c.full_name || '?').charAt(0).toUpperCase())}</div>
             <span style="min-width:0;word-break:break-word;">${escapeHtml(c.full_name)}</span>
           </a>

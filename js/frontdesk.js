@@ -658,11 +658,11 @@
       // Client file / message / phone / email (spans, since links can't
       // nest in the row link) go there instead of opening Notion.
       const link = e.target.closest('[data-href]');
-      if (link) { e.preventDefault(); location.href = link.dataset.href; }
+      if (link) { e.preventDefault(); if (!(window.ClientPanel && ClientPanel.handle(link.dataset.href, e))) location.href = link.dataset.href; }
     });
     conList.addEventListener('keydown', (e) => {
       const link = e.key === 'Enter' && e.target.closest('[data-href]');
-      if (link) { e.preventDefault(); location.href = link.dataset.href; }
+      if (link) { e.preventDefault(); if (!(window.ClientPanel && ClientPanel.handle(link.dataset.href, null))) location.href = link.dataset.href; }
     });
     const conSearch = document.getElementById('fdConSearch');
     conSearch.addEventListener('input', () => {
@@ -824,13 +824,13 @@
       const dl = e.target.closest('[data-pq-dl]');
       if (dl) { e.preventDefault(); downloadPq(dl); return; }
       const link = e.target.closest('[data-href]');
-      if (link) { e.preventDefault(); location.href = link.dataset.href; }
+      if (link) { e.preventDefault(); if (!(window.ClientPanel && ClientPanel.handle(link.dataset.href, e))) location.href = link.dataset.href; }
     });
     pqList.addEventListener('keydown', (e) => {
       const dl = e.key === 'Enter' && e.target.closest('[data-pq-dl]');
       if (dl) { e.preventDefault(); downloadPq(dl); return; }
       const link = e.key === 'Enter' && e.target.closest('[data-href]');
-      if (link) { e.preventDefault(); location.href = link.dataset.href; }
+      if (link) { e.preventDefault(); if (!(window.ClientPanel && ClientPanel.handle(link.dataset.href, null))) location.href = link.dataset.href; }
     });
     const pqSearch = document.getElementById('fdPqSearch');
     pqSearch.addEventListener('input', () => {

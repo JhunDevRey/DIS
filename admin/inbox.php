@@ -264,5 +264,6 @@ $waDefault = $waOn && $openClient && $waNumber ? waPreferredChannel((int)$openCl
 <div id="toast"></div>
 <script src="js/ui-kit.js?v=<?= assetVersion('js/ui-kit.js') ?>"></script>
 <script src="js/messages.js?v=<?= assetVersion('js/messages.js') ?>"></script>
+<script src="js/client-panel.js?v=<?= assetVersion('js/client-panel.js') ?>"></script>
 </body>
 </html>
