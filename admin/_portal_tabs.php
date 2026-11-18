@@ -18,20 +18,27 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer">
 <link rel="stylesheet" href="css/style.css?v=<?= cssVersion() ?>">
 </head>
-<body>
+<body class="pt-shell">
+<div class="ct-bar" id="ctBar">
+  <div class="ct-tabs" id="ctTabs" role="tablist" aria-label="Open tabs"></div>
+  <button type="button" class="ct-add" id="ctAdd" title="New tab" aria-label="New tab"><i class="fa-solid fa-plus"></i></button>
+</div>
 <div class="app-shell">
   <?php include __DIR__ . '/_sidebar.php'; ?>
 
   <main class="main ct-main">
-    <div class="ct-bar">
-      <div class="ct-tabs" id="ctTabs" role="tablist" aria-label="Open tabs"></div>
-      <button type="button" class="ct-add" id="ctAdd" title="Open a new tab" aria-label="Open a new tab" aria-haspopup="true" aria-expanded="false"><i class="fa-solid fa-plus"></i></button>
-      <div class="ct-pop" id="ctPop" hidden>
-        <input type="search" id="ctSearch" placeholder="Open a page or client…" autocomplete="off" aria-label="Open a page or client in a new tab">
-        <ul id="ctResults"></ul>
-      </div>
+    <div class="ct-frames" id="ctFrames">
+      <section class="ct-new" id="ctNew" hidden aria-label="New tab">
+        <div class="ct-new-inner">
+          <h1>New tab</h1>
+          <div class="ct-new-search">
+            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+            <input type="search" id="ctNewSearch" placeholder="Search pages and clients…" autocomplete="off" aria-label="Search pages and clients">
+          </div>
+          <div id="ctNewList"></div>
+        </div>
+      </section>
     </div>
-    <div class="ct-frames" id="ctFrames"></div>
   </main>
 </div>
 <div id="toast"></div>
