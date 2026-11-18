@@ -2952,20 +2952,32 @@ td.cell-wrap { overflow-wrap: anywhere; }
   .act-card td[data-label="From"] { display: none; }
 }
 
-/* ---------- Client tabs (admin/_client_tabs.php, js/client-tabs.js) ----------
-   Browser-style tab bar; each client is a kept-alive iframe of client.php
-   (?embed=1), so switching never loses typed text or an open document. */
+/* ---------- Portal tabs (admin/_portal_tabs.php, js/portal-tabs.js) ----------
+   Notion-style: rounded tabs with a page icon, the close button only on
+   hover, a small + at the end. Each tab is a kept-alive iframe, so
+   switching never loses typed text or an open document. */
 .ct-main { padding: 0; display: flex; flex-direction: column; height: 100vh; min-width: 0; }
-.ct-bar { position: relative; z-index: 30; display: flex; align-items: flex-end; gap: 4px; padding: 8px 12px 0; background: var(--surface-alt); border-bottom: 1px solid var(--line); flex-shrink: 0; }
-.ct-tabs { display: flex; gap: 2px; min-width: 0; flex: 0 1 auto; overflow: hidden; }
-.ct-tab { display: flex; align-items: center; gap: 6px; max-width: 220px; min-width: 0; padding: 8px 6px 8px 12px; border: 1px solid transparent; border-bottom: 0; border-radius: 8px 8px 0 0; color: var(--ink); font-size: 13px; cursor: pointer; white-space: nowrap; flex: 1 1 0; opacity: .8; }
-.ct-tab:hover { background: var(--card); opacity: 1; }
-.ct-tab.on { background: var(--card); border-color: var(--line); font-weight: 600; margin-bottom: -1px; opacity: 1; }
+.ct-bar { position: relative; z-index: 30; display: flex; align-items: center; gap: 4px; height: 42px; padding: 0 10px; background: var(--surface-alt); border-bottom: 1px solid var(--line); flex-shrink: 0; }
+.ct-tabs { display: flex; align-items: center; gap: 2px; min-width: 0; flex: 0 1 auto; overflow: hidden; }
+.ct-tab { position: relative; display: flex; align-items: center; gap: 7px; height: 30px; max-width: 200px; min-width: 0; padding: 0 6px 0 9px; border-radius: 8px; color: var(--ink); font-size: 13px; cursor: pointer; white-space: nowrap; flex: 1 1 0; opacity: .72; transition: background .12s, opacity .12s; user-select: none; }
+.ct-tab:hover { background: rgba(127,127,127,.14); opacity: 1; }
+.ct-tab.on { background: var(--card); opacity: 1; font-weight: 600; box-shadow: 0 0 0 1px var(--line), 0 1px 3px rgba(0,0,0,.08); }
+.ct-tab.dragging { opacity: .4; }
+.ct-tab.drop-before::before, .ct-tab.drop-after::after { content: ""; position: absolute; top: 4px; bottom: 4px; width: 2px; background: var(--gold); border-radius: 2px; }
+.ct-tab.drop-before::before { left: -2px; }
+.ct-tab.drop-after::after { right: -2px; }
+.ct-ico { flex-shrink: 0; width: 15px; text-align: center; font-size: 12px; opacity: .8; }
 .ct-name { overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1; }
-.ct-x { border: 0; background: none; color: inherit; width: 20px; height: 20px; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; cursor: pointer; opacity: .6; flex-shrink: 0; }
-.ct-x:hover { background: var(--line); opacity: 1; }
-.ct-add { border: 0; background: none; color: var(--ink); width: 30px; height: 30px; margin-bottom: 4px; border-radius: 6px; cursor: pointer; flex-shrink: 0; }
-.ct-add:hover { background: var(--line); }
+.ct-x { border: 0; background: none; color: inherit; width: 20px; height: 20px; border-radius: 5px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; cursor: pointer; flex-shrink: 0; opacity: 0; transition: opacity .12s; }
+.ct-tab:hover .ct-x, .ct-tab.on .ct-x, .ct-x:focus-visible { opacity: .6; }
+.ct-x:hover { background: rgba(127,127,127,.25); opacity: 1 !important; }
+.ct-add { border: 0; background: none; color: var(--ink); width: 28px; height: 28px; border-radius: 8px; cursor: pointer; flex-shrink: 0; opacity: .7; font-size: 12px; }
+.ct-add:hover { background: rgba(127,127,127,.18); opacity: 1; }
+.ct-menu { position: fixed; z-index: 60; min-width: 200px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.2); padding: 5px; }
+.ct-menu button { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; border: 0; background: none; padding: 7px 9px; border-radius: 6px; color: var(--ink); font-size: 13px; cursor: pointer; }
+.ct-menu button:hover:not(:disabled) { background: var(--surface-alt); }
+.ct-menu button:disabled { opacity: .4; cursor: default; }
+.ct-menu i { width: 15px; text-align: center; opacity: .7; }
 .ct-pop { position: fixed; top: 44px; left: 12px; width: min(340px, calc(100vw - 24px)); background: var(--card); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.18); padding: 8px; z-index: 30; }
 .ct-pop[hidden] { display: none; }
 .ct-pop input { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--ink); font-size: 14px; }
@@ -2980,7 +2992,7 @@ td.cell-wrap { overflow-wrap: anywhere; }
 .ct-frames { flex: 1; min-height: 0; position: relative; }
 .ct-frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: transparent; }
 .ct-frame[hidden] { display: none; }
-@media (max-width: 860px) { .ct-main { height: calc(100dvh - 56px); } .ct-tab { max-width: 160px; } }
+@media (max-width: 860px) { .ct-main { height: calc(100dvh - 56px); } .ct-tab { max-width: 150px; } .ct-x { opacity: .6; } }
 
 /* ---------- Checklist colour coding (client page, documents column) ----------
    Each document is a coloured box so what's missing is obvious at a glance:
