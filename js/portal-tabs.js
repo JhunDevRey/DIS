@@ -231,11 +231,12 @@
         var loc = f.contentWindow.location;
         var file = loc.pathname.replace(/^.*\//, '');
         if (file === 'login.php' || file === 'index.php' || file === '') { top.location.href = 'login.php'; return; }
-        // A page that came back as a whole tab shell (old service worker):
-        // reload it once as a plain embedded page.
+        // Backup for the shell's own guard: a page that came back as a whole
+        // tab shell is reloaded as the plain embedded page (never loops: the
+        // embedded URL can't render the shell).
         if (f.contentDocument.getElementById('ctTabs')) {
           var again = norm(loc.href);
-          if (again && !f.dataset.retried) { f.dataset.retried = '1'; f.src = withEmbed(again); }
+          if (again && !/[?&]embed=1/.test(loc.search)) f.src = withEmbed(again);
           return;
         }
         var cur = find(t.id);
@@ -478,6 +479,9 @@
     });
   }
   setInterval(pollBadges, 30000);
+
+  // Pick up the newest service worker (it lets tab pages through as frames).
+  try { navigator.serviceWorker.getRegistration().then(function (r) { if (r) r.update(); }); } catch (e) {}
 
   show(active);
 })();

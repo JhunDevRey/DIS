@@ -9,6 +9,15 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<script>
+/* Loaded inside a portal tab (the browser didn't say it was a frame)?
+   Swap straight to the plain embedded page before anything renders. */
+if (window.top !== window.self) {
+  var u = new URL(location.href);
+  u.searchParams.set('embed', '1');
+  location.replace(u.href);
+}
+</script>
 <meta name="csrf-token" content="<?= h(csrfToken()) ?>">
 <script>(function(){var t=localStorage.getItem("theme")||(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t);})();</script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
