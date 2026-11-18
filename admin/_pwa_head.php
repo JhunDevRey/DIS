@@ -10,8 +10,10 @@ if (portalEmbedded()):
    page link open that page in a new portal tab (the shell is the parent). */
 (function () {
   document.documentElement.classList.add('portal-embed');
+  // Opened in the Clients list's side panel (clients.php): no "All clients" link.
+  if (/[?&]panel=1(&|$)/.test(location.search)) document.documentElement.classList.add('portal-panel');
   function go(e, a) {
-    var t = window.parent && window.parent.PortalTabs;
+    var t = (window.top && window.top.PortalTabs) || (window.parent && window.parent.PortalTabs);
     if (!t || !a || a.target || a.hasAttribute('download')) return;
     if (!/^[a-z_]+\.php([?#]|$)/i.test(a.getAttribute('href') || '')) return;
     e.preventDefault();

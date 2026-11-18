@@ -364,6 +364,19 @@ sort($clientNoOptions, SORT_NATURAL);
   </div>
 </div>
 
+<!-- Client file in a side panel (like Processors): the full client page,
+     embedded, so every action on it works here too. -->
+<div class="side-panel-backdrop" id="clientPanel">
+  <div class="side-panel client-panel" role="dialog" aria-modal="true" aria-labelledby="clientPanelName">
+    <div class="client-panel-bar">
+      <h3 id="clientPanelName">Client</h3>
+      <a class="btn btn-ghost btn-sm" id="clientPanelFull" href="#" title="Open as a full page"><i class="fa-solid fa-up-right-and-down-left-from-center"></i><span class="client-panel-full-label"> Open full page</span></a>
+      <button type="button" class="side-panel-close" id="clientPanelClose" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <iframe class="client-panel-frame" id="clientPanelFrame" title="Client file"></iframe>
+  </div>
+</div>
+
 <div id="toast"></div>
 <script src="js/ui-kit.js?v=<?= assetVersion('js/ui-kit.js') ?>"></script>
 <script src="js/admin.js?v=<?= assetVersion('js/admin.js') ?>"></script>
@@ -518,16 +531,96 @@ clientGroups.forEach(group => {
   group.querySelector('[data-add-client]').addEventListener('click', () => openModal('modalNewClient'));
 });
 
+// ---- Client side panel (like Processors) ----
+// A plain click on a client opens their file in a panel over the list;
+// Ctrl/Cmd-click or middle-click still opens it in a new tab.
+const clientPanel = document.getElementById('clientPanel');
+const clientPanelFrame = document.getElementById('clientPanelFrame');
+const clientPanelName = document.getElementById('clientPanelName');
+let clientPanelId = 0, clientPanelLoads = 0, clientPanelTimer = null;
+
+function closeClientPanel() {
+  if (!clientPanel.classList.contains('open')) return;
+  clientPanel.classList.remove('open');
+  try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+  const changed = clientPanelLoads > 1; // the client page reloads itself after a save
+  clientPanelId = 0;
+  clearTimeout(clientPanelTimer);
+  clientPanelTimer = setTimeout(() => { clientPanelFrame.src = 'about:blank'; }, 300);
+  if (changed) location.reload(); // refresh the list (status, processor, case type…)
+}
+function openClientPanel(id, name) {
+  id = parseInt(id, 10);
+  if (!id) return;
+  clearTimeout(clientPanelTimer);
+  clientPanelId = id;
+  clientPanelLoads = 0;
+  clientPanelName.textContent = name || 'Client';
+  clientPanelFrame.src = 'client.php?id=' + id + '&embed=1&panel=1';
+  clientPanel.classList.add('open');
+  try { history.replaceState(null, '', location.pathname + location.search + '#client=' + id); } catch (e) {}
+}
+clientPanelFrame.addEventListener('load', () => {
+  if (!clientPanelId) return;
+  clientPanelLoads++;
+  try {
+    const doc = clientPanelFrame.contentDocument;
+    const h1 = doc.querySelector('.client-hero-id h1');
+    if (h1) clientPanelName.textContent = h1.textContent.trim();
+    // Esc inside the client page closes the panel too (unless a dialog of
+    // its own is open there).
+    doc.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !doc.querySelector('.modal-backdrop.open, .modal-backdrop.show')) closeClientPanel();
+    });
+    // The client was deleted (the page sends you back to the list).
+    if (!/\/client\.php$/.test(clientPanelFrame.contentWindow.location.pathname)) closeClientPanel();
+  } catch (e) { /* still loading */ }
+});
+document.getElementById('clientPanelClose').addEventListener('click', closeClientPanel);
+clientPanel.addEventListener('click', (e) => { if (e.target === clientPanel) closeClientPanel(); });
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && clientPanel.classList.contains('open') && !document.querySelector('.modal-backdrop.open, .modal-backdrop.show')) closeClientPanel();
+});
+document.getElementById('clientPanelFull').addEventListener('click', (e) => {
+  e.preventDefault();
+  const url = 'client.php?id=' + clientPanelId;
+  const tabs = window.top && window.top.PortalTabs;
+  if (tabs) { tabs.open(url); closeClientPanel(); }
+  else location.href = url;
+});
+
 // Whole row opens the client (the name is a real link, for middle-click /
-// copy-link); clicks on the row's own buttons and links are left alone.
+// copy-link); clicks on the row's own buttons and other links are left alone.
 document.querySelectorAll('#clientsList tr.cu-row').forEach(row => {
+  const id = (row.dataset.href.match(/id=(\d+)/) || [])[1];
+  const nameLink = row.querySelector('a[href^="client.php?id="]');
+  if (nameLink) {
+    nameLink.addEventListener('click', (e) => {
+      if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return; // new tab etc.
+      e.preventDefault();
+      openClientPanel(id, nameLink.textContent.trim());
+    });
+  }
   row.addEventListener('click', (e) => {
     if (e.target.closest('a, button, input')) return;
     if (window.getSelection().toString()) return; // let people select/copy text
-    if (e.ctrlKey || e.metaKey) window.open(row.dataset.href, '_blank');
-    else location.href = row.dataset.href;
+    if (e.ctrlKey || e.metaKey) {
+      const tabs = window.top && window.top.PortalTabs;
+      if (tabs) tabs.open(row.dataset.href); else window.open(row.dataset.href, '_blank');
+    } else {
+      openClientPanel(id, nameLink ? nameLink.textContent.trim() : '');
+    }
   });
 });
+
+// Reopen the panel after a refresh (#client=ID).
+(function () {
+  const m = location.hash.match(/^#client=(\d+)$/);
+  if (m) {
+    const link = document.querySelector('#clientsList a[href="client.php?id=' + m[1] + '"]');
+    openClientPanel(m[1], link ? link.textContent.trim() : '');
+  }
+})();
 
 renderClientsTable();
 
