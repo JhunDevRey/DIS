@@ -24,14 +24,6 @@ if (!$client) {
     exit;
 }
 
-// Client tabs: a normal visit renders the tab shell (admin/_client_tabs.php),
-// which loads each open client in its own kept-alive frame of this same page
-// with ?embed=1. Only the embedded copy renders the full client file.
-if (!isset($_GET['embed'])) {
-    include __DIR__ . '/_client_tabs.php';
-    exit;
-}
-
 $processors = $db->query('SELECT * FROM processors ORDER BY full_name ASC')->fetchAll();
 
 // Client No. datalist: a straightforward 1-100 range to pick from, PLUS
@@ -231,8 +223,10 @@ function renderAdminDocItem(array $r, int $displayNumber, array $filesByRequest,
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer">
 <link rel="stylesheet" href="css/style.css?v=<?= cssVersion() ?>">
 </head>
-<body class="client-embed">
+<body>
 <div class="app-shell">
+  <?php include __DIR__ . '/_sidebar.php'; ?>
+
   <main class="main client-page">
     <a class="client-back" href="clients.php"><i class="fa-solid fa-arrow-left"></i> All clients</a>
     <?php
@@ -610,7 +604,6 @@ $dropboxAddedYear = $client['dropbox_added_at'] ? (int)date('Y', strtotime($clie
 <div id="toast"></div>
 <script src="js/ui-kit.js?v=<?= assetVersion('js/ui-kit.js') ?>"></script>
 <script src="js/admin.js?v=<?= assetVersion('js/admin.js') ?>"></script>
-<script src="js/client-tabs.js?v=<?= assetVersion('js/client-tabs.js') ?>"></script>
 <script>
 const CHECKLIST_TEMPLATES = <?= json_encode($checklistTemplates, JSON_UNESCAPED_UNICODE) ?>;
 const CLIENT_ID = <?= (int)$clientId ?>;

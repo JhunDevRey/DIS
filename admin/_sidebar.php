@@ -1,4 +1,8 @@
 <?php
+// Inside a portal tab (see includes/portal_tabs.php) the shell owns the sidebar.
+require_once __DIR__ . '/../includes/portal_tabs.php';
+if (portalEmbedded()) return;
+
 // $activeNav should be set by the including page: 'frontdesk' | 'clients' | 'inbox' | 'processors' | 'staff' | 'activity' | 'profile'
 $activeNav = $activeNav ?? '';
 

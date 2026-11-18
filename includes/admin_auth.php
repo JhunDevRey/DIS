@@ -92,4 +92,9 @@ function requireAdmin(): void
             exit;
         }
     }
+
+    // Notion-style tabs: a normal page load of a staff page is answered with
+    // the tab shell, which loads this same page in a frame (see portal_tabs.php).
+    require_once __DIR__ . '/portal_tabs.php';
+    portalTabsMaybeShell();
 }
