@@ -3009,11 +3009,44 @@ body.pt-shell { height: 100vh; height: 100dvh; display: flex; flex-direction: co
 .ct-new-sub { margin-left: auto; padding-left: 12px; font-size: 12px; color: var(--text-muted, var(--ink)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 45%; }
 .ct-new-none { padding: 14px 8px; color: var(--text-muted, var(--ink)); font-size: 14px; }
 
+/* Each tab is its own size container: when tabs get squeezed, the name
+   goes first, then the close button (except on the active tab), leaving
+   the page icon — never a sideways scroll. */
+.ct-tab { container-type: inline-size; container-name: cttab; }
+@container cttab (max-width: 92px) {
+  .ct-name { display: none; }
+  .ct-tab { justify-content: center; }
+}
+@container cttab (max-width: 60px) {
+  .ct-tab:not(.on) .ct-x { display: none; }
+}
+
+/* Touch screens: no hover, so the close button is always visible on the
+   active tab (others close via the menu or by switching first), and
+   everything is a finger-sized target. */
+@media (hover: none) {
+  .ct-bar { height: 46px; }
+  .ct-tab { height: 36px; }
+  .ct-tab .ct-x { display: none; }
+  .ct-tab.on .ct-x { display: inline-flex; opacity: .6; width: 28px; height: 28px; }
+  .ct-add { width: 36px; height: 36px; opacity: .8; }
+}
+
+/* Tablets and phones: the portal's own mobile header (logo + menu button)
+   comes first, then the tab strip, then the page. */
 @media (max-width: 860px) {
-  .ct-tab { width: 150px; }
-  .ct-x { opacity: .55; }
-  .ct-new-inner { padding: 32px 16px; }
+  .pt-shell > .app-shell { display: contents; }
+  .pt-shell .sidebar { order: 1; flex-shrink: 0; }
+  .pt-shell .ct-bar { order: 2; padding: 0 6px; }
+  .pt-shell .ct-main { order: 3; flex: 1; min-height: 0; }
+  .ct-tab { width: 160px; min-width: 40px; padding: 0 4px 0 8px; }
+  .ct-tab.on { min-width: 120px; } /* the current tab keeps its name visible */
+  .ct-new-inner { padding: 28px 16px 32px; }
+  .ct-new h1 { font-size: 24px; margin-bottom: 14px; }
+  .ct-new-search input { font-size: 16px; height: 44px; } /* 16px: no iPhone zoom */
+  .ct-new-item { padding: 11px 8px; font-size: 15px; }
   .ct-new-sub { display: none; }
+  .ct-menu button { padding: 11px 10px; font-size: 14px; }
 }
 
 /* ---------- Checklist colour coding (client page, documents column) ----------
@@ -3045,7 +3078,19 @@ body.pt-shell { height: 100vh; height: 100dvh; display: flex; flex-direction: co
 .client-panel-bar h3 { flex: 1; min-width: 0; margin: 0; font-family: var(--font-display); font-size: 16px; font-weight: 700; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .client-panel-frame { flex: 1; min-height: 0; width: 100%; border: 0; background: var(--bg); }
 .portal-panel .client-back { display: none; }
+.side-panel.client-panel { height: 100vh; height: 100dvh; }
+/* Tablets: nearly full width so the client page keeps its two columns. */
+@media (max-width: 1024px) {
+  .side-panel.client-panel { width: 96vw; max-width: 96vw; }
+}
+/* Phones: a full-screen sheet (the client page stacks to one column). */
 @media (max-width: 700px) {
-  .side-panel.client-panel { width: 100vw; max-width: 100vw; border-left: 0; }
+  .side-panel.client-panel { width: 100vw; max-width: 100vw; border-left: 0; box-shadow: none; }
+  .client-panel-bar { padding: 8px 8px 8px 14px; gap: 6px; }
+  .client-panel-bar h3 { font-size: 15px; }
   .client-panel-full-label { display: none; }
+}
+@media (hover: none) {
+  .client-panel-bar .side-panel-close { width: 40px; height: 40px; font-size: 18px; }
+  .client-panel-bar .btn { min-height: 40px; min-width: 40px; justify-content: center; }
 }
