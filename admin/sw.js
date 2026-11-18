@@ -9,6 +9,9 @@ self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim(
 
 self.addEventListener('fetch', (event) => {
   if (event.request.mode !== 'navigate') return; // files, API calls: browser default
+  // Pages inside portal tabs (frames) go straight to the network so the server
+  // sees them as framed (Sec-Fetch-Dest: iframe); see includes/portal_tabs.php.
+  if (event.request.destination === 'iframe') return;
   event.respondWith(
     fetch(event.request).catch(() => new Response(
       '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">' +

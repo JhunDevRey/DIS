@@ -154,6 +154,13 @@
         var loc = f.contentWindow.location;
         var file = loc.pathname.replace(/^.*\//, '');
         if (file === 'login.php' || file === 'index.php' || file === '') { top.location.href = 'login.php'; return; }
+        // A tab page that came back as a whole tab shell (old service worker,
+        // header missing): reload it as a plain embedded page.
+        if (f.contentDocument.getElementById('ctTabs')) {
+          var again = norm(loc.href);
+          if (again && !f.dataset.retried) { f.dataset.retried = '1'; f.src = withEmbed(again); }
+          return;
+        }
         var cur = find(t.id);
         if (!cur) return;
         var url = norm(loc.href);

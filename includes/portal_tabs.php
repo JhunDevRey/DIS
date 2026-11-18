@@ -38,7 +38,11 @@ function portalTabsMaybeShell(): void
     if (!in_array($page, portalTabPages(), true)) return;
     if (portalEmbedded()) return;
     // Only a real page navigation; never downloads, fetches or JSON views.
-    if (strtolower($_SERVER['HTTP_SEC_FETCH_DEST'] ?? '') !== 'document') return;
+    // The service worker re-sends page loads, which turns the destination
+    // into "empty" (mode stays "navigate"); real frames are "iframe".
+    $mode = strtolower($_SERVER['HTTP_SEC_FETCH_MODE'] ?? '');
+    $dest = strtolower($_SERVER['HTTP_SEC_FETCH_DEST'] ?? '');
+    if ($mode !== 'navigate' || !in_array($dest, ['document', 'empty'], true)) return;
     if (isset($_GET['format']) || isset($_GET['raw'])) return;
 
     // Anything going wrong while building the shell falls back to the
