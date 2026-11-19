@@ -501,56 +501,49 @@
       d.classList.remove('open');
       setTimeout(() => d.remove(), 180);
       if (conMsgHandler) { window.removeEventListener('message', conMsgHandler); conMsgHandler = null; }
-      // Closed without a confirmed signature (e.g. signed in a new tab): keep
-      // checking (every 10s, up to 3 min) until the contract moves.
+      // Closed before the signing page reported completion (e.g. signed in a
+      // new tab): keep checking (every 10s, up to 3 min) until it moves.
       if (conSigned) { const id = conSigned; conSigned = false; watchSigned(id); }
     }
     let conMsgHandler = null;
     // Ask Documenso (through our server) whether JD's signature is in. If it
-    // is, move the contract to Fully signed straight away — no waiting for
-    // Make → Notion. quiet: called by the signing page itself, so no nagging.
-    let conChecking = false;
-    async function finishSigning(c, quiet) {
-      if (conChecking) return;
-      conChecking = true;
-      const btn = conDialog && conDialog.querySelector('[data-sign]');
-      if (btn) btn.disabled = true;
+    // is, the server remembers it and the contract shows as Fully signed
+    // straight away — no waiting for Make → Notion.
+    async function signedInDocumenso(id) {
       try {
         const res = await fetch('api/frontdesk_contract_sign.php', {
           method: 'POST',
           headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: 'check=1&id=' + encodeURIComponent(c.id),
+          body: 'check=1&id=' + encodeURIComponent(id),
         });
         const out = await res.json();
-        if (out.success && out.completed) {
-          conSigned = false;
-          const mine = (contracts || []).find(x => x.id === c.id);
-          if (mine) { mine.stage = 'done'; mine.can_sign = false; mine.updated_at = new Date().toISOString(); }
-          renderContracts();
-          closeConDialog();
-          showToast('Signed — moved to Fully signed.');
-          return;
-        }
-        if (!quiet) showToast(out.success
-          ? 'Documenso doesn’t have JD’s signature yet. Click the signature field, then press Complete on the signing page.'
-          : (out.message || 'Could not check the signature.'), true);
-      } catch (err) {
-        if (!quiet) showToast('Could not check the signature. Check your connection.', true);
-      } finally {
-        conChecking = false;
-        if (btn) btn.disabled = false;
-      }
+        return !!(out.success && out.completed);
+      } catch (err) { return false; }
+    }
+    function markSigned(id) {
+      const mine = (contracts || []).find(x => x.id === id);
+      if (mine) { mine.stage = 'done'; mine.can_sign = false; mine.updated_at = new Date().toISOString(); }
+      renderContracts();
+      showToast('Signed — moved to Fully signed.');
+    }
+    // The signing page said "completed": confirm with Documenso, then close.
+    async function finishSigning(c) {
+      if (!(await signedInDocumenso(c.id))) return;
+      conSigned = false;
+      closeConDialog();
+      markSigned(c.id);
     }
     function watchSigned(id) {
       let tries = 0;
       const tick = async () => {
         tries++;
+        if (await signedInDocumenso(id)) { markSigned(id); return; }
         await loadContracts(true);
         const c = (contracts || []).find(x => x.id === id);
         if (!c || c.stage !== 'jd') { if (c) showToast('Contract moved to Fully signed.'); return; }
         if (tries < 18) setTimeout(tick, 10000);
       };
-      setTimeout(tick, 5000);
+      setTimeout(tick, 1000);
     }
     function openConDialog(c, startSigning) {
       closeConDialog();
@@ -599,7 +592,6 @@
 
       const signBtn = d.querySelector('[data-sign]');
       if (signBtn) signBtn.addEventListener('click', async () => {
-        if (conSigned) { finishSigning(c, false); return; }   // "I've signed"
         signBtn.disabled = true;
         try {
           const res = await fetch('api/frontdesk_contract_sign.php', {
@@ -623,17 +615,16 @@
             let msg = e.data;
             if (typeof msg === 'string') { try { msg = JSON.parse(msg); } catch (err) { return; } }
             const action = msg && (msg.action || msg.type);
-            if (action === 'document-completed') finishSigning(c, true);
+            if (action === 'document-completed') finishSigning(c);
           };
           window.addEventListener('message', conMsgHandler);
           frame.src = out.signing_url;
           const hint = d.querySelector('.fd-con-hint');
           hint.hidden = false;
-          hint.innerHTML = 'Click the signature field (JD’s saved signature goes in), press Complete, then “I’ve signed”. If the page stays blank, <a href="' + esc(out.signing_url) + '" target="_blank" rel="noopener">open the signing page in a new tab</a>.';
-          d.querySelector('[data-dl]').hidden = true;
-          d.querySelector('[data-notion]').hidden = true;
-          signBtn.innerHTML = '<i class="fa-solid fa-check"></i> I’ve signed';
-          signBtn.disabled = false;
+          hint.innerHTML = 'Click your signature field (your saved signature goes in), then press Complete — this window closes by itself. If the page stays blank, <a href="' + esc(out.signing_url) + '" target="_blank" rel="noopener">open the signing page in a new tab</a>.';
+          d.querySelector('[data-dl]').style.display = 'none';
+          d.querySelector('[data-notion]').style.display = 'none';
+          signBtn.style.display = 'none';
         } catch (err) {
           showToast('Could not start signing. Check your connection.', true);
           signBtn.disabled = false;
