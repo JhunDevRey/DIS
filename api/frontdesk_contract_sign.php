@@ -28,7 +28,20 @@ try {
         if (strcasecmp($c['id'], $id) === 0) { $found = $c; break; }
     }
     if (!$found) jsonResponse(false, 'That contract is no longer on the list — refresh and try again.');
-    if ($found['stage'] !== 'jd' || empty($found['documenso_id'])) jsonResponse(false, 'This contract is not waiting for JD to sign.');
+    if (empty($found['documenso_id'])) jsonResponse(false, 'This contract is not waiting for JD to sign.');
+
+    // POST check=1 ("I've signed", or the signing page reported it's done):
+    // ask Documenso directly instead of waiting for Make to update Notion.
+    if (!empty($_POST['check'])) {
+        $done = $found['stage'] === 'done' || documensoEnvelopeState($found['documenso_id']) === 'completed';
+        if ($done && $found['stage'] !== 'done') {
+            documensoMarkSigned($found['id']);
+            auditLog('contract_signed_jd', $found['client_id'] ?? null, $found['name']);
+        }
+        jsonResponse(true, '', ['completed' => $done]);
+    }
+
+    if ($found['stage'] !== 'jd') jsonResponse(false, 'This contract is not waiting for JD to sign.');
 
     $url = documensoJdSigningUrl($found['documenso_id']);
 } catch (RuntimeException $e) {

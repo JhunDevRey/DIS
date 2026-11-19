@@ -500,9 +500,46 @@
       const d = conDialog; conDialog = null;
       d.classList.remove('open');
       setTimeout(() => d.remove(), 180);
-      // Documenso → Make → Notion takes up to a minute or two after JD signs,
-      // so keep checking (every 10s, up to 3 min) until the contract moves.
+      if (conMsgHandler) { window.removeEventListener('message', conMsgHandler); conMsgHandler = null; }
+      // Closed without a confirmed signature (e.g. signed in a new tab): keep
+      // checking (every 10s, up to 3 min) until the contract moves.
       if (conSigned) { const id = conSigned; conSigned = false; watchSigned(id); }
+    }
+    let conMsgHandler = null;
+    // Ask Documenso (through our server) whether JD's signature is in. If it
+    // is, move the contract to Fully signed straight away — no waiting for
+    // Make → Notion. quiet: called by the signing page itself, so no nagging.
+    let conChecking = false;
+    async function finishSigning(c, quiet) {
+      if (conChecking) return;
+      conChecking = true;
+      const btn = conDialog && conDialog.querySelector('[data-sign]');
+      if (btn) btn.disabled = true;
+      try {
+        const res = await fetch('api/frontdesk_contract_sign.php', {
+          method: 'POST',
+          headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: 'check=1&id=' + encodeURIComponent(c.id),
+        });
+        const out = await res.json();
+        if (out.success && out.completed) {
+          conSigned = false;
+          const mine = (contracts || []).find(x => x.id === c.id);
+          if (mine) { mine.stage = 'done'; mine.can_sign = false; mine.updated_at = new Date().toISOString(); }
+          renderContracts();
+          closeConDialog();
+          showToast('Signed — moved to Fully signed.');
+          return;
+        }
+        if (!quiet) showToast(out.success
+          ? 'Documenso doesn’t have JD’s signature yet. Click the signature field, then press Complete on the signing page.'
+          : (out.message || 'Could not check the signature.'), true);
+      } catch (err) {
+        if (!quiet) showToast('Could not check the signature. Check your connection.', true);
+      } finally {
+        conChecking = false;
+        if (btn) btn.disabled = false;
+      }
     }
     function watchSigned(id) {
       let tries = 0;
@@ -562,7 +599,7 @@
 
       const signBtn = d.querySelector('[data-sign]');
       if (signBtn) signBtn.addEventListener('click', async () => {
-        if (conSigned) { closeConDialog(); return; }   // "I've signed"
+        if (conSigned) { finishSigning(c, false); return; }   // "I've signed"
         signBtn.disabled = true;
         try {
           const res = await fetch('api/frontdesk_contract_sign.php', {
@@ -575,10 +612,24 @@
           conSigned = c.id;
           d.querySelector('.fd-con-sheet').hidden = true;
           d.querySelector('.fd-con-frame').hidden = false;
-          d.querySelector('.fd-con-frame iframe').src = out.signing_url;
+          const frame = d.querySelector('.fd-con-frame iframe');
+          // Documenso's embed signing page tells its parent when the contract
+          // is completed (postMessage {action: 'document-completed'}).
+          let signOrigin = '';
+          try { signOrigin = new URL(out.signing_url).origin; } catch (e) {}
+          if (conMsgHandler) window.removeEventListener('message', conMsgHandler);
+          conMsgHandler = (e) => {
+            if (e.origin !== signOrigin || e.source !== frame.contentWindow) return;
+            let msg = e.data;
+            if (typeof msg === 'string') { try { msg = JSON.parse(msg); } catch (err) { return; } }
+            const action = msg && (msg.action || msg.type);
+            if (action === 'document-completed') finishSigning(c, true);
+          };
+          window.addEventListener('message', conMsgHandler);
+          frame.src = out.signing_url;
           const hint = d.querySelector('.fd-con-hint');
           hint.hidden = false;
-          hint.innerHTML = 'Sign below, then press “I’ve signed”. If the page stays blank, <a href="' + esc(out.signing_url) + '" target="_blank" rel="noopener">open the signing page in a new tab</a>.';
+          hint.innerHTML = 'Click the signature field (JD’s saved signature goes in), press Complete, then “I’ve signed”. If the page stays blank, <a href="' + esc(out.signing_url) + '" target="_blank" rel="noopener">open the signing page in a new tab</a>.';
           d.querySelector('[data-dl]').hidden = true;
           d.querySelector('[data-notion]').hidden = true;
           signBtn.innerHTML = '<i class="fa-solid fa-check"></i> I’ve signed';

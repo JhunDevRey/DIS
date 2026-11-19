@@ -93,6 +93,52 @@ function documensoIsCompleted(array $env): bool
 }
 
 /**
+ * Contracts JD has finished signing in Documenso, by Notion page id. The
+ * Make webhook takes a minute or two to flip Notion, so the Contracts list
+ * shows these as fully signed in the meantime (kept for 30 minutes).
+ */
+define('DOCUMENSO_SIGNED_MEMORY_SECONDS', 1800);
+
+function documensoSignedMarksFile(): string
+{
+    return UPLOAD_DIR . '/cache/documenso_signed.json';
+}
+
+function documensoSignedMarks(): array
+{
+    $file = documensoSignedMarksFile();
+    $marks = is_file($file) ? json_decode((string)file_get_contents($file), true) : [];
+    if (!is_array($marks)) return [];
+    $cut = time() - DOCUMENSO_SIGNED_MEMORY_SECONDS;
+    return array_filter($marks, fn($t) => is_int($t) && $t >= $cut);
+}
+
+function documensoMarkSigned(string $notionId): void
+{
+    $marks = documensoSignedMarks();
+    $marks[strtolower($notionId)] = time();
+    $dir = dirname(documensoSignedMarksFile());
+    if (!is_dir($dir)) @mkdir($dir, 0755, true);
+    @file_put_contents(documensoSignedMarksFile(), json_encode($marks), LOCK_EX);
+}
+
+/**
+ * Where an envelope is now: 'completed' (every signer is done) or 'jd'
+ * (somebody still has to sign).
+ */
+function documensoEnvelopeState(string $envelopeId): string
+{
+    $env = documensoEnvelope($envelopeId);
+    if (documensoIsCompleted($env)) return 'completed';
+    foreach ($env['recipients'] ?? [] as $r) {
+        $role = strtoupper((string)($r['role'] ?? 'SIGNER'));
+        if (($role === 'SIGNER' || $role === 'APPROVER') && strtoupper((string)($r['signingStatus'] ?? '')) !== 'SIGNED') return 'jd';
+    }
+    // Every signer is done; Documenso may still be sealing the PDF.
+    return 'completed';
+}
+
+/**
  * JD's signing page URL for an envelope the client has already signed.
  * Picks the one recipient that still has to sign (matching
  * DOCUMENSO_JD_EMAIL when several do). Throws RuntimeException with a

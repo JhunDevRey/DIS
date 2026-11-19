@@ -29,7 +29,14 @@ try {
 // client-signed contracts once DOCUMENSO_TOKEN is in config.php.
 require_once __DIR__ . '/../includes/documenso.php';
 $canSign = documensoEnabled() && adminIsOwner();
-$out['contracts'] = array_map(function ($c) use ($canSign) {
+// JD just signed in Documenso but Make hasn't flipped Notion yet: show it as signed.
+$signedMarks = documensoSignedMarks();
+$out['contracts'] = array_map(function ($c) use ($canSign, $signedMarks) {
+    $mark = $signedMarks[strtolower($c['id'])] ?? null;
+    if ($mark && $c['stage'] === 'jd') {
+        $c['stage'] = 'done';
+        $c['updated_at'] = gmdate('Y-m-d\TH:i:s\Z', $mark);
+    }
     $c['can_sign'] = $canSign && $c['stage'] === 'jd' && !empty($c['documenso_id']);
     unset($c['documenso_id']);
     return $c;
