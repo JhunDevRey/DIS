@@ -889,7 +889,7 @@
 
     renderPq();
     loadPq();
-    setInterval(() => { if (!document.hidden) loadPq(); }, PQ_POLL_MS);
+    // No auto-polling: every poll cost ~32-66 Cognito API requests. Refresh button only.
   }
 
 })();

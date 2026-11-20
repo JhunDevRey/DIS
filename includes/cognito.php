@@ -25,7 +25,7 @@
 require_once __DIR__ . '/db.php'; // loads config.php
 require_once __DIR__ . '/functions.php';
 
-define('COGNITO_CACHE_SECONDS', 60);   // answer from the state file if it is this fresh
+define('COGNITO_CACHE_SECONDS', 1800); // page loads answer from the state file if it is this fresh (Refresh button skips it)
 define('COGNITO_DAYS', 60);            // older entries are left to Cognito
 define('COGNITO_PARALLEL', 4);         // simultaneous requests
 define('COGNITO_REQ_PER_MIN', 90);     // our own cap on API requests per rolling minute
