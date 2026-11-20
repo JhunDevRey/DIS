@@ -486,10 +486,22 @@ function cognitoPqEntries(bool $fresh = false): array
  * PDF without sending our API key to the document link. Returns
  * ['name' => person name, 'pdf' => bytes]. Throws RuntimeException with a
  * message that is safe to show staff.
+ *
+ * $storedRow = the entry JSON we already have (pq_entries.raw_json): its
+ * Document link is tried first, so a download normally costs no API call;
+ * only if that fails is the entry fetched fresh (1 API call).
  */
-function cognitoEntryPdf(string $form, int $number): array
+function cognitoEntryPdf(string $form, int $number, ?array $storedRow = null): array
 {
     if (!in_array($form, cognitoForms(), true) || $number < 1) throw new RuntimeException('Unknown PQ form entry.');
+
+    if ($storedRow !== null) {
+        try {
+            return cognitoPdfFromRow($storedRow);
+        } catch (RuntimeException $e) {
+            // Link missing or expired: fall through to a fresh copy of the entry.
+        }
+    }
 
     $ch = cognitoCurl('forms/' . rawurlencode($form) . '/entries/' . $number);
     $raw = curl_exec($ch);
@@ -501,7 +513,12 @@ function cognitoEntryPdf(string $form, int $number): array
         error_log('cognitoEntryPdf: entry http ' . $code);
         throw new RuntimeException('Could not reach Cognito Forms right now.');
     }
+    return cognitoPdfFromRow($row);
+}
 
+/** Download the PDF behind an entry's Document link (no API key sent). */
+function cognitoPdfFromRow(array $row): array
+{
     $entry = cognitoEntryForJson($row);
     if (!$entry || $entry['stage'] !== 'submitted') throw new RuntimeException('This PQ has not been submitted yet, so there is no PDF.');
 

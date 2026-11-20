@@ -157,7 +157,10 @@ $comingWindows = [];
           <ul class="fd-list" id="fdPqList"><li class="fd-empty">Loading PQ forms…</li></ul>
           <footer>
             <a href="<?= h(cognitoEntriesUrl()) ?>" target="_blank" rel="noopener">Open in Cognito →</a>
-            <button type="button" class="btn btn-ghost btn-sm" id="fdPqRefresh"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+            <span style="display:flex;gap:6px;">
+              <button type="button" class="btn btn-ghost btn-sm" id="fdPqResync" style="display:none;" title="Owners only, at most once an hour: re-check Waiting entries with Cognito (uses API requests)"><i class="fa-solid fa-cloud-arrow-down"></i> Resync</button>
+              <button type="button" class="btn btn-ghost btn-sm" id="fdPqRefresh" title="Reload the list (no Cognito requests)"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+            </span>
           </footer>
         <?php else: ?>
           <div class="fd-soon-body">

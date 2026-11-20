@@ -155,6 +155,14 @@ define('CALENDLY_TOKEN', '');
 // (the part of its entries link after cognitoforms.com/).
 define('COGNITO_API_KEY', '');
 define('COGNITO_PQ_FORM', '');
+// Secret for api/cognito_pq_webhook.php (Cognito "Post JSON Data" + Make
+// PQ BOT). 32+ random characters; generate with
+//   php -r 'echo bin2hex(random_bytes(24)), "\n";'
+// The Front Desk card reads only the pq_entries table (filled by that
+// webhook); it no longer calls the Cognito API on page load.
+define('COGNITO_WEBHOOK_TOKEN', '');
+// Rollback switch: true = the old live-API card (polls Cognito, costs requests).
+// define('COGNITO_PQ_LIVE_API', true);
 
 // ---- WhatsApp (via 360dialog, Coexistence with the office WhatsApp Business app) ----
 // Leave WA_API_KEY empty to keep WhatsApp switched off — the Inbox then

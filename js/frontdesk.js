@@ -725,13 +725,14 @@
   }
 
   // ---- PQ Forms window ----
-  // Entries on the Cognito Forms PQ form (via api/frontdesk_pq.php, cached
-  // ~60s): Waiting = not submitted yet (oldest first, so the longest wait is
+  // PQ entries from our own table pq_entries (api/frontdesk_pq.php; filled by
+  // the Cognito/Make webhook, never fetched from Cognito on page load).
+  // Waiting = not submitted yet (oldest first, so the longest wait is
   // chased first), Submitted = in the last 14 days (newest first).
   const pqWin = document.getElementById('fdPq');
   if (pqWin && pqWin.dataset.enabled === '1') {
     const PQ_KEY = 'duqueFrontDeskPq';
-    const PQ_POLL_MS = 120000;
+    const PQ_POLL_MS = 60000;   // MySQL only (pq_entries) — no Cognito requests
     const PQ_ROWS = 5;
     const PQ_DONE_DAYS = 14;
     const PQ_CHASE_DAYS = 3;    // waiting this long gets a "Follow up" tag
@@ -744,6 +745,8 @@
     let pqQuery = '';
     let pqEntries = null;
     let pqPartialTries = 0;
+    let pqTimer = null;
+    const pqResync = document.getElementById('fdPqResync');
     try {
       const saved = JSON.parse(localStorage.getItem(PQ_KEY) || '{}');
       if (PQ_STAGES.includes(saved.stage)) pqStage = saved.stage;
@@ -816,6 +819,11 @@
         }
         pqEntries = out.entries || [];
         renderPq();
+        pqResync.style.display = out.can_resync ? '' : 'none';
+        if (out.last_resync) pqResync.title = `Owners only, at most once an hour. Last resync ${new Date(out.last_resync.at).toLocaleString()} (${out.last_resync.api_calls} Cognito requests).`;
+        // Reading our own database is free, so keep the list current every
+        // minute (never in the old live-Cognito mode: that costs API requests).
+        if (out.source === 'db' && !pqTimer) pqTimer = setInterval(() => { if (!document.hidden) loadPq(); }, PQ_POLL_MS);
         // First load of a big backlog is finished over a few quick refreshes.
         if (out.partial && pqPartialTries < 30) { pqPartialTries++; setTimeout(() => loadPq(), Math.max(3, out.wait || 3) * 1000); }
         else if (!out.partial) pqPartialTries = 0;
@@ -886,10 +894,29 @@
       await loadPq(true);
       pqRefresh.disabled = false;
     });
+    // Owners: ask the server to re-check Waiting entries with Cognito (rate-limited there).
+    pqResync.addEventListener('click', async () => {
+      pqResync.disabled = true;
+      const label = pqResync.innerHTML;
+      pqResync.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resyncing…';
+      try {
+        const fd = new FormData();
+        fd.append('action', 'resync');
+        const res = await fetch('api/frontdesk_pq.php', { method: 'POST', body: fd });
+        const out = await res.json();
+        showToast(out.message || (out.success ? 'Resynced.' : 'Resync failed.'), !out.success);
+        if (out.success) await loadPq();
+      } catch (e) {
+        showToast('Resync failed. Check your connection.', true);
+      } finally {
+        pqResync.innerHTML = label;
+        pqResync.disabled = false;
+      }
+    });
 
     renderPq();
     loadPq();
-    // No auto-polling: every poll cost ~32-66 Cognito API requests. Refresh button only.
+    // Auto-reload starts in loadPq() only when the server reads from MySQL.
   }
 
 })();
