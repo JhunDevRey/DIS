@@ -11,7 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $clientId     = (int)($_POST['client_id'] ?? 0);
 $docName      = trim($_POST['doc_name'] ?? '');
-$instructions = trim($_POST['instructions'] ?? '');
+$instructions = cleanMultilineText($_POST['instructions'] ?? '');
 $isRequired   = isset($_POST['is_required']) ? 1 : 0;
 
 if ($clientId <= 0 || $docName === '') {

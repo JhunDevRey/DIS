@@ -453,14 +453,15 @@ function serializeLiveEditorContent(root) {
     if (node.classList && node.classList.contains('live-link')) {
       const text = node.dataset.text || node.textContent;
       const url = node.dataset.url || '';
-      result += url ? `[${text}](${url})` : text;
+      // A link whose label is just its own URL is stored as the bare URL.
+      result += !url ? text : (text === url ? url : `[${text}](${url})`);
       return; // don't descend into the span's own <a>/<button> children
     }
     if (node.tagName === 'BR') {
       result += '\n';
       return;
     }
-    const isBlock = node.tagName === 'DIV' || node.tagName === 'P';
+    const isBlock = /^(DIV|P|LI|UL|OL|H[1-6]|TR|BLOCKQUOTE|PRE)$/.test(node.tagName);
     if (isBlock && result && !result.endsWith('\n')) {
       result += '\n';
     }
@@ -468,7 +469,8 @@ function serializeLiveEditorContent(root) {
   }
 
   root.childNodes.forEach(walk);
-  return result.replace(/\n+$/, '');
+  // Browsers sometimes type indentation as non-breaking spaces; store plain ones.
+  return result.replace(/ /g, ' ').replace(/\n+$/, '');
 }
 
 function syncLiveEditorToTextarea(editorEl) {
@@ -523,6 +525,172 @@ function scanAndLinkifyPlainUrls(editor) {
   return changed;
 }
 
+// Fills an editor from the stored format: "[text](url)" becomes a live
+// link chip, everything else (line breaks, indentation, bullets) stays
+// plain text — the editor is white-space: pre-wrap.
+function fillLiveEditor(editor, value) {
+  editor.textContent = '';
+  const re = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
+  let last = 0, m;
+  while ((m = re.exec(value)) !== null) {
+    if (m.index > last) editor.appendChild(document.createTextNode(value.slice(last, m.index)));
+    editor.appendChild(buildLiveLinkSpan(m[1], m[2]));
+    last = m.index + m[0].length;
+  }
+  if (last < value.length) editor.appendChild(document.createTextNode(value.slice(last)));
+  scanAndLinkifyPlainUrls(editor);
+}
+
+// Replaces the content of a textarea already upgraded by
+// initLiveLinkEditor() (e.g. when the "Edit field" dialog is reused).
+function setLiveEditorValue(textarea, value) {
+  textarea.value = value || '';
+  const editor = textarea.nextElementSibling;
+  if (editor && editor.classList.contains('live-link-editor')) {
+    fillLiveEditor(editor, textarea.value);
+    syncLiveEditorToTextarea(editor);
+  }
+}
+
+function insertPlainTextAtCursor(editor, text) {
+  editor.focus();
+  // execCommand keeps the browser's undo history; manual insert otherwise.
+  try {
+    if (document.execCommand('insertText', false, text)) return;
+  } catch (e) { /* fall through */ }
+  const sel = window.getSelection();
+  if (!sel.rangeCount || !editor.contains(sel.anchorNode)) {
+    editor.appendChild(document.createTextNode(text));
+    return;
+  }
+  const range = sel.getRangeAt(0);
+  range.deleteContents();
+  const node = document.createTextNode(text);
+  range.insertNode(node);
+  range.setStartAfter(node);
+  range.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+function normalizePastedText(text) {
+  return String(text)
+    .replace(/\r\n?/g, '\n')
+    .replace(/\t/g, '    ')
+    .replace(/ /g, ' ')
+    .replace(/[ ]+$/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/^\n+|\n+$/g, '');
+}
+
+// Turns pasted HTML (Word, Google Docs, Outlook/Gmail, web pages) into
+// plain text that still LOOKS like the original: list items get "• " or
+// "1. " markers, nested lists and indented paragraphs get 4 spaces per
+// level, paragraphs and <br> become line breaks. DOMParser never runs
+// scripts or loads images from the pasted markup.
+function clipboardHtmlToText(html) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const lines = [];
+  let cur = '';
+  const BULLETS = ['•', '◦', '▪'];
+  const INDENT = '    ';
+
+  // `prefix` = how much of `cur` is just indent + bullet marker, so a
+  // <p> inside an <li> (Google Docs) stays on the bullet's line.
+  let prefix = 0;
+  function newline() { lines.push(cur); cur = ''; prefix = 0; }
+  function ensureLineStart() {
+    if (cur.length > prefix && cur.trim() !== '') newline();
+    else if (!prefix) cur = '';
+  }
+  function setPrefix(p) { cur = p; prefix = p.length; }
+
+  function indentFromStyle(style) {
+    const m = style.match(/margin-left\s*:\s*([\d.]+)\s*(pt|px|in|cm)/);
+    if (!m) return 0;
+    const v = parseFloat(m[1]);
+    const pt = { pt: v, px: v * 0.75, in: v * 72, cm: v * 28.35 }[m[2]];
+    return Math.max(0, Math.round(pt / 36));
+  }
+
+  function walk(node, ctx) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      let t = node.textContent;
+      if (!ctx.pre) {
+        t = t.replace(/[\s ]+/g, ' ');
+        if (cur.length === prefix || cur.trim() === '') t = t.replace(/^ +/, '');
+      }
+      cur += t;
+      return;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+    const tag = node.tagName;
+    const style = (node.getAttribute('style') || '').toLowerCase();
+    if (/^(SCRIPT|STYLE|HEAD|TITLE|META|LINK|TEMPLATE)$/.test(tag) || /display\s*:\s*none/.test(style)) return;
+    // Word's own fake bullet/number ("·", "1.") — we write our own marker.
+    if (/mso-list\s*:\s*ignore/.test(style)) return;
+
+    if (tag === 'BR') { newline(); return; }
+
+    if (tag === 'UL' || tag === 'OL') {
+      const sub = { ...ctx, depth: ctx.depth + 1, ordered: tag === 'OL', n: parseInt(node.getAttribute('start') || '1', 10) || 1 };
+      node.childNodes.forEach(c => walk(c, sub));
+      ensureLineStart();
+      return;
+    }
+    if (tag === 'LI') {
+      ensureLineStart();
+      const d = Math.max(0, ctx.depth - 1);
+      setPrefix(INDENT.repeat(d) + (ctx.ordered ? (ctx.n++) + '. ' : BULLETS[d % BULLETS.length] + ' '));
+      node.childNodes.forEach(c => walk(c, ctx));
+      ensureLineStart();
+      if (prefix && cur.length === prefix) { cur = ''; prefix = 0; } // empty <li>
+      return;
+    }
+
+    if (/^(P|DIV|H[1-6]|TR|BLOCKQUOTE|PRE|TABLE|SECTION|ARTICLE|HEADER|FOOTER|DL|DT|DD|FIGURE)$/.test(tag)) {
+      ensureLineStart();
+      // Word list paragraph: <p style="mso-list:l0 level2 lfo1">
+      const wl = style.match(/mso-list\s*:\s*l\d+\s+level(\d+)/);
+      if (prefix) {
+        // Paragraph inside a list item: keep writing after its bullet.
+      } else if (wl) {
+        const d = Math.max(0, parseInt(wl[1], 10) - 1);
+        const ignore = node.querySelector('[style*="mso-list"]');
+        let marker = ignore ? ignore.textContent.replace(/[\s ]+/g, '') : '';
+        if (!/^(\d+|[a-z]{1,4})[.)]$/i.test(marker)) marker = BULLETS[d % BULLETS.length];
+        setPrefix(INDENT.repeat(d) + marker + ' ');
+      } else {
+        const lvl = indentFromStyle(style) || (tag === 'BLOCKQUOTE' ? 1 : 0);
+        if (lvl) setPrefix(INDENT.repeat(lvl));
+      }
+      const sub = (tag === 'PRE' || /white-space\s*:\s*pre/.test(style)) ? { ...ctx, pre: true } : ctx;
+      node.childNodes.forEach(c => walk(c, sub));
+      ensureLineStart();
+      if (prefix && cur.length === prefix) { cur = ''; prefix = 0; }
+      return;
+    }
+    if (tag === 'TD' || tag === 'TH') {
+      if (cur.trim() !== '') cur += '    ';
+      node.childNodes.forEach(c => walk(c, ctx));
+      return;
+    }
+    if (tag === 'A') {
+      const href = node.getAttribute('href') || '';
+      const label = node.textContent.replace(/[\s ]+/g, ' ').trim();
+      if (/^https?:\/\//i.test(href) && label) {
+        cur += (label === href || label === href.replace(/\/$/, '')) ? href : `[${label.replace(/[\[\]]/g, '')}](${href})`;
+        return;
+      }
+    }
+    node.childNodes.forEach(c => walk(c, ctx));
+  }
+
+  walk(doc.body, { depth: 0, ordered: false, n: 1, pre: false });
+  if (cur !== '') lines.push(cur);
+  return lines.map(l => l.replace(/ +$/, '')).join('\n');
+}
+
 function initLiveLinkEditor(textarea) {
   if (!textarea || textarea.dataset.liveLinkInit === '1') return;
   textarea.dataset.liveLinkInit = '1';
@@ -531,7 +699,7 @@ function initLiveLinkEditor(textarea) {
   editor.className = 'live-link-editor';
   editor.contentEditable = 'true';
   editor.setAttribute('data-placeholder', textarea.placeholder || '');
-  if (textarea.value) editor.textContent = textarea.value;
+  if (textarea.value) fillLiveEditor(editor, textarea.value);
 
   textarea.style.display = 'none';
   textarea.after(editor);
@@ -550,9 +718,33 @@ function initLiveLinkEditor(textarea) {
   editor.addEventListener('input', () => syncLiveEditorToTextarea(editor));
 
   editor.addEventListener('paste', (e) => {
-    const pasted = (e.clipboardData || window.clipboardData).getData('text');
+    const clip = e.clipboardData || window.clipboardData;
+    const pasted = clip.getData('text');
     const url = extractPastedUrl(pasted);
-    if (!url) return; // not a bare URL — let the normal paste happen as plain text
+    if (!url) {
+      // Not a bare URL — paste as text but KEEP the layout: bullets,
+      // numbering, indentation and line breaks from Word / Google Docs /
+      // email become plain characters ("• ", "1. ", spaces) instead of
+      // being dropped by the browser's rich-text paste.
+      e.preventDefault();
+      const html = clip.getData('text/html');
+      let text = html ? clipboardHtmlToText(html) : '';
+      if (!text.trim()) text = pasted;
+      text = normalizePastedText(text);
+      insertPlainTextAtCursor(editor, text);
+      syncLiveEditorToTextarea(editor);
+      if (/\[[^\]]+\]\(https?:\/\//.test(text)) {
+        // Show pasted links as link chips straight away (cursor goes to the end).
+        fillLiveEditor(editor, editor.previousElementSibling.value);
+        syncLiveEditorToTextarea(editor);
+        const end = document.createRange();
+        end.selectNodeContents(editor);
+        end.collapse(false);
+        window.getSelection().removeAllRanges();
+        window.getSelection().addRange(end);
+      }
+      return;
+    }
 
     e.preventDefault();
     const span = buildLiveLinkSpan(url, url);
@@ -567,6 +759,32 @@ function initLiveLinkEditor(textarea) {
       sel.addRange(range);
     } else {
       editor.appendChild(span);
+    }
+    syncLiveEditorToTextarea(editor);
+  });
+
+  // Tab indents (4 spaces) instead of jumping to the next field;
+  // Shift+Tab removes up to 4 spaces at the start of the current line.
+  editor.addEventListener('keydown', (e) => {
+    if (e.key !== 'Tab' || e.ctrlKey || e.altKey || e.metaKey) return;
+    e.preventDefault();
+    if (!e.shiftKey) {
+      insertPlainTextAtCursor(editor, '    ');
+    } else {
+      const sel = window.getSelection();
+      if (!sel.rangeCount) return;
+      const r = sel.getRangeAt(0);
+      const node = r.startContainer;
+      if (node.nodeType !== Node.TEXT_NODE) return;
+      const offset = r.startOffset;
+      const lineStart = node.textContent.slice(0, offset).lastIndexOf('\n') + 1;
+      const lead = node.textContent.slice(lineStart).match(/^ {1,4}/);
+      if (!lead) return;
+      node.textContent = node.textContent.slice(0, lineStart) + node.textContent.slice(lineStart + lead[0].length);
+      r.setStart(node, Math.max(lineStart, offset - lead[0].length));
+      r.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(r);
     }
     syncLiveEditorToTextarea(editor);
   });

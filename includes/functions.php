@@ -140,6 +140,19 @@ function h(?string $value): string
 }
 
 /**
+ * Tidies a multi-line free-text field (document instructions) WITHOUT
+ * losing its formatting: CRLF -> LF, blank lines at the very start and
+ * trailing whitespace at the end removed, but leading spaces on the first
+ * line (indentation) and bullet characters kept exactly as typed/pasted.
+ */
+function cleanMultilineText(?string $text): string
+{
+    $text = str_replace(["\r\n", "\r"], "\n", (string)$text);
+    $text = preg_replace('/^(?:[ \t]*\n)+/', '', $text);
+    return rtrim($text);
+}
+
+/**
  * Renders text safely, with links shown as real clickable elements
  * instead of dead text — e.g. a client pasting a link to a document
  * scan hosted elsewhere, or staff sharing a reference link. Used for
@@ -176,7 +189,15 @@ function h(?string $value): string
  */
 function linkifyText(string $text, string $editType = '', ?int $editId = null): string
 {
-    $escaped = h($text);
+    $escaped = h(str_replace(["\r\n", "\r"], "\n", $text));
+
+    // Keep indentation: HTML collapses leading spaces/tabs, so turn the
+    // whitespace at the start of each line into non-breaking spaces
+    // (a tab counts as 4). Done before linking — a link never starts a
+    // line with whitespace, so no URL is touched.
+    $escaped = preg_replace_callback('/^[ \t]+/m', function (array $m): string {
+        return str_repeat('&nbsp;', strlen(str_replace("\t", '    ', $m[0])));
+    }, $escaped);
 
     $pattern = '/\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)|(https?:\/\/[^\s<]+)/i';
 

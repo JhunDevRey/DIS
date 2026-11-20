@@ -11,7 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $clientId     = (int)($_POST['client_id'] ?? 0);
 $docName      = trim($_POST['doc_name'] ?? '');
-$instructions = trim($_POST['instructions'] ?? '');
+$instructions = cleanMultilineText($_POST['instructions'] ?? '');
 
 if ($clientId <= 0 || $docName === '') {
     jsonResponse(false, 'A document name is required.');

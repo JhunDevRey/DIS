@@ -113,7 +113,7 @@ $recentComments = $stmt->fetchAll();
                     <td class="cell-wrap">
                       <div style="font-weight:600;color:var(--ink);"><?= h($r['doc_name']) ?></div>
                       <?php if ($r['instructions']): ?>
-                        <div style="font-size:12.5px;color:var(--text-muted);"><?= h($r['instructions']) ?></div>
+                        <div style="font-size:12.5px;color:var(--text-muted);"><?= linkifyText($r['instructions']) ?></div>
                       <?php endif; ?>
                     </td>
                     <td style="text-align:right;"><span class="pill <?= $meta['class'] ?>"><?= h($meta['label']) ?></span></td>

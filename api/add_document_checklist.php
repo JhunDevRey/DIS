@@ -74,7 +74,7 @@ foreach ($items as $index => $item) {
 
     $clean[] = [
         'doc_name' => $docName,
-        'instructions' => trim((string)($item['instructions'] ?? '')) ?: null,
+        'instructions' => cleanMultilineText((string)($item['instructions'] ?? '')) ?: null,
         'is_required' => !empty($item['is_required']) ? 1 : 0,
         'file' => $hasFile ? $file : null,
     ];

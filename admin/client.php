@@ -203,6 +203,7 @@ function renderAdminDocItem(array $r, int $displayNumber, array $filesByRequest,
               <i class="fa-solid fa-upload"></i> <span class="label-text sr-only"><?= $r['is_review'] ? 'Upload corrected version' : 'Upload for client' ?></span>
               <input type="file" class="admin-upload-input" data-request-id="<?= (int)$r['id'] ?>" multiple style="display:none;">
             </label>
+            <button type="button" class="btn btn-ghost btn-sm icon-btn-tooltip" data-edit-request="<?= (int)$r['id'] ?>" data-doc-name="<?= h($r['doc_name']) ?>" data-instructions="<?= h($r['instructions'] ?? '') ?>" data-required="<?= (int)$r['is_required'] ?>" data-review="<?= (int)$r['is_review'] ?>" title="Edit field" aria-label="Edit field"><i class="fa-solid fa-pen"></i></button>
             <button class="btn btn-danger btn-sm icon-btn-tooltip" data-delete-request="<?= (int)$r['id'] ?>" data-doc-name="<?= h($r['doc_name']) ?>" title="Remove field" aria-label="Remove field"><i class="fa-regular fa-trash-can"></i></button>
           </div>
         </div>
@@ -350,6 +351,36 @@ function renderAdminDocItem(array $r, int $displayNumber, array $filesByRequest,
       <div class="modal-actions">
         <button type="button" class="btn btn-ghost" onclick="closeModal('modalRemoveField')">Cancel</button>
         <button type="submit" class="btn btn-danger-solid">Remove and notify client</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modalEditField">
+  <div class="modal">
+    <h3>Edit document field<button type="button" class="modal-close-btn" onclick="closeModal('modalEditField')" aria-label="Close"><i class="fa-solid fa-xmark"></i></button></h3>
+    <form id="formEditField">
+      <input type="hidden" name="request_id" id="editFieldId">
+      <div class="modal-body">
+        <div class="field">
+          <label>Document name</label>
+          <input type="text" name="doc_name" id="editFieldName" required maxlength="255">
+        </div>
+        <div class="field">
+          <label>Instructions for the client</label>
+          <textarea name="instructions" id="editFieldInstructions" placeholder="Optional notes for the client" data-live-links></textarea>
+          <p class="help-text">Line breaks, indentation (Tab) and bullet points are kept as you see them here.</p>
+        </div>
+        <div class="checkbox-row" id="editFieldRequiredRow" style="margin-bottom:16px;">
+          <input type="checkbox" id="editFieldRequired" name="is_required" value="1">
+          <label for="editFieldRequired" style="margin:0;text-transform:none;font-weight:500;color:var(--text);">Required document</label>
+        </div>
+        <p class="help-text" style="margin-top:0;">Uploaded files, comments and status stay as they are. If the name or instructions change, the client is told in their next daily update.</p>
+        <p class="error-text" id="editFieldError" style="display:none;"></p>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modalEditField')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save changes</button>
       </div>
     </form>
   </div>
@@ -867,7 +898,7 @@ document.getElementById('btnSendChecklist').addEventListener('click', async func
     if (!name) return;
     const i = itemCount++;
     fd.append(`items[${i}][doc_name]`, name);
-    fd.append(`items[${i}][instructions]`, row.querySelector('.ci-instructions').value.trim());
+    fd.append(`items[${i}][instructions]`, row.querySelector('.ci-instructions').value);
     fd.append(`items[${i}][is_required]`, row.querySelector('.ci-required').checked ? '1' : '0');
     const attachInput = row.querySelector('.ci-attachment');
     if (attachInput.files.length) {
@@ -1282,6 +1313,46 @@ document.querySelectorAll('.admin-upload-input').forEach(input => {
 
     input.value = '';
   });
+});
+
+// Edit document request field (name, instructions, required)
+document.querySelectorAll('[data-edit-request]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.getElementById('editFieldId').value = btn.dataset.editRequest;
+    document.getElementById('editFieldName').value = btn.dataset.docName || '';
+    setLiveEditorValue(document.getElementById('editFieldInstructions'), btn.dataset.instructions || '');
+    document.getElementById('editFieldRequired').checked = btn.dataset.required === '1';
+    // Application Review fields have no required/optional choice.
+    document.getElementById('editFieldRequiredRow').style.display = btn.dataset.review === '1' ? 'none' : '';
+    document.getElementById('editFieldError').style.display = 'none';
+    openModal('modalEditField');
+    document.getElementById('editFieldName').focus();
+  });
+});
+
+document.getElementById('formEditField').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const errEl = document.getElementById('editFieldError');
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  errEl.style.display = 'none';
+  submitBtn.disabled = true;
+  try {
+    const res = await fetch('api/update_document_request.php', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (data.success) {
+      if (data.changed === false) { closeModal('modalEditField'); return; }
+      location.reload();
+    } else {
+      errEl.textContent = data.message || 'Could not save changes.';
+      errEl.style.display = 'block';
+    }
+  } catch (err) {
+    errEl.textContent = 'Network error. Please try again.';
+    errEl.style.display = 'block';
+  } finally {
+    submitBtn.disabled = false;
+  }
 });
 
 // Delete document request field
